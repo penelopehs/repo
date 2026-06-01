@@ -1,0 +1,880 @@
+"""Lead-centric CRM API.
+
+A `clients` row is a permanent account; each pipeline run is a `crm_leads`
+row carrying `pipeline_status`. The "New Leads" list is leads in a
+pre-signature status. This router consolidates the pipeline, the client overview
+aggregate, follow-up calls, engagements (+ yearly billing) and saved calculations
+into a focused surface — no per-model CRUD.
+"""
+
+from datetime import date, datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+from app.auth import verify_token
+from app.database import get_db
+from app.models import LEAD_STATUSES, PipelineStatus
+
+router = APIRouter(tags=["leads"], dependencies=[Depends(verify_token)])
+
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+def _caller(db: Session, claims: dict) -> models.User:
+    """Resolve the authenticated user to a users row (same contract as the old
+    leads.create flow). 403 if no profile exists yet."""
+    oid = claims.get("oid")
+    user = db.query(models.User).filter(models.User.azure_ad_user_id == oid).first()
+    if not user:
+        raise HTTPException(
+            status_code=403,
+            detail="User profile not found. Call GET /users/me first to provision it.",
+        )
+    return user
+
+
+def _default_client_status_id(db: Session) -> int:
+    """clients.client_status_idclient_status is a NOT-NULL FK. Reuse the first
+    active status (lowest sort_order) or create a default 'Active' one if the
+    reference table is empty."""
+    row = (
+        db.query(models.ClientStatusRef)
+        .filter(models.ClientStatusRef.is_active.is_(True))
+        .order_by(models.ClientStatusRef.sort_order.asc())
+        .first()
+    )
+    if row:
+        return row.idclient_status
+    row = models.ClientStatusRef(status_name="Active", is_active=True, sort_order=1)
+    db.add(row)
+    db.flush()
+    return row.idclient_status
+
+
+def _get_or_create_engagement_type(db: Session, name: str) -> int:
+    row = (
+        db.query(models.EngagementTypeRef)
+        .filter(models.EngagementTypeRef.engagement_type_name == name)
+        .first()
+    )
+    if not row:
+        row = models.EngagementTypeRef(engagement_type_name=name)
+        db.add(row)
+        db.flush()
+    return row.idengagement_types
+
+
+def _get_or_create_engagement_status(db: Session, name: str) -> int:
+    row = (
+        db.query(models.EngagementStatusRef)
+        .filter(models.EngagementStatusRef.status_name == name)
+        .first()
+    )
+    if not row:
+        row = models.EngagementStatusRef(status_name=name)
+        db.add(row)
+        db.flush()
+    return row.idengagement_status
+
+
+def _get_lead(db: Session, lead_id: int) -> models.CrmLead:
+    lead = (
+        db.query(models.CrmLead)
+        .filter(models.CrmLead.idcrm_lead == lead_id)
+        .first()
+    )
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return lead
+
+
+def _latest_calc_total(db: Session, lead_id: int) -> Optional[float]:
+    calc = (
+        db.query(models.CrmCalculation)
+        .filter(models.CrmCalculation.crm_leads_id == lead_id)
+        .order_by(models.CrmCalculation.created_at.desc())
+        .first()
+    )
+    if calc and calc.total_bill is not None:
+        return float(calc.total_bill)
+    return None
+
+
+def _client_type(db: Session, client_id: Optional[int]) -> str:
+    if not client_id:
+        return "New"
+    count = (
+        db.query(func.count(models.CrmLead.idcrm_lead))
+        .filter(models.CrmLead.clients_idclients == client_id)
+        .scalar()
+    )
+    return "Returning" if (count or 0) > 1 else "New"
+
+
+def _people_contact_info(db: Session, client_id: int):
+    """Primary contact (company/email/phone) for a client, walking
+    client → entities → entity_people_roles → people. Returns a
+    (company, email, phone) tuple, or None when the client has no people.
+
+    'company' is taken from the contact's firm; the primary email/phone win
+    (is_primary, else first seen). The chosen contact is the lowest-id person
+    that has an email, else the lowest-id person overall."""
+    entity_ids = [
+        e.entity_id
+        for e in db.query(models.Entity)
+        .filter(models.Entity.clients_idclients == client_id)
+        .all()
+    ]
+    if not entity_ids:
+        return None
+    links = (
+        db.query(models.EntityPeopleRole)
+        .filter(models.EntityPeopleRole.entities_entity_id.in_(entity_ids))
+        .all()
+    )
+    person_ids = {l.people_idperson for l in links}
+    if not person_ids:
+        return None
+    people = {
+        p.idperson: p
+        for p in db.query(models.Person).filter(models.Person.idperson.in_(person_ids)).all()
+    }
+    if not people:
+        return None
+    emails = _primary_map(
+        db.query(models.PeopleEmail)
+        .filter(models.PeopleEmail.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.people_idperson,
+        lambda r: r.email,
+    )
+    phones = _primary_map(
+        db.query(models.PeoplePhone)
+        .filter(models.PeoplePhone.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.people_idperson,
+        lambda r: r.phone,
+    )
+    chosen = next((pid for pid in sorted(people) if pid in emails), min(people))
+    p = people[chosen]
+    return (p.firm, emails.get(chosen), phones.get(chosen))
+
+
+def _lead_profile_for(db: Session, lead: models.CrmLead) -> Optional[models.CrmLeadProfile]:
+    """The lead's profile: the lead-linked one if present, else the
+    one keyed by its client."""
+    profile = (
+        db.query(models.CrmLeadProfile)
+        .filter(models.CrmLeadProfile.crm_leads_id == lead.idcrm_lead)
+        .first()
+    )
+    if not profile and lead.clients_idclients:
+        profile = (
+            db.query(models.CrmLeadProfile)
+            .filter(models.CrmLeadProfile.clients_idclients == lead.clients_idclients)
+            .first()
+        )
+    return profile
+
+
+def _resolve_contact(db: Session, lead: models.CrmLead, profile):
+    """company/email/phone for a lead (my_update.md): from the client's
+    people when it has a client, otherwise from its lead profile. Falls back to
+    the lead profile when a client has no people yet."""
+    if lead.clients_idclients:
+        info = _people_contact_info(db, lead.clients_idclients)
+        if info and any(info):
+            return info
+    return (
+        profile.company if profile else None,
+        profile.email if profile else None,
+        profile.phone if profile else None,
+    )
+
+
+# ── Pipeline list ────────────────────────────────────────────────────────────
+
+@router.get("/leads", response_model=List[schemas.LeadListItem])
+def list_leads(
+    db: Session = Depends(get_db),
+    status: Optional[str] = Query(
+        None,
+        description="Comma-separated pipeline statuses, e.g. 'Lead,Calculation Sent' "
+        "for the New Leads table.",
+    ),
+):
+    q = db.query(models.CrmLead).order_by(models.CrmLead.created_at.desc())
+    if status:
+        wanted = [s.strip() for s in status.split(",") if s.strip()]
+        q = q.filter(models.CrmLead.pipeline_status.in_(wanted))
+    leads = q.all()
+
+    client_ids = {o.clients_idclients for o in leads if o.clients_idclients}
+    lead_ids = [o.idcrm_lead for o in leads]
+    clients = {
+        c.idclients: c
+        for c in db.query(models.Client).filter(models.Client.idclients.in_(client_ids)).all()
+    } if client_ids else {}
+    # Lead profiles for clientless leads are keyed by lead; client-backed
+    # leads fall back to the client-keyed profile (see _resolve_contact).
+    profiles_by_client = {
+        p.clients_idclients: p
+        for p in db.query(models.CrmLeadProfile)
+        .filter(models.CrmLeadProfile.clients_idclients.in_(client_ids))
+        .all()
+    } if client_ids else {}
+    profiles_by_lead = {
+        p.crm_leads_id: p
+        for p in db.query(models.CrmLeadProfile)
+        .filter(models.CrmLeadProfile.crm_leads_id.in_(lead_ids))
+        .all()
+    } if lead_ids else {}
+    # total lead count per client (across ALL statuses) -> New/Returning
+    counts = dict(
+        db.query(models.CrmLead.clients_idclients, func.count())
+        .filter(models.CrmLead.clients_idclients.in_(client_ids))
+        .group_by(models.CrmLead.clients_idclients)
+        .all()
+    ) if client_ids else {}
+    rep_ids = {o.salesperson_iduser for o in leads if o.salesperson_iduser}
+    reps = {
+        u.iduser: f"{u.first_name} {u.last_name}".strip()
+        for u in db.query(models.User).filter(models.User.iduser.in_(rep_ids)).all()
+    } if rep_ids else {}
+    people_company: dict = {}  # client_id -> company, computed lazily once per client
+
+    def _company(o: models.CrmLead) -> Optional[str]:
+        if o.clients_idclients:
+            if o.clients_idclients not in people_company:
+                info = _people_contact_info(db, o.clients_idclients)
+                people_company[o.clients_idclients] = info[0] if info and info[0] else None
+            if people_company[o.clients_idclients]:
+                return people_company[o.clients_idclients]
+            prof = profiles_by_lead.get(o.idcrm_lead) or profiles_by_client.get(o.clients_idclients)
+        else:
+            prof = profiles_by_lead.get(o.idcrm_lead)
+        return prof.company if prof else None
+
+    return [
+        schemas.LeadListItem(
+            id=o.idcrm_lead,
+            client_id=o.clients_idclients,
+            client_name=(
+                clients[o.clients_idclients].client_name
+                if o.clients_idclients in clients
+                else (_company(o) or "")
+            ),
+            company=_company(o),
+            title=o.title,
+            research_type=o.research_type,
+            pipeline_status=o.pipeline_status,
+            lead_source=o.lead_source,
+            salesperson_iduser=o.salesperson_iduser,
+            salesperson_name=reps.get(o.salesperson_iduser),
+            client_type="Returning" if o.clients_idclients and counts.get(o.clients_idclients, 1) > 1 else "New",
+            latest_calc_total=_latest_calc_total(db, o.idcrm_lead),
+            created_at=o.created_at,
+            sow_signed_at=o.sow_signed_at,
+            engagement_started_at=o.engagement_started_at,
+        )
+        for o in leads
+    ]
+
+
+# ── Create lead ────────────────────────────────────────────────────────────────
+
+@router.post("/leads", response_model=schemas.LeadDetail, status_code=201)
+def create_lead(
+    body: schemas.LeadCreate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(verify_token),
+):
+    caller = _caller(db, claims)
+
+    client = None
+    new_client = False
+    if body.client_id:
+        client = db.query(models.Client).filter(models.Client.idclients == body.client_id).first()
+        if not client:
+            raise HTTPException(status_code=404, detail="Client not found")
+    elif body.client_name and body.client_name.strip():
+        # A named prospect becomes a client account up-front (as before).
+        client = models.Client(
+            client_name=body.client_name.strip(),
+            client_status_idclient_status=_default_client_status_id(db),
+            created_by=caller.iduser,
+        )
+        db.add(client)
+        db.flush()  # populate idclients
+        new_client = True
+    # else: a clientless lead — its contact info lives on the lead-linked profile.
+
+    lead = models.CrmLead(
+        clients_idclients=client.idclients if client else None,
+        title=body.title,
+        research_type=body.research_type,
+        pipeline_status=PipelineStatus.lead.value,
+        lead_source=body.lead_source,
+        salesperson_iduser=caller.iduser,
+        notes=body.notes,
+    )
+    db.add(lead)
+    db.flush()  # populate idcrm_lead for the profile link
+
+    if body.company or body.email or body.phone:
+        db.add(
+            models.CrmLeadProfile(
+                # Only key by client for a brand-new client (keeps the per-client
+                # unique constraint safe); otherwise the profile is lead-scoped.
+                clients_idclients=client.idclients if new_client else None,
+                crm_leads_id=lead.idcrm_lead,
+                company=body.company,
+                email=body.email,
+                phone=body.phone,
+            )
+        )
+
+    db.commit()
+    db.refresh(lead)
+    return _build_detail(db, lead)
+
+
+# ── Detail aggregate ────────────────────────────────────────────────────────────
+
+@router.get("/leads/{lead_id}", response_model=schemas.LeadDetail)
+def get_lead(lead_id: int, db: Session = Depends(get_db)):
+    return _build_detail(db, _get_lead(db, lead_id))
+
+
+def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
+    client = (
+        db.query(models.Client).filter(models.Client.idclients == lead.clients_idclients).first()
+        if lead.clients_idclients
+        else None
+    )
+    profile = _lead_profile_for(db, lead)
+    company, email, phone = _resolve_contact(db, lead, profile)
+    rep = (
+        db.query(models.User).filter(models.User.iduser == lead.salesperson_iduser).first()
+        if lead.salesperson_iduser
+        else None
+    )
+
+    # sub-entities (read) — entities belonging to the client
+    entities = (
+        db.query(models.Entity)
+        .filter(models.Entity.clients_idclients == lead.clients_idclients)
+        .all()
+    )
+    entity_ids = [e.entity_id for e in entities]
+    type_names = {
+        t.id: t.entity_type_name
+        for t in db.query(models.EntityTypeRef).all()
+    }
+    sub_entities = [
+        schemas.SubEntityRead(
+            id=e.entity_id,
+            name=e.entity_name,
+            ein=e.ein,
+            state=e.state,
+            city=e.city,
+            entity_type=type_names.get(e.entity_types_id),
+        )
+        for e in entities
+    ]
+
+    # contacts (read, pragmatic) — people linked to the client's entities
+    contacts: List[schemas.ContactRead] = []
+    if entity_ids:
+        links = (
+            db.query(models.EntityPeopleRole)
+            .filter(models.EntityPeopleRole.entities_entity_id.in_(entity_ids))
+            .all()
+        )
+        person_ids = {l.people_idperson for l in links}
+        people = {
+            p.idperson: p
+            for p in db.query(models.Person).filter(models.Person.idperson.in_(person_ids)).all()
+        } if person_ids else {}
+        role_names = {r.idroles: r.role_name for r in db.query(models.PeopleRole).all()}
+        emails = _primary_map(
+            db.query(models.PeopleEmail)
+            .filter(models.PeopleEmail.people_idperson.in_(person_ids))
+            .all(),
+            lambda r: r.people_idperson,
+            lambda r: r.email,
+        ) if person_ids else {}
+        phones = _primary_map(
+            db.query(models.PeoplePhone)
+            .filter(models.PeoplePhone.people_idperson.in_(person_ids))
+            .all(),
+            lambda r: r.people_idperson,
+            lambda r: r.phone,
+        ) if person_ids else {}
+        for l in links:
+            p = people.get(l.people_idperson)
+            if not p:
+                continue
+            contacts.append(
+                schemas.ContactRead(
+                    id=p.idperson,
+                    name=f"{p.first_name} {p.last_name}".strip(),
+                    role=role_names.get(l.roles_idroles),
+                    title=p.title,
+                    firm=p.firm,
+                    email=emails.get(p.idperson),
+                    phone=phones.get(p.idperson),
+                    entity_id=l.entities_entity_id,
+                )
+            )
+
+    # engagements (+ yearly billing + tax years)
+    engagements: List[schemas.EngagementRead] = []
+    eng_rows = (
+        db.query(models.Engagement)
+        .filter(models.Engagement.crm_leads_id == lead.idcrm_lead)
+        .all()
+    )
+    if eng_rows:
+        eng_ids = [e.idengagements for e in eng_rows]
+        type_map = {t.idengagement_types: t.engagement_type_name for t in db.query(models.EngagementTypeRef).all()}
+        status_map = {s.idengagement_status: s.status_name for s in db.query(models.EngagementStatusRef).all()}
+        billing = (
+            db.query(models.CrmEngagementBilling)
+            .filter(models.CrmEngagementBilling.engagements_idengagements.in_(eng_ids))
+            .all()
+        )
+        tax_years = (
+            db.query(models.EngagementTaxYear)
+            .filter(models.EngagementTaxYear.engagements_idengagements.in_(eng_ids))
+            .all()
+        )
+        for e in eng_rows:
+            engagements.append(
+                schemas.EngagementRead(
+                    id=e.idengagements,
+                    type=type_map.get(e.engagement_types_idengagement_types),
+                    status=status_map.get(e.engagement_status_idengagement_status),
+                    phase=e.phase,
+                    start_date=e.start_date,
+                    end_date=e.end_date,
+                    yearly_billing=[
+                        schemas.YearlyBilling(year=int(b.tax_year), billing_amount=float(b.billing_amount))
+                        for b in billing
+                        if b.engagements_idengagements == e.idengagements
+                    ],
+                    tax_years=[
+                        int(t.tax_year) for t in tax_years if t.engagements_idengagements == e.idengagements
+                    ],
+                )
+            )
+
+    follow_up_calls = [
+        schemas.FollowUpCallRead(
+            id=c.idcrm_follow_up_call,
+            scheduled_date=c.scheduled_date,
+            scheduled_time=c.scheduled_time,
+            notes=c.notes,
+            completed=bool(c.completed),
+        )
+        for c in db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead.idcrm_lead)
+        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
+        .all()
+    ]
+
+    intake_questions = [
+        schemas.IntakeQuestionRead(id=q.idcrm_intake_question, question=q.question, answer=q.answer)
+        for q in db.query(models.CrmIntakeQuestion)
+        .filter(models.CrmIntakeQuestion.crm_leads_id == lead.idcrm_lead)
+        .order_by(models.CrmIntakeQuestion.display_order.asc())
+        .all()
+    ]
+
+    calc_rows = (
+        db.query(models.CrmCalculation)
+        .filter(models.CrmCalculation.crm_leads_id == lead.idcrm_lead)
+        .order_by(models.CrmCalculation.created_at.desc())
+        .all()
+    )
+    calc_counts = {}
+    if calc_rows:
+        for cid, cnt in (
+            db.query(models.CrmCalculationEntity.crm_calculations_id, func.count())
+            .filter(models.CrmCalculationEntity.crm_calculations_id.in_([c.idcrm_calculation for c in calc_rows]))
+            .group_by(models.CrmCalculationEntity.crm_calculations_id)
+            .all()
+        ):
+            calc_counts[cid] = cnt
+    calculations = [
+        schemas.CalculationSummary(
+            id=c.idcrm_calculation,
+            tax_year=c.tax_year,
+            tax_filing_status=c.tax_filing_status,
+            total_bill=float(c.total_bill) if c.total_bill is not None else None,
+            entity_count=calc_counts.get(c.idcrm_calculation, 0),
+            created_at=c.created_at,
+        )
+        for c in calc_rows
+    ]
+
+    return schemas.LeadDetail(
+        id=lead.idcrm_lead,
+        client_id=lead.clients_idclients,
+        client_name=client.client_name if client else (company or ""),
+        company=company,
+        email=email,
+        phone=phone,
+        title=lead.title,
+        research_type=lead.research_type,
+        pipeline_status=lead.pipeline_status,
+        lead_source=lead.lead_source,
+        salesperson_iduser=lead.salesperson_iduser,
+        salesperson_name=f"{rep.first_name} {rep.last_name}".strip() if rep else None,
+        client_type=_client_type(db, lead.clients_idclients),
+        latest_calc_total=_latest_calc_total(db, lead.idcrm_lead),
+        created_at=lead.created_at,
+        updated_at=lead.updated_at,
+        sow_signed_at=lead.sow_signed_at,
+        engagement_started_at=lead.engagement_started_at,
+        notes=lead.notes,
+        sub_entities=sub_entities,
+        contacts=contacts,
+        engagements=engagements,
+        follow_up_calls=follow_up_calls,
+        intake_questions=intake_questions,
+        calculations=calculations,
+    )
+
+
+def _primary_map(rows, key_fn, val_fn) -> dict:
+    """Map person_id -> preferred value (is_primary wins, else first seen)."""
+    out: dict = {}
+    for r in rows:
+        k = key_fn(r)
+        if k not in out or getattr(r, "is_primary", False):
+            out[k] = val_fn(r)
+    return out
+
+
+# ── Update (incl. status transitions) ──────────────────────────────────────────
+
+@router.patch("/leads/{lead_id}", response_model=schemas.LeadDetail)
+def update_lead(
+    lead_id: int, body: schemas.LeadUpdate, db: Session = Depends(get_db)
+):
+    lead = _get_lead(db, lead_id)
+    data = body.model_dump(exclude_unset=True)
+
+    # account-level fields live on crm_lead_profile, not the lead
+    profile_fields = {k: data.pop(k) for k in ("company", "email", "phone") if k in data}
+    if profile_fields:
+        profile = _lead_profile_for(db, lead)
+        if not profile:
+            profile = models.CrmLeadProfile(
+                clients_idclients=lead.clients_idclients,
+                crm_leads_id=lead.idcrm_lead,
+            )
+            db.add(profile)
+        for k, v in profile_fields.items():
+            setattr(profile, k, v)
+
+    new_status = data.get("pipeline_status")
+    if isinstance(new_status, PipelineStatus):
+        new_status = new_status.value
+        data["pipeline_status"] = new_status
+    if new_status == PipelineStatus.sow_signed.value and lead.sow_signed_at is None:
+        lead.sow_signed_at = datetime.utcnow()
+    if new_status == PipelineStatus.active_engagement.value and lead.engagement_started_at is None:
+        lead.engagement_started_at = datetime.utcnow()
+
+    for field, value in data.items():
+        setattr(lead, field, value)
+
+    db.commit()
+    db.refresh(lead)
+    return _build_detail(db, lead)
+
+
+@router.delete("/leads/{lead_id}", status_code=204)
+def delete_lead(lead_id: int, db: Session = Depends(get_db)):
+    lead = _get_lead(db, lead_id)
+    # Children (intake / calls / calculations + entities) cascade via FK.
+    # The clients/crm_lead_profile account is intentionally NOT deleted.
+    db.delete(lead)
+    db.commit()
+
+
+# ── Follow-up calls ────────────────────────────────────────────────────────────
+
+@router.post(
+    "/leads/{lead_id}/follow-up-calls",
+    response_model=schemas.FollowUpCallRead,
+    status_code=201,
+)
+def create_follow_up_call(
+    lead_id: int, body: schemas.FollowUpCallCreate, db: Session = Depends(get_db)
+):
+    _get_lead(db, lead_id)
+    call = models.CrmFollowUpCall(
+        crm_leads_id=lead_id,
+        scheduled_date=body.scheduled_date,
+        scheduled_time=body.scheduled_time,
+        notes=body.notes,
+        completed=False,
+    )
+    db.add(call)
+    db.commit()
+    db.refresh(call)
+    return _call_read(call)
+
+
+@router.patch("/follow-up-calls/{call_id}", response_model=schemas.FollowUpCallRead)
+def update_follow_up_call(
+    call_id: int, body: schemas.FollowUpCallUpdate, db: Session = Depends(get_db)
+):
+    call = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.idcrm_follow_up_call == call_id)
+        .first()
+    )
+    if not call:
+        raise HTTPException(status_code=404, detail="Follow-up call not found")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(call, field, value)
+    db.commit()
+    db.refresh(call)
+    return _call_read(call)
+
+
+@router.delete("/follow-up-calls/{call_id}", status_code=204)
+def delete_follow_up_call(call_id: int, db: Session = Depends(get_db)):
+    call = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.idcrm_follow_up_call == call_id)
+        .first()
+    )
+    if not call:
+        raise HTTPException(status_code=404, detail="Follow-up call not found")
+    db.delete(call)
+    db.commit()
+
+
+def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
+    return schemas.FollowUpCallRead(
+        id=call.idcrm_follow_up_call,
+        scheduled_date=call.scheduled_date,
+        scheduled_time=call.scheduled_time,
+        notes=call.notes,
+        completed=bool(call.completed),
+    )
+
+
+# ── Engagements (+ yearly billing) ───────────────────────────────────────────
+
+@router.post("/leads/{lead_id}/engagements", response_model=schemas.EngagementRead, status_code=201)
+def create_engagement(
+    lead_id: int,
+    body: schemas.EngagementCreate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(verify_token),
+):
+    lead = _get_lead(db, lead_id)
+    caller = _caller(db, claims)
+
+    # Resolve the (NOT NULL) entity from the client's first entity.
+    ent = (
+        db.query(models.Entity)
+        .filter(models.Entity.clients_idclients == lead.clients_idclients)
+        .order_by(models.Entity.entity_id.asc())
+        .first()
+        if lead.clients_idclients
+        else None
+    )
+    if not ent:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot create an engagement: the lead has no client entity yet.",
+        )
+    entity_id = ent.entity_id
+
+    years = sorted(b.year for b in body.yearly_billing) if body.yearly_billing else []
+    start = date(years[0], 1, 1) if years else date.today()
+
+    eng = models.Engagement(
+        entities_entity_id=entity_id,
+        assigned_user_id=caller.iduser,
+        engagement_types_idengagement_types=_get_or_create_engagement_type(db, body.type),
+        engagement_status_idengagement_status=_get_or_create_engagement_status(db, body.status),
+        start_date=start,
+        end_date=date(years[-1], 12, 31) if years else None,
+        created_by=caller.iduser,
+        phase=body.phase,
+        crm_leads_id=lead_id,
+    )
+    db.add(eng)
+    db.flush()
+    for b in body.yearly_billing:
+        db.add(
+            models.CrmEngagementBilling(
+                engagements_idengagements=eng.idengagements,
+                tax_year=b.year,
+                billing_amount=b.billing_amount,
+            )
+        )
+    db.commit()
+    db.refresh(eng)
+    return _engagement_read(db, eng)
+
+
+@router.patch("/engagements/{eng_id}", response_model=schemas.EngagementRead)
+def update_engagement(
+    eng_id: int, body: schemas.EngagementUpdate, db: Session = Depends(get_db)
+):
+    eng = db.query(models.Engagement).filter(models.Engagement.idengagements == eng_id).first()
+    if not eng:
+        raise HTTPException(status_code=404, detail="Engagement not found")
+
+    if body.type is not None:
+        eng.engagement_types_idengagement_types = _get_or_create_engagement_type(db, body.type)
+    if body.status is not None:
+        eng.engagement_status_idengagement_status = _get_or_create_engagement_status(db, body.status)
+    if body.phase is not None:
+        eng.phase = body.phase
+
+    if body.yearly_billing is not None:
+        db.query(models.CrmEngagementBilling).filter(
+            models.CrmEngagementBilling.engagements_idengagements == eng_id
+        ).delete(synchronize_session=False)
+        years = sorted(b.year for b in body.yearly_billing)
+        for b in body.yearly_billing:
+            db.add(
+                models.CrmEngagementBilling(
+                    engagements_idengagements=eng_id,
+                    tax_year=b.year,
+                    billing_amount=b.billing_amount,
+                )
+            )
+        if years:
+            eng.start_date = date(years[0], 1, 1)
+            eng.end_date = date(years[-1], 12, 31)
+
+    db.commit()
+    db.refresh(eng)
+    return _engagement_read(db, eng)
+
+
+def _engagement_read(db: Session, eng: models.Engagement) -> schemas.EngagementRead:
+    type_name = (
+        db.query(models.EngagementTypeRef.engagement_type_name)
+        .filter(models.EngagementTypeRef.idengagement_types == eng.engagement_types_idengagement_types)
+        .scalar()
+    )
+    status_name = (
+        db.query(models.EngagementStatusRef.status_name)
+        .filter(models.EngagementStatusRef.idengagement_status == eng.engagement_status_idengagement_status)
+        .scalar()
+    )
+    billing = (
+        db.query(models.CrmEngagementBilling)
+        .filter(models.CrmEngagementBilling.engagements_idengagements == eng.idengagements)
+        .all()
+    )
+    tax_years = (
+        db.query(models.EngagementTaxYear)
+        .filter(models.EngagementTaxYear.engagements_idengagements == eng.idengagements)
+        .all()
+    )
+    return schemas.EngagementRead(
+        id=eng.idengagements,
+        type=type_name,
+        status=status_name,
+        phase=eng.phase,
+        start_date=eng.start_date,
+        end_date=eng.end_date,
+        yearly_billing=[
+            schemas.YearlyBilling(year=int(b.tax_year), billing_amount=float(b.billing_amount))
+            for b in billing
+        ],
+        tax_years=[int(t.tax_year) for t in tax_years],
+    )
+
+
+# ── Calculations ───────────────────────────────────────────────────────────────
+
+@router.post("/leads/{lead_id}/calculations", response_model=schemas.CalculationRead, status_code=201)
+def create_calculation(
+    lead_id: int,
+    body: schemas.CalculationCreate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(verify_token),
+):
+    lead = _get_lead(db, lead_id)
+    caller = _caller(db, claims)
+
+    total = sum((e.grand_total or 0) for e in body.entities) or None
+    calc = models.CrmCalculation(
+        crm_leads_id=lead_id,
+        tax_year=body.tax_year,
+        tax_filing_status=body.tax_filing_status,
+        total_bill=total,
+        notes=body.notes,
+        created_by=caller.iduser,
+    )
+    db.add(calc)
+    db.flush()
+    for e in body.entities:
+        db.add(
+            models.CrmCalculationEntity(
+                crm_calculations_id=calc.idcrm_calculation,
+                entities_entity_id=e.entities_entity_id,
+                entity_name=e.entity_name,
+                state=e.state,
+                tax_filing_status=e.tax_filing_status,
+                employee_count=e.employee_count,
+                estimate_qras=e.estimate_qras,
+                gross_credit=e.gross_credit,
+                w2_wages=e.w2_wages,
+                contract_research=e.contract_research,
+                supplies=e.supplies,
+                other_expenses=e.other_expenses,
+                manager_reviewed=e.manager_reviewed,
+                notes=e.notes,
+                tier=e.tier,
+                total_bill=e.total_bill,
+                grand_total=e.grand_total,
+                result_json=e.result_json,
+            )
+        )
+
+    # Mirror the old saveCalculation behaviour: a fresh Lead becomes Calculation Sent.
+    if lead.pipeline_status == PipelineStatus.lead.value:
+        lead.pipeline_status = PipelineStatus.calculation_sent.value
+
+    db.commit()
+    db.refresh(calc)
+    return schemas.CalculationRead(
+        id=calc.idcrm_calculation,
+        tax_year=calc.tax_year,
+        tax_filing_status=calc.tax_filing_status,
+        total_bill=float(calc.total_bill) if calc.total_bill is not None else None,
+        entity_count=len(body.entities),
+        created_at=calc.created_at,
+    )
+
+
+@router.delete("/calculations/{calc_id}", status_code=204)
+def delete_calculation(calc_id: int, db: Session = Depends(get_db)):
+    calc = (
+        db.query(models.CrmCalculation)
+        .filter(models.CrmCalculation.idcrm_calculation == calc_id)
+        .first()
+    )
+    if not calc:
+        raise HTTPException(status_code=404, detail="Calculation not found")
+    db.delete(calc)
+    db.commit()
