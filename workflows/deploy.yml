@@ -10,6 +10,13 @@ jobs:
  
     steps:
       - uses: actions/checkout@v4
+
+      # Write SSL certificate
+      - name: Write SSL certificate
+        working-directory: backend    
+        run: |
+          mkdir -p certs
+          echo "${{ secrets.MYSQL_SSL }}" | base64 -d > certs/DigiCertGlobalRootG2.crt.pem
  
       # ---- Build the React frontend ----
       - name: Set up Node
