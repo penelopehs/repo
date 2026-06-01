@@ -1,12 +1,12 @@
 // Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
 
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Calculator, Users, LogIn, LogOut, FileText, Menu } from "lucide-react";
 import { useState } from "react";
+import { useMsal, useIsAuthenticated } from "@azure/msal-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/authStore";
 
 const NAV = [
   { to: "/", label: "Calculator", icon: Calculator },
@@ -16,12 +16,22 @@ const NAV = [
 
 export function AppHeader() {
   const { location } = useRouterState();
-  const { isAuthenticated, user, logout } = useAuthStore();
-  const navigate = useNavigate();
+  const { instance } = useMsal();
+  const isAuthenticated = useIsAuthenticated();
+  const account = instance.getActiveAccount();
+  const displayName = account?.name ?? account?.username;
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
+
+  const signOut = async () => {
+    // Navigates to Azure AD logout endpoint, then back to the app root.
+    await instance.logoutRedirect({
+      account: instance.getActiveAccount() ?? undefined,
+      postLogoutRedirectUri: typeof window !== "undefined" ? window.location.origin : "/",
+    });
+  };
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-navy/20 bg-navy text-navy-foreground shadow-elevated">
@@ -65,11 +75,11 @@ export function AppHeader() {
             <Button
               type="button"
               variant="ghost"
-              onClick={() => { logout(); navigate({ to: "/login" }); }}
+              onClick={signOut}
               className="ml-2 text-white/85 hover:bg-white/10 hover:text-white"
             >
               <LogOut className="mr-1.5 h-4 w-4" />
-              {user?.displayName ?? "Sign out"}
+              {displayName ?? "Sign out"}
             </Button>
           ) : (
             <Link
@@ -109,7 +119,7 @@ export function AppHeader() {
               <div className="mt-4 border-t border-white/10 pt-4">
                 {isAuthenticated ? (
                   <button
-                    onClick={() => { logout(); setMobileOpen(false); navigate({ to: "/login" }); }}
+                    onClick={() => { setMobileOpen(false); void signOut(); }}
                     className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/85 hover:bg-white/10"
                   >
                     <LogOut className="h-4 w-4" /> Sign out

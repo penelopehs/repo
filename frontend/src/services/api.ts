@@ -1,17 +1,33 @@
-// API service abstraction — Azure Web App / Functions ready.
-// Centralize fetch calls here so the UI never hits URLs directly.
-
-import { useAuthStore } from "@/store/authStore";
+import { apiRequest, msalInstance } from "@/lib/auth/authConfig";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
 interface RequestOptions extends RequestInit {
-  token?: string;
+  anonymous?: boolean;
+}
+
+// Acquires an access token silently; if that fails (consent needed, expired)
+// triggers a redirect to Azure AD. The redirect flow means execution will not
+// return — the page restarts after the user authenticates.
+async function getAccessToken(): Promise<string> {
+  const account = msalInstance.getActiveAccount();
+  if (!account) throw new Error("No active account. Sign in first.");
+
+  try {
+    const result = await msalInstance.acquireTokenSilent({ ...apiRequest, account });
+    return result.accessToken;
+  } catch {
+    // acquireTokenRedirect navigates away; this throw is never reached but
+    // satisfies the Promise<string> return type for the compiler.
+    await msalInstance.acquireTokenRedirect({ ...apiRequest, account });
+    throw new Error("Redirecting to sign in…");
+  }
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const { token: explicit, headers, ...rest } = opts;
-  const token = explicit ?? useAuthStore.getState().token ?? undefined;
+  const { anonymous, headers, ...rest } = opts;
+  const token = anonymous ? undefined : await getAccessToken();
+
   const res = await fetch(`${BASE_URL}${path}`, {
     ...rest,
     headers: {

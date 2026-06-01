@@ -1,13 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { LoginPage } from "@/pages/LoginPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+// Login now lives at the root ("/"), gated by AuthGate in __root.tsx.
+// Keep this route as a redirect so any old /login links still work.
 export const Route = createFileRoute("/login")({
-  head: () => ({
-    meta: [
-      { title: "Sign In — Sales Billing Calculator" },
-      { name: "description", content: "Sign in to the enterprise R&D tax credit and billing workspace." },
-      { name: "robots", content: "noindex,nofollow" },
-    ],
-  }),
-  component: LoginPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/" });
+  },
 });

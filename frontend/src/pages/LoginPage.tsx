@@ -1,45 +1,24 @@
-// Frontend Login page — mock authentication, validated, token-ready.
-
 import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { z } from "zod";
+import { useMsal } from "@azure/msal-react";
 import { motion } from "framer-motion";
-import { LogIn, Loader2, ShieldCheck } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/authStore";
-import { toast } from "sonner";
-
-const schema = z.object({
-  username: z.string().trim().min(2, "Username too short").max(60),
-  password: z.string().min(4, "Minimum 4 characters").max(120),
-});
+import { loginRequest } from "@/lib/auth/authConfig";
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const login = useAuthStore((s) => s.login);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const { instance } = useMsal();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signIn = async () => {
     setError(null);
-    const parsed = schema.safeParse({ username, password });
-    if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Invalid input");
-      return;
-    }
     setLoading(true);
     try {
-      await login(parsed.data.username, parsed.data.password);
-      toast.success("Welcome back", { description: parsed.data.username });
-      navigate({ to: "/" });
+      // Navigates to Azure AD; the page won't continue past this call.
+      // On return, client.tsx processes handleRedirectPromise() before hydrating.
+      await instance.loginRedirect(loginRequest);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
       setLoading(false);
     }
   };
@@ -64,49 +43,43 @@ export function LoginPage() {
           <p className="mt-4 text-sm text-white/75">Sign in to your enterprise R&amp;D billing workspace.</p>
         </div>
 
-        <form onSubmit={submit} className="space-y-4 px-8 py-7">
-          <div>
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Michael Williams"
-              maxLength={60}
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              maxLength={120}
-            />
-          </div>
+        <div className="space-y-4 px-8 py-7">
           {error && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
               {error}
             </div>
           )}
           <Button
-            type="submit"
+            type="button"
+            onClick={signIn}
             disabled={loading}
             className="w-full bg-orange text-orange-foreground hover:bg-orange/90 shadow-elevated"
           >
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogIn className="mr-2 h-4 w-4" />}
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <MicrosoftLogo className="mr-2 h-4 w-4" />
+            )}
+            {loading ? "Signing in..." : "Sign in with Microsoft"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">
-            Frontend mock authentication. Azure AD / MSAL integration ready for production.
+            Authentication is handled by Microsoft Entra ID (Azure AD).
           </p>
-        </form>
+        </div>
       </motion.div>
     </div>
+  );
+}
+
+// Microsoft four-square logo mark.
+function MicrosoftLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 21 21" aria-hidden="true">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
   );
 }

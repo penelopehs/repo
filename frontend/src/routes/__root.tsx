@@ -7,11 +7,20 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
+import {
+  useMsal,
+  AuthenticatedTemplate,
+  UnauthenticatedTemplate,
+} from "@azure/msal-react";
+import { InteractionStatus } from "@azure/msal-browser";
+import { Loader2 } from "lucide-react";
 
 import appCss from "../styles.css?url";
 import { reportError } from "../lib/error-reporting";
 import { AppHeader } from "@/components/AppHeader";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { LoginPage } from "@/pages/LoginPage";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -116,13 +125,63 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background">
-        <AppHeader />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+    <AuthProvider>
+      <QueryClientProvider client={queryClient}>
+        <ClientAuthGate />
+        <Toaster richColors position="top-right" />
+      </QueryClientProvider>
+    </AuthProvider>
+  );
+}
+
+// Defers auth rendering to the client to avoid SSR hydration mismatches:
+// the server has no MSAL state so it would always render LoginPage, while
+// the client may immediately show the authenticated app — causing a mismatch.
+// Both server and client render the spinner on the first pass; after mount
+// the real AuthGate takes over with the true MSAL state.
+function ClientAuthGate() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
-      <Toaster richColors position="top-right" />
-    </QueryClientProvider>
+    );
+  }
+
+  return <AuthGate />;
+}
+
+function AuthGate() {
+  const { inProgress } = useMsal();
+
+  // While MSAL initializes / handles a redirect, avoid flashing the login
+  // screen to users who are in fact already signed in.
+  if (
+    inProgress === InteractionStatus.Startup ||
+    inProgress === InteractionStatus.HandleRedirect
+  ) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <AuthenticatedTemplate>
+        <div className="min-h-screen bg-background">
+          <AppHeader />
+          {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+          <Outlet />
+        </div>
+      </AuthenticatedTemplate>
+      <UnauthenticatedTemplate>
+        <LoginPage />
+      </UnauthenticatedTemplate>
+    </>
   );
 }
