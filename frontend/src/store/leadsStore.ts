@@ -28,6 +28,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   error: null,
 
   fetchLeads: async () => {
+    if (get().loading) return;
     set({ loading: true, error: null });
     try {
       const leads = await leadsApi.list();
