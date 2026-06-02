@@ -1,6 +1,6 @@
 // Calculator page — multi-year client setup, eligibility-aware entities, billing dashboard.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -19,6 +19,7 @@ import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable, computeBilled } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
 import { FILING_STATUSES } from "@/types/crm";
+import { leadsApi } from "@/services/leads";
 
 export function CalculatorPage() {
   const {
@@ -31,6 +32,30 @@ export function CalculatorPage() {
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
+
+  const [allLeadNames, setAllLeadNames] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionRef = useRef<HTMLDivElement>(null);
+
+  // Fetch all lead names once on mount for client name autocomplete
+  useEffect(() => {
+    leadsApi.listNames().then(setAllLeadNames).catch(() => {});
+  }, []);
+
+  const suggestions = allLeadNames.filter((name) =>
+    name.toLowerCase().includes(client.clientName.toLowerCase()),
+  );
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const filingRate = FILING_STATUSES.find((f) => f.value === client.filingStatus)?.rate ?? 0.21;
 
@@ -93,14 +118,36 @@ export function CalculatorPage() {
       {/* Section 1 — Client Information */}
       <Section icon={<Building2 className="h-4 w-4 text-cyan" />} title="Client Information">
         <div className="grid gap-4 md:grid-cols-3">
-          <div>
+          <div className="relative" ref={suggestionRef}>
             <Label>Client Name</Label>
             <Input
               value={client.clientName}
-              onChange={(e) => setClientField("clientName", e.target.value)}
+              onChange={(e) => {
+                setClientField("clientName", e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
               placeholder="e.g. Helios Biotech LLC"
               maxLength={160}
+              autoComplete="off"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className="absolute z-50 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
+                {suggestions.map((name) => (
+                  <li
+                    key={name}
+                    className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setClientField("clientName", name);
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <Label>Tax Year(s)</Label>

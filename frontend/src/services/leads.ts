@@ -125,6 +125,17 @@ export interface LeadCreateInput {
 // ── Public API ──────────────────────────────────────────────────────────────────
 
 export const leadsApi = {
+  /** Fetch only the lean list and return unique company names — for autocomplete. */
+  async listNames(): Promise<string[]> {
+    const items = await api.get<ApiLeadListItem[]>("/leads");
+    const seen = new Set<string>();
+    for (const i of items) {
+      const name = (i.company ?? i.client_name ?? "").trim();
+      if (name) seen.add(name);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  },
+
   /** List leads, then hydrate each with its detail aggregate (tax years,
    *  entity count, latest-calculation date) the list endpoint doesn't carry. */
   async list(): Promise<Lead[]> {
