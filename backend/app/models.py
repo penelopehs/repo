@@ -203,7 +203,7 @@ class Engagement(Base):
     # ── new columns (managed by Alembic) ──
     phase = Column(String(100), nullable=True)
     crm_leads_id = Column(
-        Integer, ForeignKey("crm_leads.idcrm_lead"), nullable=True
+        Integer, ForeignKey("crm_leads.crm_lead_id"), nullable=True
     )
 
 
@@ -220,14 +220,10 @@ class EngagementTaxYear(Base):
 class CrmLead(Base):
     __tablename__ = "crm_leads"
 
-    idcrm_lead = Column(Integer, primary_key=True, autoincrement=True)
-    # Nullable: a pre-client lead carries its contact info on crm_lead_profile
-    # instead of a clients row (extra_db.md / my_update.md).
+    crm_lead_id = Column(Integer, primary_key=True, autoincrement=True)
     clients_idclients = Column(
         Integer, ForeignKey("clients.idclients"), nullable=True
     )
-    title = Column(String(255), nullable=True)
-    research_type = Column(String(100), nullable=True)
     pipeline_status = Column(
         PIPELINE_ENUM, nullable=False, server_default=PipelineStatus.lead.value
     )
@@ -235,6 +231,7 @@ class CrmLead(Base):
     salesperson_iduser = Column(
         Integer, ForeignKey("users.iduser"), nullable=True
     )
+    calculations = Column(JSON, nullable=False)
     notes = Column(Text, nullable=True)
     sow_signed_at = Column(DateTime, nullable=True)
     engagement_started_at = Column(DateTime, nullable=True)
@@ -244,38 +241,13 @@ class CrmLead(Base):
     __table_args__ = (Index("idx_crm_lead_status", "pipeline_status"),)
 
 
-class CrmLeadProfile(Base):
-    __tablename__ = "crm_lead_profile"
-
-    idcrm_lead_profile = Column(Integer, primary_key=True, autoincrement=True)
-    # Either link to a client account (returning/known client) or directly to a
-    # lead (a clientless lead). At most one of these is set per profile.
-    clients_idclients = Column(
-        Integer, ForeignKey("clients.idclients"), nullable=True
-    )
-    crm_leads_id = Column(
-        Integer,
-        ForeignKey("crm_leads.idcrm_lead", ondelete="CASCADE"),
-        nullable=True,
-    )
-    company = Column(String(255), nullable=True)
-    email = Column(String(255), nullable=True)
-    phone = Column(String(50), nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
-    updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
-
-    __table_args__ = (
-        UniqueConstraint("clients_idclients", name="uq_crm_lead_profile_client"),
-    )
-
-
 class CrmIntakeQuestion(Base):
     __tablename__ = "crm_intake_questions"
 
     idcrm_intake_question = Column(Integer, primary_key=True, autoincrement=True)
     crm_leads_id = Column(
         Integer,
-        ForeignKey("crm_leads.idcrm_lead", ondelete="CASCADE"),
+        ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
         nullable=False,
     )
     question = Column(Text, nullable=False)
@@ -290,7 +262,7 @@ class CrmFollowUpCall(Base):
     idcrm_follow_up_call = Column(Integer, primary_key=True, autoincrement=True)
     crm_leads_id = Column(
         Integer,
-        ForeignKey("crm_leads.idcrm_lead", ondelete="CASCADE"),
+        ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
         nullable=False,
     )
     scheduled_date = Column(Date, nullable=False)
@@ -299,73 +271,3 @@ class CrmFollowUpCall(Base):
     completed = Column(Boolean, nullable=False, server_default=text("0"))
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
-
-
-class CrmCalculation(Base):
-    __tablename__ = "crm_calculations"
-
-    idcrm_calculation = Column(Integer, primary_key=True, autoincrement=True)
-    crm_leads_id = Column(
-        Integer,
-        ForeignKey("crm_leads.idcrm_lead", ondelete="CASCADE"),
-        nullable=False,
-    )
-    tax_year = Column(Integer, nullable=False)
-    tax_filing_status = Column(String(50), nullable=True)
-    total_bill = Column(Numeric(12, 2), nullable=True)
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
-    created_by = Column(Integer, ForeignKey("users.iduser"), nullable=True)
-
-
-class CrmCalculationEntity(Base):
-    __tablename__ = "crm_calculation_entities"
-
-    idcrm_calculation_entity = Column(Integer, primary_key=True, autoincrement=True)
-    crm_calculations_id = Column(
-        Integer,
-        ForeignKey("crm_calculations.idcrm_calculation", ondelete="CASCADE"),
-        nullable=False,
-    )
-    entities_entity_id = Column(
-        Integer, ForeignKey("entities.entity_id"), nullable=True
-    )
-    entity_name = Column(String(255), nullable=False)
-    state = Column(String(50), nullable=True)
-    tax_filing_status = Column(String(50), nullable=True)
-    # inputs
-    employee_count = Column(Integer, nullable=True)
-    estimate_qras = Column(Integer, nullable=True)
-    gross_credit = Column(Numeric(12, 2), nullable=True)
-    w2_wages = Column(Numeric(12, 2), nullable=True)
-    contract_research = Column(Numeric(12, 2), nullable=True)
-    supplies = Column(Numeric(12, 2), nullable=True)
-    other_expenses = Column(Numeric(12, 2), nullable=True)
-    manager_reviewed = Column(Boolean, nullable=False, server_default=text("0"))
-    notes = Column(Text, nullable=True)
-    # cached headline results
-    tier = Column(String(45), nullable=True)
-    total_bill = Column(Numeric(12, 2), nullable=True)
-    grand_total = Column(Numeric(12, 2), nullable=True)
-    # full CalcResult snapshot
-    result_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
-
-
-class CrmEngagementBilling(Base):
-    __tablename__ = "crm_engagement_billing"
-
-    idcrm_engagement_billing = Column(Integer, primary_key=True, autoincrement=True)
-    engagements_idengagements = Column(
-        Integer, ForeignKey("engagements.idengagements"), nullable=False
-    )
-    tax_year = Column(YEAR, nullable=False)
-    billing_amount = Column(Numeric(12, 2), nullable=False, server_default=text("0.00"))
-    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
-    updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
-
-    __table_args__ = (
-        UniqueConstraint(
-            "engagements_idengagements", "tax_year", name="uq_crm_eng_billing_year"
-        ),
-    )

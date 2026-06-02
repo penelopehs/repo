@@ -56,26 +56,18 @@ class LeadCreate(BaseModel):
     client_id: Optional[int] = None
     # ...or create a new client (client_name required when client_id is absent).
     client_name: Optional[str] = None
-    company: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
     # Lead fields.
-    title: Optional[str] = None
-    research_type: Optional[str] = None
     lead_source: Optional[str] = None
     notes: Optional[str] = None
+    # Free-form calculator state stored on the lead (crm_leads.calculations).
+    calculations: Optional[Any] = None
 
 
 class LeadUpdate(BaseModel):
-    title: Optional[str] = None
-    research_type: Optional[str] = None
     pipeline_status: Optional[PipelineStatus] = None
     lead_source: Optional[str] = None
     notes: Optional[str] = None
-    # account-level contact info (crm_lead_profile)
-    company: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
+    calculations: Optional[Any] = None
 
 
 class LeadListItem(BaseModel):
@@ -83,8 +75,6 @@ class LeadListItem(BaseModel):
     client_id: Optional[int] = None
     client_name: str
     company: Optional[str] = None
-    title: Optional[str] = None
-    research_type: Optional[str] = None
     pipeline_status: str
     lead_source: Optional[str] = None
     salesperson_iduser: Optional[int] = None
@@ -118,11 +108,6 @@ class ContactRead(BaseModel):
     entity_id: int
 
 
-class YearlyBilling(BaseModel):
-    year: int
-    billing_amount: float
-
-
 class EngagementRead(BaseModel):
     id: int
     type: Optional[str] = None
@@ -130,7 +115,6 @@ class EngagementRead(BaseModel):
     phase: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    yearly_billing: List[YearlyBilling] = Field(default_factory=list)
     tax_years: List[int] = Field(default_factory=list)
 
 
@@ -148,15 +132,6 @@ class IntakeQuestionRead(BaseModel):
     answer: Optional[str] = None
 
 
-class CalculationSummary(BaseModel):
-    id: int
-    tax_year: int
-    tax_filing_status: Optional[str] = None
-    total_bill: Optional[float] = None
-    entity_count: int
-    created_at: datetime
-
-
 class LeadDetail(LeadListItem):
     email: Optional[str] = None
     phone: Optional[str] = None
@@ -167,7 +142,8 @@ class LeadDetail(LeadListItem):
     engagements: List[EngagementRead] = Field(default_factory=list)
     follow_up_calls: List[FollowUpCallRead] = Field(default_factory=list)
     intake_questions: List[IntakeQuestionRead] = Field(default_factory=list)
-    calculations: List[CalculationSummary] = Field(default_factory=list)
+    # Free-form calculator state stored on the lead (crm_leads.calculations).
+    calculations: Any = None
 
 
 # ── Follow-up calls ────────────────────────────────────────────────────────────
@@ -191,44 +167,17 @@ class EngagementCreate(BaseModel):
     type: str = "R&D Tax Credit"
     status: str = "Active"
     phase: Optional[str] = None
-    yearly_billing: List[YearlyBilling] = Field(default_factory=list)
 
 
 class EngagementUpdate(BaseModel):
     type: Optional[str] = None
     status: Optional[str] = None
     phase: Optional[str] = None
-    yearly_billing: Optional[List[YearlyBilling]] = None
 
 
 # ── Calculations ───────────────────────────────────────────────────────────────
+# Calculations are no longer a separate table: the whole calculator state is
+# stored as a free-form JSON blob on crm_leads.calculations.
 
-class CalculationEntityIn(BaseModel):
-    entity_name: str
-    entities_entity_id: Optional[int] = None
-    state: Optional[str] = None
-    tax_filing_status: Optional[str] = None
-    employee_count: Optional[int] = None
-    estimate_qras: Optional[int] = None
-    gross_credit: Optional[float] = None
-    w2_wages: Optional[float] = None
-    contract_research: Optional[float] = None
-    supplies: Optional[float] = None
-    other_expenses: Optional[float] = None
-    manager_reviewed: bool = False
-    notes: Optional[str] = None
-    tier: Optional[str] = None
-    total_bill: Optional[float] = None
-    grand_total: Optional[float] = None
-    result_json: Optional[Any] = None
-
-
-class CalculationCreate(BaseModel):
-    tax_year: int
-    tax_filing_status: Optional[str] = None
-    notes: Optional[str] = None
-    entities: List[CalculationEntityIn] = Field(default_factory=list)
-
-
-class CalculationRead(CalculationSummary):
-    pass
+class CalculationsUpdate(BaseModel):
+    calculations: Any

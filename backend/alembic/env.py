@@ -31,12 +31,8 @@ config.set_main_option("sqlalchemy.url", db_url)
 
 CRM_TABLES = {
     "crm_leads",
-    "crm_lead_profile",
     "crm_intake_questions",
     "crm_follow_up_calls",
-    "crm_calculations",
-    "crm_calculation_entities",
-    "crm_engagement_billing",
 }
 # Existing tables we extend -> the ONLY columns autogenerate may manage on them.
 EXTENDED_COLUMNS = {
