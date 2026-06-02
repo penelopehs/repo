@@ -76,11 +76,11 @@ export function AddLeadDialog() {
     setSubmitting(true);
     try {
       await addLead({ ...parsed.data, taxYears: years });
-      toast.success("Lead added", { description: `${parsed.data.fullName} · ${parsed.data.company}` });
+    toast.success("Lead added", { description: `${parsed.data.fullName} · ${parsed.data.company}` });
       setForm({ ...initial, rep: me ? userFullName(me) : "" });
-      setYears([]);
-      setErrors({});
-      setOpen(false);
+    setYears([]);
+    setErrors({});
+    setOpen(false);
     } catch (err) {
       toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -127,10 +127,7 @@ export function AddLeadDialog() {
               </Select>
             </Field>
             <Field label="Assigned Sales Representative">
-              {/* Always the signed-in user — disabled. The list is pulled from the
-                  API so the value matches a real user; the backend assigns the
-                  caller as salesperson regardless. */}
-              <Select value={form.rep} disabled>
+              <Select value={form.rep}>
                 <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
                 <SelectContent>
                   {users.map((u) => (

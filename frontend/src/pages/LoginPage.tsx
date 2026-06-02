@@ -1,7 +1,9 @@
+// Login page — Microsoft Entra ID (Azure AD) sign-in via MSAL redirect flow.
+
 import { useState } from "react";
-import { useMsal } from "@azure/msal-react";
 import { motion } from "framer-motion";
 import { Loader2, ShieldCheck } from "lucide-react";
+import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
 import { loginRequest } from "@/lib/auth/authConfig";
 
@@ -15,7 +17,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       // Navigates to Azure AD; the page won't continue past this call.
-      // On return, client.tsx processes handleRedirectPromise() before hydrating.
+      // On return, main.tsx processes handleRedirectPromise() before rendering.
       await instance.loginRedirect(loginRequest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");

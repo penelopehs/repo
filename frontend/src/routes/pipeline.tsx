@@ -4,9 +4,9 @@ import { PipelinePage } from "@/pages/PipelinePage";
 export const Route = createFileRoute("/pipeline")({
   head: () => ({
     meta: [
-      { title: "Client Pipeline — Sales Billing CRM" },
+      { title: "Client Dashboard — Sales Billing CRM" },
       { name: "description", content: "Manage leads, send proposals, and track active client engagements." },
-      { property: "og:title", content: "Client Pipeline" },
+      { property: "og:title", content: "Client Dashboard" },
       { property: "og:description", content: "Manage leads, send proposals, and track active engagements." },
     ],
   }),

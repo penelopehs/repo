@@ -1,6 +1,4 @@
-// Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
-
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { Calculator, Users, LogIn, LogOut, FileText, Menu } from "lucide-react";
 import { useState } from "react";
 import { useMsal, useIsAuthenticated } from "@azure/msal-react";

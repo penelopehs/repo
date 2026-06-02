@@ -65,19 +65,19 @@ export function ProfilePage({ id }: { id: string }) {
           <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/pipeline" })}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex gap-2">
-            <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated" onClick={() => setOpenEng(true)}>
-              <Plus className="mr-1.5 h-4 w-4" /> New Engagement
-            </Button>
-            <Button variant="outline" onClick={() => setOpenEdit(true)}>
-              <Pencil className="mr-1.5 h-4 w-4" /> Edit Client
-            </Button>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Client</p>
+            <h1 className="text-2xl font-bold text-navy">{lead.fullName}</h1>
+            <p className="text-sm text-muted-foreground">{lead.company}</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Client</p>
-          <h1 className="text-2xl font-bold text-navy">{lead.fullName}</h1>
-          <p className="text-sm text-muted-foreground">{lead.company}</p>
+        <div className="flex gap-2 lg:justify-end">
+          <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated" onClick={() => setOpenEng(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New Engagement
+          </Button>
+          <Button variant="outline" onClick={() => setOpenEdit(true)}>
+            <Pencil className="mr-1.5 h-4 w-4" /> Edit Client
+          </Button>
         </div>
       </div>
 

@@ -20,6 +20,7 @@ import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 
 const SOURCES: LeadSource[] = ["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"];
+const REPS: SalesRep[] = ["David Kim", "James Carter", "Sarah Johnson", "Unassigned"];
 const STATUSES: { value: LeadStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "calculation_sent", label: "Calculation Sent" },
@@ -87,8 +88,8 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     setSubmitting(true);
     try {
       await update(lead.id, parsed.data);
-      toast.success("Client updated", { description: form.fullName });
-      setOpen(false);
+    toast.success("Client updated", { description: form.fullName });
+    setOpen(false);
     } catch (err) {
       toast.error("Couldn't update client", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -117,9 +118,6 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              {/* Read-only — the salesperson is owned by the backend. Options come
-                  from the API; the lead's current rep is always included so it
-                  displays even if that user isn't in the list. */}
               <Select value={form.rep} disabled>
                 <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
                 <SelectContent>
