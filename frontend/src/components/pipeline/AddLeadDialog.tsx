@@ -53,7 +53,7 @@ export function AddLeadDialog() {
   // Load the user list once, and default the (disabled) rep to the signed-in user.
   useEffect(() => { void ensureUsers(); }, [ensureUsers]);
   useEffect(() => {
-    if (me) setForm((f) => (f.rep ? f : { ...f, rep: userFullName(me) }));
+    if (me) setForm((f) => (f.rep ? f : { ...f, rep: me.email }));
   }, [me]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
