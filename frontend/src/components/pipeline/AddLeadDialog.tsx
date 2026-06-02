@@ -131,7 +131,7 @@ export function AddLeadDialog() {
                 <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
                 <SelectContent>
                   {users.map((u) => (
-                    <SelectItem key={u.iduser} value={userFullName(u)}>{userFullName(u)}</SelectItem>
+                    <SelectItem key={u.iduser} value={u.email}>{userFullName(u) || u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
