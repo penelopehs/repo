@@ -1,67 +1,69 @@
-// Leads store — pipeline data with reactive KPIs and full mutators.
+// Leads store — API-backed pipeline data with reactive KPIs and full mutators.
+//
+// State is the single source of truth the Client Dashboard reads from; mutators
+// call the FastAPI backend (services/leads.ts) and reconcile local state with the
+// server response so KPIs/tables stay in sync. Read-only consumers (ProfilePage,
+// ConfigureRequestPage) keep using the same `leads` selector unchanged.
 
 import { create } from "zustand";
-import type { Lead, LeadStatus, TaxYear } from "@/types/crm";
-import { MOCK_LEADS } from "@/data/mockLeads";
+import type { Lead, LeadStatus } from "@/types/crm";
+import { leadsApi, type LeadCreateInput } from "@/services/leads";
 
 interface LeadsState {
   leads: Lead[];
-  addLead: (
-    l: Omit<
-      Lead,
-      | "id"
-      | "addedAt"
-      | "status"
-      | "engagementYears"
-      | "engagedSince"
-      | "entitiesCount"
-      | "latestCalculation"
-      | "taxYears"
-    > & { taxYears?: TaxYear[] },
-  ) => void;
-  updateLead: (id: string, patch: Partial<Lead>) => void;
-  deleteLead: (id: string) => void;
-  setStatus: (id: string, status: LeadStatus) => void;
-  promoteToActive: (id: string) => void;
+  loading: boolean;
+  error: string | null;
+  fetchLeads: () => Promise<void>;
+  addLead: (l: LeadCreateInput) => Promise<void>;
+  updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  setStatus: (id: string, status: LeadStatus) => Promise<void>;
+  promoteToActive: (id: string) => Promise<void>;
   getLead: (id: string) => Lead | undefined;
 }
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
-  leads: MOCK_LEADS,
-  addLead: (l) =>
-    set((s) => ({
-      leads: [
-        {
-          ...l,
-          taxYears: l.taxYears ?? [],
-          id: `ld_${Date.now()}`,
-          status: "new",
-          engagementYears: 0,
-          engagedSince: "",
-          entitiesCount: 0,
-          latestCalculation: "—",
-          addedAt: new Date().toISOString(),
-        } as Lead,
-        ...s.leads,
-      ],
-    })),
-  updateLead: (id, patch) =>
-    set((s) => ({ leads: s.leads.map((x) => (x.id === id ? { ...x, ...patch } : x)) })),
-  deleteLead: (id) => set((s) => ({ leads: s.leads.filter((x) => x.id !== id) })),
-  setStatus: (id, status) =>
-    set((s) => ({ leads: s.leads.map((x) => (x.id === id ? { ...x, status } : x)) })),
-  promoteToActive: (id) =>
-    set((s) => ({
-      leads: s.leads.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              status: "active_engagement",
-              engagedSince: x.engagedSince || new Date().toISOString().slice(0, 10),
-              engagementYears: Math.max(1, x.engagementYears),
-            }
-          : x,
-      ),
-    })),
+  leads: [],
+  loading: false,
+  error: null,
+
+  fetchLeads: async () => {
+    set({ loading: true, error: null });
+    try {
+      const leads = await leadsApi.list();
+      set({ leads, loading: false });
+    } catch (e) {
+      set({
+        error: e instanceof Error ? e.message : "Failed to load leads",
+        loading: false,
+      });
+    }
+  },
+
+  addLead: async (l) => {
+    const created = await leadsApi.create(l);
+    set((s) => ({ leads: [created, ...s.leads] }));
+  },
+
+  updateLead: async (id, patch) => {
+    const updated = await leadsApi.update(id, patch);
+    set((s) => ({ leads: s.leads.map((x) => (x.id === id ? updated : x)) }));
+  },
+
+  deleteLead: async (id) => {
+    await leadsApi.remove(id);
+    set((s) => ({ leads: s.leads.filter((x) => x.id !== id) }));
+  },
+
+  setStatus: async (id, status) => {
+    const updated = await leadsApi.update(id, { status });
+    set((s) => ({ leads: s.leads.map((x) => (x.id === id ? updated : x)) }));
+  },
+
+  promoteToActive: async (id) => {
+    const updated = await leadsApi.update(id, { status: "active_engagement" });
+    set((s) => ({ leads: s.leads.map((x) => (x.id === id ? updated : x)) }));
+  },
+
   getLead: (id) => get().leads.find((l) => l.id === id),
 }));

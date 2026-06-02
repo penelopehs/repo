@@ -14,11 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadSource, LeadStatus, SalesRep } from "@/types/crm";
+import type { Lead, LeadSource, LeadStatus } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
+import { useUsersStore } from "@/store/usersStore";
+import { userFullName } from "@/services/users";
 
 const SOURCES: LeadSource[] = ["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"];
-const REPS: SalesRep[] = ["David Kim", "James Carter", "Sarah Johnson", "Unassigned"];
 const STATUSES: { value: LeadStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "calculation_sent", label: "Calculation Sent" },
@@ -33,7 +34,8 @@ const schema = z.object({
   email: z.string().trim().email().max(255),
   phone: z.string().trim().min(7).max(40),
   source: z.enum(["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"]),
-  rep: z.enum(["David Kim", "James Carter", "Sarah Johnson", "Unassigned"]),
+  // The salesperson is owned by the backend (caller) and shown read-only.
+  rep: z.string().trim().min(1),
   status: z.enum(["new", "calculation_sent", "sow_signed", "active_engagement", "lost"]),
   notes: z.string().max(2000).optional(),
 });
@@ -50,6 +52,10 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   const open = openProp ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const update = useLeadsStore((s) => s.updateLead);
+  const users = useUsersStore((s) => s.users);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
+
+  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
 
   const [form, setForm] = useState({
     fullName: lead.fullName,
@@ -69,16 +75,25 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     });
   }, [lead]);
 
-  const submit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
       toast.error("Please check the form for errors.");
       return;
     }
-    update(lead.id, parsed.data);
-    toast.success("Client updated", { description: form.fullName });
-    setOpen(false);
+    setSubmitting(true);
+    try {
+      await update(lead.id, parsed.data);
+      toast.success("Client updated", { description: form.fullName });
+      setOpen(false);
+    } catch (err) {
+      toast.error("Couldn't update client", { description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -102,9 +117,19 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              <Select value={form.rep} onValueChange={(v) => setForm({ ...form, rep: v as SalesRep })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{REPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+              {/* Read-only — the salesperson is owned by the backend. Options come
+                  from the API; the lead's current rep is always included so it
+                  displays even if that user isn't in the list. */}
+              <Select value={form.rep} disabled>
+                <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
+                <SelectContent>
+                  {form.rep && !users.some((u) => userFullName(u) === form.rep) && (
+                    <SelectItem value={form.rep}>{form.rep}</SelectItem>
+                  )}
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={userFullName(u)}>{userFullName(u)}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Item>
             <Item label="Status">
@@ -118,8 +143,8 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
             <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </Item>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-navy text-navy-foreground hover:bg-navy/90">Save Changes</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-navy text-navy-foreground hover:bg-navy/90">{submitting ? "Saving…" : "Save Changes"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

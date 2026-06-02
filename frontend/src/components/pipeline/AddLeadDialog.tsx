@@ -1,6 +1,6 @@
 // "Add New Lead" modal — validated with zod, dispatches to leads store.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
@@ -13,13 +13,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus } from "lucide-react";
-import type { LeadSource, SalesRep, TaxYear } from "@/types/crm";
+import type { LeadSource, TaxYear } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
+import { useUsersStore } from "@/store/usersStore";
+import { userFullName } from "@/services/users";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { ALL_TAX_YEARS } from "@/types/crm";
 
 const SOURCES: LeadSource[] = ["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"];
-const REPS: SalesRep[] = ["David Kim", "James Carter", "Sarah Johnson", "Unassigned"];
 
 const schema = z.object({
   fullName: z.string().trim().min(1, "Required").max(120),
@@ -27,14 +28,16 @@ const schema = z.object({
   email: z.string().trim().email("Invalid email").max(255),
   phone: z.string().trim().min(7, "Invalid phone").max(40),
   source: z.enum(["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"]),
-  rep: z.enum(["David Kim", "James Carter", "Sarah Johnson", "Unassigned"]),
+  // The sales rep is always the authenticated user (the field is disabled);
+  // the backend forces salesperson = caller regardless of what's sent.
+  rep: z.string().trim().min(1, "Required"),
 });
 
 type FormState = z.infer<typeof schema>;
 
 const initial: FormState = {
   fullName: "", company: "", email: "", phone: "",
-  source: "Website", rep: "Unassigned",
+  source: "Website", rep: "",
 };
 
 export function AddLeadDialog() {
@@ -43,6 +46,15 @@ export function AddLeadDialog() {
   const [years, setYears] = useState<TaxYear[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const addLead = useLeadsStore((s) => s.addLead);
+  const me = useUsersStore((s) => s.me);
+  const users = useUsersStore((s) => s.users);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
+
+  // Load the user list once, and default the (disabled) rep to the signed-in user.
+  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
+  useEffect(() => {
+    if (me) setForm((f) => (f.rep ? f : { ...f, rep: userFullName(me) }));
+  }, [me]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -50,7 +62,9 @@ export function AddLeadDialog() {
   const toggleYear = (y: TaxYear) =>
     setYears((p) => (p.includes(y) ? p.filter((x) => x !== y) : [...p, y].sort((a, b) => a - b)));
 
-  const submit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
@@ -59,12 +73,19 @@ export function AddLeadDialog() {
       setErrors(fe);
       return;
     }
-    addLead({ ...parsed.data, taxYears: years });
-    toast.success("Lead added", { description: `${parsed.data.fullName} · ${parsed.data.company}` });
-    setForm(initial);
-    setYears([]);
-    setErrors({});
-    setOpen(false);
+    setSubmitting(true);
+    try {
+      await addLead({ ...parsed.data, taxYears: years });
+      toast.success("Lead added", { description: `${parsed.data.fullName} · ${parsed.data.company}` });
+      setForm({ ...initial, rep: me ? userFullName(me) : "" });
+      setYears([]);
+      setErrors({});
+      setOpen(false);
+    } catch (err) {
+      toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -106,10 +127,15 @@ export function AddLeadDialog() {
               </Select>
             </Field>
             <Field label="Assigned Sales Representative">
-              <Select value={form.rep} onValueChange={(v) => set("rep", v as SalesRep)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              {/* Always the signed-in user — disabled. The list is pulled from the
+                  API so the value matches a real user; the backend assigns the
+                  caller as salesperson regardless. */}
+              <Select value={form.rep} disabled>
+                <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
                 <SelectContent>
-                  {REPS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={userFullName(u)}>{userFullName(u)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
@@ -123,8 +149,8 @@ export function AddLeadDialog() {
             />
           </Field>
           <DialogFooter className="mt-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-navy text-navy-foreground hover:bg-navy/90">Add Lead</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-navy text-navy-foreground hover:bg-navy/90">{submitting ? "Adding…" : "Add Lead"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -55,11 +55,9 @@ export type LeadSource =
   | "Partner"
   | "Other";
 
-export type SalesRep =
-  | "David Kim"
-  | "James Carter"
-  | "Sarah Johnson"
-  | "Unassigned";
+// Sales rep names now come from the API (GET /users/), so `rep` is a free
+// string (a user's full name) rather than a fixed union.
+export type SalesRep = string;
 
 export interface Lead {
   id: string;

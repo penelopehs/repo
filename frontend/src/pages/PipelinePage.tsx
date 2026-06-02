@@ -1,6 +1,6 @@
 // Client Pipeline — three sections + KPI-driven filtering, search, and sortable table.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -43,10 +43,17 @@ const KPI_TO_STATUS: Record<Exclude<KpiFilter, "total" | null>, LeadStatus> = {
 
 export function PipelinePage() {
   const leads = useLeadsStore((s) => s.leads);
+  const loading = useLeadsStore((s) => s.loading);
+  const error = useLeadsStore((s) => s.error);
+  const fetchLeads = useLeadsStore((s) => s.fetchLeads);
   const deleteLead = useLeadsStore((s) => s.deleteLead);
   const setStatus = useLeadsStore((s) => s.setStatus);
   const promote = useLeadsStore((s) => s.promoteToActive);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    void fetchLeads();
+  }, [fetchLeads]);
 
   const [query, setQuery] = useState("");
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null);
@@ -171,14 +178,27 @@ export function PipelinePage() {
           <span className="text-xs text-muted-foreground">{filtered.length} record{filtered.length === 1 ? "" : "s"}</span>
         </header>
 
+        {error && (
+          <div className="flex items-center justify-between gap-3 border-b border-border bg-destructive/10 px-5 py-3 text-sm text-destructive">
+            <span>Couldn't load leads: {error}</span>
+            <Button size="sm" variant="outline" onClick={() => void fetchLeads()}>Retry</Button>
+          </div>
+        )}
+
         <PipelineTable
           rows={paged}
           sortField={sortField} sortDir={sortDir} onSort={onSort}
           onProfile={goProfile} onCalc={goCalc} onEdit={(l) => setEditing(l)}
-          onSignSow={(l) => { setStatus(l.id, "sow_signed"); toast.success("SOW signed", { description: l.company }); }}
-          onStartEng={(l) => { promote(l.id); toast.success("Engagement started", { description: l.company }); }}
+          onSignSow={async (l) => {
+            try { await setStatus(l.id, "sow_signed"); toast.success("SOW signed", { description: l.company }); }
+            catch (e) { toast.error("Couldn't sign SOW", { description: e instanceof Error ? e.message : undefined }); }
+          }}
+          onStartEng={async (l) => {
+            try { await promote(l.id); toast.success("Engagement started", { description: l.company }); }
+            catch (e) { toast.error("Couldn't start engagement", { description: e instanceof Error ? e.message : undefined }); }
+          }}
           onDelete={(l) => setPendingDelete(l.id)}
-          emptyText="No leads match your filters."
+          emptyText={loading ? "Loading leads…" : "No leads match your filters."}
         />
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-xs text-muted-foreground">
@@ -201,9 +221,12 @@ export function PipelinePage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (pendingDelete) { deleteLead(pendingDelete); toast.success("Lead deleted"); }
+              onClick={async () => {
+                const id = pendingDelete;
                 setPendingDelete(null);
+                if (!id) return;
+                try { await deleteLead(id); toast.success("Lead deleted"); }
+                catch (e) { toast.error("Couldn't delete lead", { description: e instanceof Error ? e.message : undefined }); }
               }}
             >
               Delete
