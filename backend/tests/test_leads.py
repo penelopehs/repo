@@ -89,9 +89,11 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     assert body["salesperson_iduser"] == 1
     # company is read back from the seeded JSON entity.
     assert body["company"] == "Pike Diagnostics"
-    # tax_years + latest_calc_date are derived from the data blob's buckets.
+    # tax_years come from the data blob's buckets; entities_count from its
+    # entities list. Freshly seeded calcs carry no created_at yet.
     assert body["tax_years"] == [2025, 2026]
-    assert body["latest_calc_date"] == 2026.0
+    assert body["entities_count"] == 1
+    assert body["latest_calc_date"] is None
 
     # The JSON blob holds the entity + an empty bucket per tax year.
     lead = db_session.query(models.CrmLead).filter(
@@ -230,17 +232,22 @@ def test_save_calculations_stores_blob_and_advances_status(client):
     assert lead["pipeline_status"] == "Lead"
 
     blob = {
-        "entities": [{"name": "Calc Co, PC"}],
-        "calculations": {"2023": {}, "2024": {}},
+        "entities": [{"name": "Calc Co, PC"}, {"name": "Calc Co Holdings"}],
+        "calculations": {
+            "2023": {"created_at": 1700000000.0},
+            "2024": {"created_at": 1710000000.0},
+        },
         "people": [],
     }
     resp = client.put(f"/leads/{lead['id']}/calculations", json={"data": blob})
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"] == blob
-    # tax_years + latest_calc_date are derived from the blob's per-year buckets.
+    # tax_years come from the per-year buckets; entities_count from the entities
+    # list; latest_calc_date is the newest calculation's created_at.
     assert body["tax_years"] == [2023, 2024]
-    assert body["latest_calc_date"] == 2024.0
+    assert body["entities_count"] == 2
+    assert body["latest_calc_date"] == 1710000000.0
     # A fresh Lead is moved to "Calculation Sent".
     assert body["pipeline_status"] == "Calculation Sent"
 

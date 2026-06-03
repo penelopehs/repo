@@ -112,9 +112,30 @@ def _lead_tax_years(data) -> List[int]:
 
 
 def _latest_calc_date(data) -> Optional[float]:
-    """The most recent tax year on the lead (max of `_lead_tax_years`)."""
-    years = _lead_tax_years(data)
-    return float(max(years)) if years else None
+    """The newest calculation's `created_at` timestamp from the lead's data
+    blob. `data['calculations']` holds calculation objects (a dict keyed by
+    year, or a list); each carries a `created_at` epoch timestamp. Returns the
+    max, or None when there are no timestamped calculations."""
+    timestamps: List[float] = []
+    if isinstance(data, dict):
+        calcs = data.get("calculations")
+        items = calcs.values() if isinstance(calcs, dict) else calcs
+        if isinstance(items, (list, tuple)) or hasattr(items, "__iter__"):
+            for calc in items:
+                if isinstance(calc, dict):
+                    ts = calc.get("created_at")
+                    if isinstance(ts, (int, float)) and not isinstance(ts, bool):
+                        timestamps.append(float(ts))
+    return max(timestamps) if timestamps else None
+
+
+def _entities_count(data) -> int:
+    """Number of entities saved on the lead (len of `data['entities']`)."""
+    if isinstance(data, dict):
+        entities = data.get("entities")
+        if isinstance(entities, list):
+            return len(entities)
+    return 0
 
 
 def _initial_data(company: Optional[str], tax_years) -> dict:
@@ -277,6 +298,7 @@ def list_leads(
             created_at=o.created_at,
             sow_signed_at=o.sow_signed_at,
             engagement_started_at=o.engagement_started_at,
+            entities_count=_entities_count(o.data),
             tax_years=_lead_tax_years(o.data),
         )
 
@@ -415,6 +437,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         updated_at=lead.updated_at,
         sow_signed_at=lead.sow_signed_at,
         engagement_started_at=lead.engagement_started_at,
+        entities_count=_entities_count(lead.data),
         notes=lead.notes,
         engagements=engagements,
         follow_up_calls=follow_up_calls,

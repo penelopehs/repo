@@ -116,6 +116,7 @@ class LeadListItem(BaseModel):
     created_at: datetime
     sow_signed_at: Optional[datetime] = None
     engagement_started_at: Optional[datetime] = None
+    entities_count: int
     tax_years: List[int] = Field(default_factory=list)
 
 
