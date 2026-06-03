@@ -96,12 +96,11 @@ def _get_lead(db: Session, lead_id: int) -> models.CrmLead:
     return lead
 
 
-def _calc_total(calculations) -> Optional[float]:
-    """Best-effort headline total pulled from the lead's calculations JSON blob
-    (crm_leads.calculations). The blob is free-form: we look for a top-level
-    total, sum the per-year buckets under `calculations`, and for a list of
-    saved runs fall back to the latest run's total."""
-    data = calculations
+def _calc_total(data) -> Optional[float]:
+    """Best-effort headline total pulled from the lead's data JSON blob
+    (crm_leads.data). The blob is free-form: we look for a top-level total, sum
+    the per-year buckets under `calculations`, and for a list of saved runs fall
+    back to the latest run's total."""
     if isinstance(data, list):
         data = data[-1] if data else None
     if not isinstance(data, dict):
@@ -119,9 +118,9 @@ def _calc_total(calculations) -> Optional[float]:
     return None
 
 
-def _initial_calculations(company: Optional[str], tax_years) -> dict:
-    """Seed the lead's calculations JSON: one entity (the provided company /
-    entity name), an empty bucket per tax year, and an empty people list."""
+def _initial_data(company: Optional[str], tax_years) -> dict:
+    """Seed the lead's data JSON: one entity (the provided company / entity
+    name), an empty bucket per tax year, and an empty people list."""
     return {
         "entities": [{"name": company}] if company else [],
         "calculations": {str(year): {} for year in (tax_years or [])},
@@ -201,10 +200,10 @@ def _people_contact_info(db: Session, client_id: int):
 
 
 def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
-    """The lead's company / entity name. It's seeded into the calculations JSON
-    on create (entities[0].name); we fall back to the client's people firm. The
+    """The lead's company / entity name. It's seeded into the data JSON on
+    create (entities[0].name); we fall back to the client's people firm. The
     lead's own contact (first_name/last_name/email/phone) lives directly on crm_leads."""
-    data = lead.calculations
+    data = lead.data
     if isinstance(data, dict):
         entities = data.get("entities")
         if isinstance(entities, list) and entities:
@@ -239,10 +238,6 @@ def list_leads(
     # Resolve each lead's client through its EPR assignment (epr → entity → client).
     client_id_by_lead = {o.crm_lead_id: _lead_client_id(db, o) for o in leads}
     client_ids = {cid for cid in client_id_by_lead.values() if cid}
-    clients = {
-        c.idclients: c
-        for c in db.query(models.Client).filter(models.Client.idclients.in_(client_ids)).all()
-    } if client_ids else {}
     # total lead count per client (across ALL statuses) -> New/Returning
     counts = dict(
         db.query(models.Entity.clients_idclients, func.count(models.CrmLead.crm_lead_id))
@@ -267,16 +262,9 @@ def list_leads(
 
     def _item(o: models.CrmLead) -> schemas.LeadListItem:
         client_id = client_id_by_lead.get(o.crm_lead_id)
-        company = _company_for(db, o)
         return schemas.LeadListItem(
             id=o.crm_lead_id,
-            client_id=client_id,
-            client_name=(
-                clients[client_id].client_name
-                if client_id in clients
-                else (company or f"{o.first_name} {o.last_name}".strip())
-            ),
-            company=company,
+            company=_company_for(db, o),
             first_name=o.first_name,
             last_name=o.last_name,
             email=o.email,
@@ -286,7 +274,7 @@ def list_leads(
             salesperson_iduser=o.salesperson_iduser,
             salesperson_name=reps.get(o.salesperson_iduser),
             client_type="Returning" if client_id and counts.get(client_id, 1) > 1 else "New",
-            latest_calc_total=_calc_total(o.calculations),
+            latest_calc_total=_calc_total(o.data),
             created_at=o.created_at,
             sow_signed_at=o.sow_signed_at,
             engagement_started_at=o.engagement_started_at,
@@ -317,10 +305,10 @@ def create_lead(
                 status_code=404, detail="Entity-people-role assignment not found"
             )
 
-    calculations = (
-        body.calculations
-        if body.calculations is not None
-        else _initial_calculations(body.company, body.tax_years)
+    data = (
+        body.data
+        if body.data is not None
+        else _initial_data(body.company, body.tax_years)
     )
 
     lead = models.CrmLead(
@@ -333,7 +321,7 @@ def create_lead(
         lead_source=body.lead_source,
         salesperson_iduser=body.assigned_sales_rep or caller.iduser,
         notes=body.notes,
-        calculations=calculations,
+        data=data,
     )
     db.add(lead)
     db.commit()
@@ -350,87 +338,12 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)):
 
 def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     client_id = _lead_client_id(db, lead)
-    client = (
-        db.query(models.Client).filter(models.Client.idclients == client_id).first()
-        if client_id
-        else None
-    )
     company = _company_for(db, lead)
     rep = (
         db.query(models.User).filter(models.User.iduser == lead.salesperson_iduser).first()
         if lead.salesperson_iduser
         else None
     )
-
-    # sub-entities (read) — entities belonging to the client
-    entities = (
-        db.query(models.Entity)
-        .filter(models.Entity.clients_idclients == client_id)
-        .all()
-        if client_id
-        else []
-    )
-    entity_ids = [e.entity_id for e in entities]
-    type_names = {
-        t.id: t.entity_type_name
-        for t in db.query(models.EntityTypeRef).all()
-    }
-    sub_entities = [
-        schemas.SubEntityRead(
-            id=e.entity_id,
-            name=e.entity_name,
-            ein=e.ein,
-            state=e.state,
-            city=e.city,
-            entity_type=type_names.get(e.entity_types_id),
-        )
-        for e in entities
-    ]
-
-    # contacts (read, pragmatic) — people linked to the client's entities
-    contacts: List[schemas.ContactRead] = []
-    if entity_ids:
-        links = (
-            db.query(models.EntityPeopleRole)
-            .filter(models.EntityPeopleRole.entities_entity_id.in_(entity_ids))
-            .all()
-        )
-        person_ids = {l.people_idperson for l in links}
-        people = {
-            p.idperson: p
-            for p in db.query(models.Person).filter(models.Person.idperson.in_(person_ids)).all()
-        } if person_ids else {}
-        role_names = {r.idroles: r.role_name for r in db.query(models.PeopleRole).all()}
-        emails = _primary_map(
-            db.query(models.PeopleEmail)
-            .filter(models.PeopleEmail.people_idperson.in_(person_ids))
-            .all(),
-            lambda r: r.people_idperson,
-            lambda r: r.email,
-        ) if person_ids else {}
-        phones = _primary_map(
-            db.query(models.PeoplePhone)
-            .filter(models.PeoplePhone.people_idperson.in_(person_ids))
-            .all(),
-            lambda r: r.people_idperson,
-            lambda r: r.phone,
-        ) if person_ids else {}
-        for l in links:
-            p = people.get(l.people_idperson)
-            if not p:
-                continue
-            contacts.append(
-                schemas.ContactRead(
-                    id=p.idperson,
-                    name=f"{p.first_name} {p.last_name}".strip(),
-                    role=role_names.get(l.roles_idroles),
-                    title=p.title,
-                    firm=p.firm,
-                    email=emails.get(p.idperson),
-                    phone=phones.get(p.idperson),
-                    entity_id=l.entities_entity_id,
-                )
-            )
 
     # engagements (+ tax years)
     engagements: List[schemas.EngagementRead] = []
@@ -487,8 +400,6 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
 
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
-        client_id=client_id,
-        client_name=client.client_name if client else (company or f"{lead.first_name} {lead.last_name}".strip()),
         company=company,
         first_name=lead.first_name,
         last_name=lead.last_name,
@@ -499,18 +410,16 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         salesperson_iduser=lead.salesperson_iduser,
         salesperson_name=f"{rep.first_name} {rep.last_name}".strip() if rep else None,
         client_type=_client_type(db, client_id),
-        latest_calc_total=_calc_total(lead.calculations),
+        latest_calc_total=_calc_total(lead.data),
         created_at=lead.created_at,
         updated_at=lead.updated_at,
         sow_signed_at=lead.sow_signed_at,
         engagement_started_at=lead.engagement_started_at,
         notes=lead.notes,
-        sub_entities=sub_entities,
-        contacts=contacts,
         engagements=engagements,
         follow_up_calls=follow_up_calls,
         intake_questions=intake_questions,
-        calculations=lead.calculations,
+        data=lead.data,
     )
 
 
@@ -710,14 +619,14 @@ def _engagement_read(db: Session, eng: models.Engagement) -> schemas.EngagementR
 
 
 # ── Calculations ───────────────────────────────────────────────────────────────
-# The calculator state is a free-form JSON blob stored on crm_leads.calculations.
+# The calculator state is a free-form JSON blob stored on crm_leads.data.
 
 @router.put("/leads/{lead_id}/calculations", response_model=schemas.LeadDetail)
 def save_calculations(
     lead_id: int, body: schemas.CalculationsUpdate, db: Session = Depends(get_db)
 ):
     lead = _get_lead(db, lead_id)
-    lead.calculations = body.calculations
+    lead.data = body.data
     # Mirror the old saveCalculation behaviour: a fresh Lead becomes Calculation Sent.
     if lead.pipeline_status == PipelineStatus.lead.value:
         lead.pipeline_status = PipelineStatus.calculation_sent.value
@@ -729,5 +638,5 @@ def save_calculations(
 @router.delete("/leads/{lead_id}/calculations", status_code=204)
 def clear_calculations(lead_id: int, db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id)
-    lead.calculations = []
+    lead.data = []
     db.commit()

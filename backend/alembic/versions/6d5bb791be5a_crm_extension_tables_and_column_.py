@@ -26,7 +26,7 @@ def upgrade() -> None:
     sa.Column('last_name', sa.String(length=255), nullable=False),
     sa.Column('email', sa.String(length=255), nullable=True),
     sa.Column('phone', sa.String(length=20), nullable=True),
-    sa.Column('calculations', sa.JSON(), nullable=False),
+    sa.Column('data', sa.JSON(), nullable=False),
     sa.Column('notes', sa.Text(), nullable=True),
     sa.Column('sow_signed_at', sa.DateTime(), nullable=True),
     sa.Column('engagement_started_at', sa.DateTime(), nullable=True),

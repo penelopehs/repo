@@ -238,7 +238,7 @@ class CrmLead(Base):
     last_name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
-    calculations = Column(JSON, nullable=False)
+    data = Column(JSON, nullable=False)
     notes = Column(Text, nullable=True)
     sow_signed_at = Column(DateTime, nullable=True)
     engagement_started_at = Column(DateTime, nullable=True)

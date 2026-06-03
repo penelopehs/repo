@@ -85,8 +85,8 @@ class LeadCreate(BaseModel):
     tax_years: List[int] = Field(default_factory=list)
     notes: Optional[str] = None
     # Optional pre-built calculator state; when omitted it's seeded from
-    # `company` + `tax_years` (see crm_leads.calculations).
-    calculations: Optional[Any] = None
+    # `company` + `tax_years` (see crm_leads.data).
+    data: Optional[Any] = None
 
 
 class LeadUpdate(BaseModel):
@@ -97,13 +97,11 @@ class LeadUpdate(BaseModel):
     pipeline_status: Optional[PipelineStatus] = None
     lead_source: Optional[str] = None
     notes: Optional[str] = None
-    calculations: Optional[Any] = None
+    data: Optional[Any] = None
 
 
 class LeadListItem(BaseModel):
     id: int
-    client_id: Optional[int] = None
-    client_name: str
     company: Optional[str] = None
     first_name: str
     last_name: str
@@ -114,10 +112,12 @@ class LeadListItem(BaseModel):
     salesperson_iduser: Optional[int] = None
     salesperson_name: Optional[str] = None
     client_type: str  # "New" | "Returning"
-    latest_calc_total: Optional[float] = None
+    latest_calc_date: Optional[float] = None
     created_at: datetime
     sow_signed_at: Optional[datetime] = None
     engagement_started_at: Optional[datetime] = None
+    tax_years: List[int] = Field(default_factory=list)
+
 
 
 # ── Nested reads for the detail aggregate ──────────────────────────────────────
@@ -169,14 +169,11 @@ class IntakeQuestionRead(BaseModel):
 class LeadDetail(LeadListItem):
     notes: Optional[str] = None
     updated_at: Optional[datetime] = None
-    sub_entities: List[SubEntityRead] = Field(default_factory=list)
-    contacts: List[ContactRead] = Field(default_factory=list)
     engagements: List[EngagementRead] = Field(default_factory=list)
     follow_up_calls: List[FollowUpCallRead] = Field(default_factory=list)
     intake_questions: List[IntakeQuestionRead] = Field(default_factory=list)
-    # Free-form calculator state stored on the lead (crm_leads.calculations).
-    calculations: Any = None
-    tax_years: List[int] = Field(default_factory=list)
+    # Free-form calculator state stored on the lead (crm_leads.data).
+    data: Any = None
 
 
 # ── Follow-up calls ────────────────────────────────────────────────────────────
@@ -210,7 +207,7 @@ class EngagementUpdate(BaseModel):
 
 # ── Calculations ───────────────────────────────────────────────────────────────
 # Calculations are no longer a separate table: the whole calculator state is
-# stored as a free-form JSON blob on crm_leads.calculations.
+# stored as a free-form JSON blob on crm_leads.data.
 
 class CalculationsUpdate(BaseModel):
-    calculations: Any
+    data: Any

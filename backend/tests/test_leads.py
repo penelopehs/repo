@@ -12,8 +12,10 @@ from tests.conftest import make_assignment
 
 # ── Create ──────────────────────────────────────────────────────────────────────
 
-def test_create_with_epr_resolves_client(client, db_session):
-    client_id, _, epr_id = make_assignment(db_session, client_name="Cedar Valley Medical")
+def test_create_with_epr_resolves_company(client, db_session):
+    # company is resolved through the EPR assignment (epr -> entity -> client
+    # people firm) when none is seeded in the data blob.
+    _, _, epr_id = make_assignment(db_session, firm="Cedar Labs")
     resp = client.post(
         "/leads",
         json={
@@ -28,9 +30,7 @@ def test_create_with_epr_resolves_client(client, db_session):
     assert resp.status_code == 201
     body = resp.json()
     assert body["pipeline_status"] == "Lead"
-    # The client is resolved through the EPR assignment (epr -> entity -> client).
-    assert body["client_id"] == client_id
-    assert body["client_name"] == "Cedar Valley Medical"
+    assert body["company"] == "Cedar Labs"
     # Contact info is carried directly on the lead.
     assert body["first_name"] == "Dana"
     assert body["last_name"] == "Cedar"
@@ -52,10 +52,9 @@ def test_create_clientless_lead(client, db_session):
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["client_id"] is None
-    # No client -> no company resolved; client_name falls back to the lead's name.
+    # No epr/client -> no company resolved.
     assert body["company"] is None
-    assert body["client_name"] == "Harbor Lead"
+    assert body["first_name"] == "Harbor"
 
 
 def test_create_requires_name(client):
@@ -95,7 +94,7 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     lead = db_session.query(models.CrmLead).filter(
         models.CrmLead.crm_lead_id == body["id"]
     ).first()
-    assert lead.calculations == {
+    assert lead.data == {
         "entities": [{"name": "Pike Diagnostics"}],
         "calculations": {"2025": {}, "2026": {}},
         "people": [],
@@ -110,15 +109,15 @@ def test_create_defaults_sales_rep_to_caller(client, db_session):
     assert body["salesperson_iduser"] == 1
 
 
-def test_create_stores_calculations_blob(client):
+def test_create_stores_data_blob(client):
     payload = {"runs": [{"total_bill": 42.0}]}
     resp = client.post(
         "/leads",
-        json={"first_name": "Calc", "last_name": "Lead", "calculations": payload},
+        json={"first_name": "Calc", "last_name": "Lead", "data": payload},
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["calculations"] == payload
+    assert body["data"] == payload
 
 
 def test_create_without_caller_user_403(client, claims):
@@ -144,11 +143,12 @@ def test_list_filter_by_status(client):
 def test_list_resolves_company_from_client_people(client, db_session):
     # With no company seeded in the JSON, company falls back to the firm of the
     # people behind the lead's client (resolved via epr -> entity -> client).
-    client_id, _, epr_id = make_assignment(db_session, firm="Acme Labs")
+    make_assignment(db_session, firm="Acme Labs")
+    epr_id = db_session.query(models.EntityPeopleRole).first().identity_people_roles
 
     client.post("/leads", json={"epr_id": epr_id, "first_name": "Dana", "last_name": "Reed"})
     resp = client.get("/leads", params={"status": "Lead"})
-    item = next(o for o in resp.json() if o["client_id"] == client_id)
+    item = next(o for o in resp.json() if o["first_name"] == "Dana")
     assert item["company"] == "Acme Labs"
 
 
@@ -158,15 +158,25 @@ def test_get_detail_404(client):
     assert client.get("/leads/424242").status_code == 404
 
 
-def test_detail_includes_sub_entities(client, db_session):
+def test_detail_returns_data_blob(client, db_session):
     _, _, epr_id = make_assignment(db_session)
-    lead = client.post("/leads", json={"epr_id": epr_id, "first_name": "Detail", "last_name": "Lead"}).json()
+    lead = client.post(
+        "/leads",
+        json={
+            "epr_id": epr_id,
+            "first_name": "Detail",
+            "last_name": "Lead",
+            "company": "Detail Co",
+            "tax_years": [2024],
+        },
+    ).json()
 
-    resp = client.get(f"/leads/{lead['id']}")
-    assert resp.status_code == 200
-    body = resp.json()
-    names = {e["name"] for e in body["sub_entities"]}
-    assert "Acme Health, PC" in names
+    body = client.get(f"/leads/{lead['id']}").json()
+    assert body["data"] == {
+        "entities": [{"name": "Detail Co"}],
+        "calculations": {"2024": {}},
+        "people": [],
+    }
 
 
 # ── Update / status transitions ─────────────────────────────────────────────────
@@ -184,13 +194,13 @@ def test_patch_sow_signed_sets_timestamp_idempotently(client):
     assert r2.json()["sow_signed_at"] == first_ts
 
 
-def test_patch_updates_calculations(client):
+def test_patch_updates_data(client):
     lead = client.post("/leads", json={"first_name": "Patch", "last_name": "Calc"}).json()
     resp = client.patch(
-        f"/leads/{lead['id']}", json={"calculations": {"total": 5}}
+        f"/leads/{lead['id']}", json={"data": {"total": 5}}
     )
     assert resp.status_code == 200
-    assert resp.json()["calculations"] == {"total": 5}
+    assert resp.json()["data"] == {"total": 5}
 
 
 # ── Delete ──────────────────────────────────────────────────────────────────────
@@ -221,10 +231,10 @@ def test_save_calculations_stores_blob_and_advances_status(client):
         "total_bill": 150.0,
         "entities": [{"entity_name": "Calc Co, PC", "grand_total": 100.0}],
     }
-    resp = client.put(f"/leads/{lead['id']}/calculations", json={"calculations": blob})
+    resp = client.put(f"/leads/{lead['id']}/calculations", json={"data": blob})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["calculations"] == blob
+    assert body["data"] == blob
     # The headline total is read best-effort from the blob.
     assert body["latest_calc_total"] == 150.0
     # A fresh Lead is moved to "Calculation Sent".
@@ -234,11 +244,11 @@ def test_save_calculations_stores_blob_and_advances_status(client):
 def test_clear_calculations(client):
     lead = client.post(
         "/leads",
-        json={"first_name": "Del", "last_name": "Calc", "calculations": {"total": 10}},
+        json={"first_name": "Del", "last_name": "Calc", "data": {"total": 10}},
     ).json()
     assert client.delete(f"/leads/{lead['id']}/calculations").status_code == 204
     detail = client.get(f"/leads/{lead['id']}").json()
-    assert detail["calculations"] == []
+    assert detail["data"] == []
 
 
 # ── Engagements ─────────────────────────────────────────────────────────────────
