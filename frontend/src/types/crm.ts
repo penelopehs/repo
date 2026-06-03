@@ -61,11 +61,17 @@ export interface LeadDataEntity {
   name: string;
 }
 
-/** A person attached to the lead's `data` blob. The shape is backend-defined and
- *  may be sparse; the UI only relies on `name` today. */
+/** A person/contact stored on the lead's `data.people[]`. Frontend-managed
+ *  (the backend persists `data` as a free-form JSON blob). */
 export interface LeadDataPerson {
-  name?: string;
-  [key: string]: unknown;
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  workEmail: string;
+  email: string;
+  workPhone: string;
+  mobilePhone: string;
 }
 
 /** Raw per-lead aggregate stored in the backend `crm_leads.data` column and

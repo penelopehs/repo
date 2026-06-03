@@ -41,14 +41,12 @@ import { useEngagementsStore } from "@/store/engagementsStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
+import type { LeadDataPerson } from "@/types/crm";
 
 export function ProfilePage({ id }: { id: string }) {
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const byClient = useEngagementsStore((s) => s.byClient);
-  const addContact = useEngagementsStore((s) => s.addContact);
-  const updateContact = useEngagementsStore((s) => s.updateContact);
-  const deleteContact = useEngagementsStore((s) => s.deleteContact);
   const updateCall = useEngagementsStore((s) => s.updateCall);
   const navigate = useNavigate();
   const [openCall, setOpenCall] = useState(false);
@@ -86,7 +84,7 @@ export function ProfilePage({ id }: { id: string }) {
     };
   }, []);
 
-  const { engagements, contacts, entities: clientEntities, calls } = byClient(id);
+  const { engagements, entities: clientEntities, calls } = byClient(id);
 
   useEffect(() => {
     const now = new Date();
@@ -131,6 +129,72 @@ export function ProfilePage({ id }: { id: string }) {
       </div>
     );
   }
+
+  // People & Contacts live on the lead's `data.people[]` and persist via PATCH /leads/{id}.
+  const people = lead.data?.people ?? [];
+
+  const resetContactForm = () => {
+    setContactForm({
+      firstName: "",
+      lastName: "",
+      role: "",
+      workEmail: "",
+      email: "",
+      workPhone: "",
+      mobilePhone: "",
+    });
+    setContactError("");
+    setEditingContactId(null);
+    setIsAddingContact(false);
+  };
+
+  const persistPeople = async (next: LeadDataPerson[]) => {
+    const base = lead.data ?? { people: [], entities: [], calculations: {} };
+    await updateLead(id, { data: { ...base, people: next } });
+  };
+
+  const flashSaved = () => {
+    setContactSaved(true);
+    window.setTimeout(() => setContactSaved(false), 2500);
+  };
+
+  const saveContact = async () => {
+    const trimmed = {
+      firstName: contactForm.firstName.trim(),
+      lastName: contactForm.lastName.trim(),
+      role: contactForm.role.trim(),
+      workEmail: contactForm.workEmail.trim(),
+      email: contactForm.email.trim(),
+      workPhone: contactForm.workPhone.trim(),
+      mobilePhone: contactForm.mobilePhone.trim(),
+    };
+    if (!trimmed.firstName || !trimmed.lastName || !trimmed.role) {
+      setContactError("First name, last name, and role are required.");
+      return;
+    }
+    const next = editingContactId
+      ? people.map((p) => (p.id === editingContactId ? { ...p, ...trimmed } : p))
+      : [...people, { id: `person_${Date.now()}`, ...trimmed }];
+    try {
+      await persistPeople(next);
+      resetContactForm();
+      flashSaved();
+    } catch (e) {
+      setContactError(e instanceof Error ? e.message : "Couldn't save contact.");
+    }
+  };
+
+  const removeContact = async () => {
+    if (!editingContactId) return;
+    const next = people.filter((p) => p.id !== editingContactId);
+    try {
+      await persistPeople(next);
+      resetContactForm();
+      flashSaved();
+    } catch (e) {
+      setContactError(e instanceof Error ? e.message : "Couldn't remove contact.");
+    }
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -178,7 +242,7 @@ export function ProfilePage({ id }: { id: string }) {
             },
             {
               label: "Total Contacts",
-              value: contacts.length,
+              value: people.length,
               icon: Users,
               accent: "cyan",
               target: "section-contacts",
@@ -434,7 +498,7 @@ export function ProfilePage({ id }: { id: string }) {
                       contacts: [],
                     })),
                 ];
-                const pocContacts = contacts.filter((c) => c.role === "Point of Contact");
+                const pocContacts = people.filter((c) => c.role === "Point of Contact");
                 return (
                   <table className="w-full text-sm">
                     <thead>
@@ -642,64 +706,10 @@ export function ProfilePage({ id }: { id: string }) {
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => {
-                      const trimmed = {
-                        firstName: contactForm.firstName.trim(),
-                        lastName: contactForm.lastName.trim(),
-                        role: contactForm.role.trim(),
-                        workEmail: contactForm.workEmail.trim(),
-                        email: contactForm.email.trim(),
-                        workPhone: contactForm.workPhone.trim(),
-                        mobilePhone: contactForm.mobilePhone.trim(),
-                      };
-
-                      if (!trimmed.firstName || !trimmed.lastName || !trimmed.role) {
-                        setContactError("First name, last name, and role are required.");
-                        return;
-                      }
-
-                      if (editingContactId) {
-                        updateContact(editingContactId, trimmed);
-                      } else {
-                        addContact({ clientId: id, ...trimmed });
-                      }
-
-                      setContactForm({
-                        firstName: "",
-                        lastName: "",
-                        role: "",
-                        workEmail: "",
-                        email: "",
-                        workPhone: "",
-                        mobilePhone: "",
-                      });
-                      setContactError("");
-                      setContactSaved(true);
-                      window.setTimeout(() => setContactSaved(false), 2500);
-                      setEditingContactId(null);
-                      setIsAddingContact(false);
-                    }}
-                  >
+                  <Button onClick={saveContact}>
                     {editingContactId ? "Update Contact" : "Save Contact"}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setContactForm({
-                        firstName: "",
-                        lastName: "",
-                        role: "",
-                        workEmail: "",
-                        email: "",
-                        workPhone: "",
-                        mobilePhone: "",
-                      });
-                      setContactError("");
-                      setEditingContactId(null);
-                      setIsAddingContact(false);
-                    }}
-                  >
+                  <Button variant="outline" onClick={resetContactForm}>
                     Cancel
                   </Button>
                 </div>
@@ -708,21 +718,7 @@ export function ProfilePage({ id }: { id: string }) {
                     <Button
                       variant="outline"
                       className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
-                      onClick={() => {
-                        deleteContact(editingContactId);
-                        setContactForm({
-                          firstName: "",
-                          lastName: "",
-                          role: "",
-                          workEmail: "",
-                          email: "",
-                          workPhone: "",
-                          mobilePhone: "",
-                        });
-                        setContactError("");
-                        setEditingContactId(null);
-                        setIsAddingContact(false);
-                      }}
+                      onClick={removeContact}
                     >
                       <Trash2 className="mr-2 h-4 w-4" /> Remove Contact
                     </Button>
@@ -731,10 +727,10 @@ export function ProfilePage({ id }: { id: string }) {
               </div>
             )}
             <ul className="space-y-3">
-              {contacts.length === 0 && (
+              {people.length === 0 && (
                 <li className="text-sm text-muted-foreground">No contacts.</li>
               )}
-              {[...contacts]
+              {[...people]
                 .sort((a, b) => {
                   const poc = "Point of Contact";
                   if (a.role === poc && b.role !== poc) return -1;

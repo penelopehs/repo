@@ -71,6 +71,20 @@ const toClientType = (v: string | null | undefined): ClientType =>
 
 const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : "");
 
+// The backend `data` column is free-form JSON and can be null or (when cleared)
+// an array. Normalise it to a well-formed LeadData so consumers can rely on it.
+function normalizeData(data: LeadData | null | undefined): LeadData {
+  if (!data || Array.isArray(data)) {
+    return { people: [], entities: [], calculations: {} };
+  }
+  return {
+    people: Array.isArray(data.people) ? data.people : [],
+    entities: Array.isArray(data.entities) ? data.entities : [],
+    calculations:
+      data.calculations && typeof data.calculations === "object" ? data.calculations : {},
+  };
+}
+
 // ── Mapping: backend list item → frontend Lead ──────────────────────────────────
 //
 // The list response is self-contained, so the dashboard table is filled entirely
@@ -78,9 +92,10 @@ const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : 
 
 function mapListItem(i: ApiLeadListItem): Lead {
   const taxYears = toTaxYears(i.tax_years);
+  const data = normalizeData(i.data);
   // Entity names live in the `data` aggregate; surface them for the dashboard
   // table and the client profile's Entities card.
-  const entityNames = (i.data?.entities ?? [])
+  const entityNames = data.entities
     .map((e) => e.name)
     .filter((n): n is string => Boolean(n && n.trim()));
 
@@ -101,7 +116,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
     sowSignedAt: isoDate(i.sow_signed_at) || undefined,
     entitiesCount: i.entities_count ?? entityNames.length,
     entityNames,
-    data: i.data ?? undefined,
+    data,
     // latest_calc_date is Unix epoch seconds; render to an ISO date string.
     latestCalculation:
       i.latest_calc_date != null
@@ -176,6 +191,7 @@ export const leadsApi = {
     if (patch.source !== undefined) body.lead_source = patch.source;
     if (patch.status !== undefined) body.pipeline_status = STATUS_TO_API[patch.status];
     if (patch.notes !== undefined) body.notes = patch.notes;
+    if (patch.data !== undefined) body.data = patch.data;
     if (patch.fullName !== undefined) body.full_name = patch.fullName;
     if (patch.rep !== undefined) body.rep = patch.rep;
 
