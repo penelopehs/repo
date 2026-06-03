@@ -66,7 +66,7 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
             "phone": "+1-555-0142",
             "lead_source": "Webinar",
             "assigned_sales_rep": 1,
-            "engagement_years": [2025, 2026],
+            "tax_years": [2025, 2026],
         },
     )
     assert resp.status_code == 201
@@ -81,7 +81,7 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     # company is read back from the seeded JSON entity.
     assert body["company"] == "Pike Diagnostics"
 
-    # The JSON blob holds the entity + an empty bucket per engagement year.
+    # The JSON blob holds the entity + an empty bucket per tax year.
     lead = db_session.query(models.CrmLead).filter(
         models.CrmLead.crm_lead_id == body["id"]
     ).first()

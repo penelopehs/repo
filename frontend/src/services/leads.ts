@@ -113,12 +113,15 @@ function mapDetail(d: ApiLeadDetail): Lead {
 // ── Inputs from the dashboard dialogs ───────────────────────────────────────────
 
 export interface LeadCreateInput {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   company: string;
   email: string;
   phone: string;
   source: LeadSource;
   rep: SalesRep;
+  /** epr id (identity_people_roles) of a picked existing client, if any. */
+  eprId?: number | null;
   taxYears?: TaxYear[];
 }
 
@@ -156,7 +159,11 @@ export const leadsApi = {
       email: input.email,
       phone: input.phone,
       lead_source: input.source,
-      full_name: input.fullName,
+      first_name: input.firstName,
+      last_name: input.lastName,
+      full_name: `${input.firstName} ${input.lastName}`.trim(),
+      // epr_id of the selected existing client (null for a brand-new person).
+      epr_id: input.eprId ?? null,
       rep: input.rep,
       tax_years: input.taxYears ?? [],
     });

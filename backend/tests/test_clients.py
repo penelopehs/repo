@@ -1,8 +1,8 @@
 """Tests for the read-only clients API.
 
-GET /clients returns the entity_people_roles join exactly as the canonical
-query states: identity_people_roles, entity_name, first_name, last_name,
-role_name, created_at.
+GET /clients returns the entity_people_roles join (identity_people_roles,
+entity_name, first_name, last_name, role_name, created_at) plus all of the
+person's emails and phones.
 """
 
 from datetime import datetime
@@ -10,14 +10,30 @@ from datetime import datetime
 from app import models
 
 
-def _seed_assignment(db_session, *, entity_name, first_name, last_name, role_name):
+def _seed_assignment(
+    db_session, *, entity_name, first_name, last_name, role_name,
+    emails=(), phones=(),
+):
     """Insert an entity + person + role and the entity_people_roles link that
-    joins them, returning the link's id."""
+    joins them (optionally with the person's emails/phones). Returns the link id.
+
+    `emails`/`phones` items are either a plain string or a (value, is_primary)
+    tuple."""
     entity = models.Entity(clients_idclients=1, entity_name=entity_name)
     person = models.Person(first_name=first_name, last_name=last_name)
     role = models.PeopleRole(role_name=role_name)
     db_session.add_all([entity, person, role])
     db_session.flush()
+    for item in emails:
+        value, is_primary = item if isinstance(item, tuple) else (item, False)
+        db_session.add(models.PeopleEmail(
+            people_idperson=person.idperson, email=value, is_primary=is_primary
+        ))
+    for item in phones:
+        value, is_primary = item if isinstance(item, tuple) else (item, False)
+        db_session.add(models.PeoplePhone(
+            people_idperson=person.idperson, phone=value, is_primary=is_primary
+        ))
     link = models.EntityPeopleRole(
         entities_entity_id=entity.entity_id,
         people_idperson=person.idperson,
@@ -49,8 +65,28 @@ def test_list_returns_join_rows(client, db_session):
         "first_name": "Dana",
         "last_name": "Reed",
         "role_name": "Owner",
+        "emails": [],
+        "phones": [],
         "created_at": "2026-01-02T03:04:05",
     }
+
+
+def test_list_returns_all_emails_and_phones_primary_first(client, db_session):
+    _seed_assignment(
+        db_session,
+        entity_name="Acme Health, PC",
+        first_name="Dana",
+        last_name="Reed",
+        role_name="Owner",
+        emails=["dana@work.test", ("dana@primary.test", True)],
+        phones=[("+1-555-0001", True), "+1-555-0002"],
+    )
+
+    rows = client.get("/clients").json()
+    assert len(rows) == 1
+    # Primary first, then the rest.
+    assert rows[0]["emails"] == ["dana@primary.test", "dana@work.test"]
+    assert rows[0]["phones"] == ["+1-555-0001", "+1-555-0002"]
 
 
 def test_list_inner_joins_skip_unlinked_people(client, db_session):

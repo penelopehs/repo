@@ -40,13 +40,16 @@ class Client(BaseModel):
 
 
 class ClientContactRow(BaseModel):
-    """One row of the entity_people_roles join exposed by GET /clients."""
+    """One row of the entity_people_roles join exposed by GET /clients, with all
+    of the person's emails and phones (primary first)."""
 
     identity_people_roles: int
     entity_name: str
     first_name: str
     last_name: str
     role_name: str
+    emails: List[str] = Field(default_factory=list)
+    phones: List[str] = Field(default_factory=list)
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -76,11 +79,12 @@ class LeadCreate(BaseModel):
     lead_source: Optional[str] = None
     # The assigned sales rep (users.iduser); defaults to the calling user.
     assigned_sales_rep: Optional[int] = None
-    # Engagement (tax) years — seeded as empty buckets in the calculations JSON.
-    engagement_years: List[int] = Field(default_factory=list)
+    # Tax years — seeded as empty buckets under calculations.calculations
+    # (e.g. [2022, 2023] -> {"2022": {}, "2023": {}}).
+    tax_years: List[int] = Field(default_factory=list)
     notes: Optional[str] = None
     # Optional pre-built calculator state; when omitted it's seeded from
-    # `company` + `engagement_years` (see crm_leads.calculations).
+    # `company` + `tax_years` (see crm_leads.calculations).
     calculations: Optional[Any] = None
 
 
@@ -169,6 +173,7 @@ class LeadDetail(LeadListItem):
     intake_questions: List[IntakeQuestionRead] = Field(default_factory=list)
     # Free-form calculator state stored on the lead (crm_leads.calculations).
     calculations: Any = None
+    tax_years: List[int] = Field(default_factory=list)
 
 
 # ── Follow-up calls ────────────────────────────────────────────────────────────
