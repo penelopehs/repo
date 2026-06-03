@@ -71,7 +71,8 @@ class LeadCreate(BaseModel):
     # (entity ↔ person ↔ role); resolves the lead's entity & client.
     epr_id: Optional[int] = None
     # Contact info carried directly on the lead.
-    full_name: str
+    first_name: str
+    last_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
     # The company / entity name — seeded into the calculations JSON as an entity.
@@ -89,7 +90,8 @@ class LeadCreate(BaseModel):
 
 
 class LeadUpdate(BaseModel):
-    full_name: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     pipeline_status: Optional[PipelineStatus] = None
@@ -103,7 +105,8 @@ class LeadListItem(BaseModel):
     client_id: Optional[int] = None
     client_name: str
     company: Optional[str] = None
-    full_name: str
+    first_name: str
+    last_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
     pipeline_status: str

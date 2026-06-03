@@ -187,7 +187,9 @@ export function AddLeadDialog() {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-navy">Add New Lead</DialogTitle>
-          <DialogDescription>Create a new lead and assign a representative.</DialogDescription>
+          <DialogDescription>
+            {eprId !== null ? "Existing client" : "Create a new lead and assign a representative."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           {/* Name + company drive the client-search dropdown (spans full width). */}

@@ -203,7 +203,7 @@ def _people_contact_info(db: Session, client_id: int):
 def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
     """The lead's company / entity name. It's seeded into the calculations JSON
     on create (entities[0].name); we fall back to the client's people firm. The
-    lead's own contact (full_name/email/phone) lives directly on crm_leads."""
+    lead's own contact (first_name/last_name/email/phone) lives directly on crm_leads."""
     data = lead.calculations
     if isinstance(data, dict):
         entities = data.get("entities")
@@ -274,10 +274,11 @@ def list_leads(
             client_name=(
                 clients[client_id].client_name
                 if client_id in clients
-                else (company or o.full_name)
+                else (company or f"{o.first_name} {o.last_name}".strip())
             ),
             company=company,
-            full_name=o.full_name,
+            first_name=o.first_name,
+            last_name=o.last_name,
             email=o.email,
             phone=o.phone,
             pipeline_status=o.pipeline_status,
@@ -324,7 +325,8 @@ def create_lead(
 
     lead = models.CrmLead(
         epr_id=body.epr_id,
-        full_name=body.full_name,
+        first_name=body.first_name,
+        last_name=body.last_name,
         email=body.email,
         phone=body.phone,
         pipeline_status=PipelineStatus.lead.value,
@@ -486,9 +488,10 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
         client_id=client_id,
-        client_name=client.client_name if client else (company or lead.full_name),
+        client_name=client.client_name if client else (company or f"{lead.first_name} {lead.last_name}".strip()),
         company=company,
-        full_name=lead.full_name,
+        first_name=lead.first_name,
+        last_name=lead.last_name,
         email=lead.email,
         phone=lead.phone,
         pipeline_status=lead.pipeline_status,

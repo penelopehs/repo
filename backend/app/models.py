@@ -234,7 +234,8 @@ class CrmLead(Base):
     salesperson_iduser = Column(
         Integer, ForeignKey("users.iduser"), nullable=True
     )
-    full_name = Column(String(255), nullable=False)
+    first_name = Column(String(255), nullable=False)
+    last_name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)
     phone = Column(String(20), nullable=True)
     calculations = Column(JSON, nullable=False)

@@ -18,7 +18,8 @@ def test_create_with_epr_resolves_client(client, db_session):
         "/leads",
         json={
             "epr_id": epr_id,
-            "full_name": "Dr. Cedar",
+            "first_name": "Dana",
+            "last_name": "Cedar",
             "email": "dr@cedar.test",
             "phone": "+1-555-0100",
             "lead_source": "Referral",
@@ -31,18 +32,24 @@ def test_create_with_epr_resolves_client(client, db_session):
     assert body["client_id"] == client_id
     assert body["client_name"] == "Cedar Valley Medical"
     # Contact info is carried directly on the lead.
-    assert body["full_name"] == "Dr. Cedar"
+    assert body["first_name"] == "Dana"
+    assert body["last_name"] == "Cedar"
     assert body["email"] == "dr@cedar.test"
     assert body["phone"] == "+1-555-0100"
 
 
 def test_create_with_unknown_epr_id_404(client):
-    resp = client.post("/leads", json={"epr_id": 99999, "full_name": "Ghost"})
+    resp = client.post(
+        "/leads", json={"epr_id": 99999, "first_name": "Ghost", "last_name": "Lead"}
+    )
     assert resp.status_code == 404
 
 
 def test_create_clientless_lead(client, db_session):
-    resp = client.post("/leads", json={"full_name": "Harbor Lead", "lead_source": "Inbound"})
+    resp = client.post(
+        "/leads",
+        json={"first_name": "Harbor", "last_name": "Lead", "lead_source": "Inbound"},
+    )
     assert resp.status_code == 201
     body = resp.json()
     assert body["client_id"] is None
@@ -51,8 +58,9 @@ def test_create_clientless_lead(client, db_session):
     assert body["client_name"] == "Harbor Lead"
 
 
-def test_create_requires_full_name(client):
-    resp = client.post("/leads", json={"client_name": "No Name Co"})
+def test_create_requires_name(client):
+    # first_name and last_name are both required.
+    resp = client.post("/leads", json={"first_name": "OnlyFirst"})
     assert resp.status_code == 422
 
 
@@ -60,7 +68,8 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     resp = client.post(
         "/leads",
         json={
-            "full_name": "Jordan Pike",
+            "first_name": "Jordan",
+            "last_name": "Pike",
             "company": "Pike Diagnostics",
             "email": "jordan@pike.test",
             "phone": "+1-555-0142",
@@ -73,7 +82,8 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     body = resp.json()
 
     # Lead-level fields land on the row.
-    assert body["full_name"] == "Jordan Pike"
+    assert body["first_name"] == "Jordan"
+    assert body["last_name"] == "Pike"
     assert body["email"] == "jordan@pike.test"
     assert body["phone"] == "+1-555-0142"
     assert body["lead_source"] == "Webinar"
@@ -93,7 +103,9 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
 
 
 def test_create_defaults_sales_rep_to_caller(client, db_session):
-    body = client.post("/leads", json={"full_name": "Default Rep"}).json()
+    body = client.post(
+        "/leads", json={"first_name": "Default", "last_name": "Rep"}
+    ).json()
     # The seeded caller user has iduser 1.
     assert body["salesperson_iduser"] == 1
 
@@ -102,7 +114,7 @@ def test_create_stores_calculations_blob(client):
     payload = {"runs": [{"total_bill": 42.0}]}
     resp = client.post(
         "/leads",
-        json={"client_name": "Calc Co", "full_name": "Calc Lead", "calculations": payload},
+        json={"first_name": "Calc", "last_name": "Lead", "calculations": payload},
     )
     assert resp.status_code == 201
     body = resp.json()
@@ -112,15 +124,15 @@ def test_create_stores_calculations_blob(client):
 def test_create_without_caller_user_403(client, claims):
     # An authenticated token whose oid has no users row -> 403.
     claims["oid"] = "ghost-oid"
-    resp = client.post("/leads", json={"full_name": "Ghost"})
+    resp = client.post("/leads", json={"first_name": "Ghost", "last_name": "User"})
     assert resp.status_code == 403
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
 def test_list_filter_by_status(client):
-    client.post("/leads", json={"client_name": "Lead Co", "full_name": "A"})  # stays Lead
-    b = client.post("/leads", json={"client_name": "Signed Co", "full_name": "B"}).json()
+    client.post("/leads", json={"first_name": "Lead", "last_name": "Co"})  # stays Lead
+    b = client.post("/leads", json={"first_name": "Signed", "last_name": "Co"}).json()
     client.patch(f"/leads/{b['id']}", json={"pipeline_status": "SOW Signed"})
 
     resp = client.get("/leads", params={"status": "Lead"})
@@ -134,7 +146,7 @@ def test_list_resolves_company_from_client_people(client, db_session):
     # people behind the lead's client (resolved via epr -> entity -> client).
     client_id, _, epr_id = make_assignment(db_session, firm="Acme Labs")
 
-    client.post("/leads", json={"epr_id": epr_id, "full_name": "Dana Reed"})
+    client.post("/leads", json={"epr_id": epr_id, "first_name": "Dana", "last_name": "Reed"})
     resp = client.get("/leads", params={"status": "Lead"})
     item = next(o for o in resp.json() if o["client_id"] == client_id)
     assert item["company"] == "Acme Labs"
@@ -148,7 +160,7 @@ def test_get_detail_404(client):
 
 def test_detail_includes_sub_entities(client, db_session):
     _, _, epr_id = make_assignment(db_session)
-    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Detail Lead"}).json()
+    lead = client.post("/leads", json={"epr_id": epr_id, "first_name": "Detail", "last_name": "Lead"}).json()
 
     resp = client.get(f"/leads/{lead['id']}")
     assert resp.status_code == 200
@@ -160,7 +172,7 @@ def test_detail_includes_sub_entities(client, db_session):
 # ── Update / status transitions ─────────────────────────────────────────────────
 
 def test_patch_sow_signed_sets_timestamp_idempotently(client):
-    lead = client.post("/leads", json={"client_name": "Transition Co", "full_name": "T"}).json()
+    lead = client.post("/leads", json={"first_name": "Transition", "last_name": "Co"}).json()
 
     r1 = client.patch(f"/leads/{lead['id']}", json={"pipeline_status": "SOW Signed"})
     assert r1.status_code == 200
@@ -173,7 +185,7 @@ def test_patch_sow_signed_sets_timestamp_idempotently(client):
 
 
 def test_patch_updates_calculations(client):
-    lead = client.post("/leads", json={"client_name": "Patch Calc Co", "full_name": "P"}).json()
+    lead = client.post("/leads", json={"first_name": "Patch", "last_name": "Calc"}).json()
     resp = client.patch(
         f"/leads/{lead['id']}", json={"calculations": {"total": 5}}
     )
@@ -185,7 +197,7 @@ def test_patch_updates_calculations(client):
 
 def test_delete_lead_keeps_client(client, db_session):
     client_id, _, epr_id = make_assignment(db_session, client_name="Keep Me Co")
-    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "K"}).json()
+    lead = client.post("/leads", json={"epr_id": epr_id, "first_name": "Keep", "last_name": "Me"}).json()
 
     assert client.delete(f"/leads/{lead['id']}").status_code == 204
     assert client.get(f"/leads/{lead['id']}").status_code == 404
@@ -201,7 +213,7 @@ def test_delete_lead_keeps_client(client, db_session):
 # ── Calculations ────────────────────────────────────────────────────────────────
 
 def test_save_calculations_stores_blob_and_advances_status(client):
-    lead = client.post("/leads", json={"client_name": "Calc Co", "full_name": "C"}).json()
+    lead = client.post("/leads", json={"first_name": "Calc", "last_name": "Co"}).json()
     assert lead["pipeline_status"] == "Lead"
 
     blob = {
@@ -222,7 +234,7 @@ def test_save_calculations_stores_blob_and_advances_status(client):
 def test_clear_calculations(client):
     lead = client.post(
         "/leads",
-        json={"client_name": "Del Calc Co", "full_name": "D", "calculations": {"total": 10}},
+        json={"first_name": "Del", "last_name": "Calc", "calculations": {"total": 10}},
     ).json()
     assert client.delete(f"/leads/{lead['id']}/calculations").status_code == 204
     detail = client.get(f"/leads/{lead['id']}").json()
@@ -233,7 +245,7 @@ def test_clear_calculations(client):
 
 def test_create_engagement_requires_client_entity(client):
     # Clientless lead -> cannot create an engagement (no entity to attach).
-    lead = client.post("/leads", json={"full_name": "No Entity", "lead_source": "Inbound"}).json()
+    lead = client.post("/leads", json={"first_name": "No", "last_name": "Entity", "lead_source": "Inbound"}).json()
     resp = client.post(
         f"/leads/{lead['id']}/engagements",
         json={"type": "R&D Tax Credit", "status": "Active"},
@@ -243,7 +255,7 @@ def test_create_engagement_requires_client_entity(client):
 
 def test_create_engagement(client, db_session):
     _, _, epr_id = make_assignment(db_session)
-    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Eng Lead"}).json()
+    lead = client.post("/leads", json={"epr_id": epr_id, "first_name": "Eng", "last_name": "Lead"}).json()
 
     resp = client.post(
         f"/leads/{lead['id']}/engagements",
@@ -258,7 +270,7 @@ def test_create_engagement(client, db_session):
 
 def test_patch_engagement(client, db_session):
     _, _, epr_id = make_assignment(db_session)
-    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Eng Lead"}).json()
+    lead = client.post("/leads", json={"epr_id": epr_id, "first_name": "Eng", "last_name": "Lead"}).json()
     eng = client.post(
         f"/leads/{lead['id']}/engagements",
         json={"type": "R&D Tax Credit", "status": "Active"},
@@ -272,7 +284,7 @@ def test_patch_engagement(client, db_session):
 # ── Follow-up calls ─────────────────────────────────────────────────────────────
 
 def test_follow_up_call_crud(client):
-    lead = client.post("/leads", json={"client_name": "Calls Co", "full_name": "Calls Lead"}).json()
+    lead = client.post("/leads", json={"first_name": "Calls", "last_name": "Lead"}).json()
 
     created = client.post(
         f"/leads/{lead['id']}/follow-up-calls",
