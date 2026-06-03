@@ -299,6 +299,7 @@ def list_leads(
             engagement_started_at=o.engagement_started_at,
             entities_count=_entities_count(o.data),
             tax_years=_lead_tax_years(o.data),
+            data=o.data,
         )
 
     return [_item(o) for o in leads]

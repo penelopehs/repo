@@ -117,6 +117,7 @@ class LeadListItem(BaseModel):
     engagement_started_at: Optional[datetime] = None
     entities_count: int
     tax_years: List[int] = Field(default_factory=list)
+    data: Any = None
 
 
 
@@ -173,7 +174,6 @@ class LeadDetail(LeadListItem):
     follow_up_calls: List[FollowUpCallRead] = Field(default_factory=list)
     intake_questions: List[IntakeQuestionRead] = Field(default_factory=list)
     # Free-form calculator state stored on the lead (crm_leads.data).
-    data: Any = None
 
 
 # ── Follow-up calls ────────────────────────────────────────────────────────────
