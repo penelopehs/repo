@@ -57,6 +57,26 @@ export type SalesRep = string;
 /** Whether this is a brand-new client or a returning one (GET /leads.client_type). */
 export type ClientType = "New" | "Returning";
 
+export interface LeadDataEntity {
+  name: string;
+}
+
+/** A person attached to the lead's `data` blob. The shape is backend-defined and
+ *  may be sparse; the UI only relies on `name` today. */
+export interface LeadDataPerson {
+  name?: string;
+  [key: string]: unknown;
+}
+
+/** Raw per-lead aggregate stored in the backend `crm_leads.data` column and
+ *  echoed by GET/POST/PATCH /leads. */
+export interface LeadData {
+  people: LeadDataPerson[];
+  entities: LeadDataEntity[];
+  /** Keyed by tax year (e.g. "2021"); the value shape is calculation-specific. */
+  calculations: Record<string, Record<string, unknown>>;
+}
+
 export interface Lead {
   id: string;
   fullName: string;
@@ -78,6 +98,8 @@ export interface Lead {
   sowSignedAt?: string;
   entitiesCount: number;
   entityNames?: string[];
+  /** Raw `data` aggregate from the backend (people, entities, calculations). */
+  data?: LeadData;
   latestCalculation: string;
   addedAt: string;
   notes?: string;

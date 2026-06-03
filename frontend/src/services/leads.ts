@@ -8,7 +8,15 @@
 
 import { api } from "@/services/api";
 import { ALL_TAX_YEARS } from "@/types/crm";
-import type { ClientType, Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
+import type {
+  ClientType,
+  Lead,
+  LeadData,
+  LeadSource,
+  LeadStatus,
+  SalesRep,
+  TaxYear,
+} from "@/types/crm";
 
 // ── Backend DTOs (subset of backend/app/schemas.py we consume) ──────────────────
 
@@ -30,6 +38,8 @@ interface ApiLeadListItem {
   engagement_started_at: string | null;
   entities_count: number;
   tax_years: number[];
+  // Per-lead aggregate (people, entities, calculations-by-year). Matches LeadData.
+  data: LeadData | null;
 }
 
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
@@ -68,6 +78,11 @@ const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : 
 
 function mapListItem(i: ApiLeadListItem): Lead {
   const taxYears = toTaxYears(i.tax_years);
+  // Entity names live in the `data` aggregate; surface them for the dashboard
+  // table and the client profile's Entities card.
+  const entityNames = (i.data?.entities ?? [])
+    .map((e) => e.name)
+    .filter((n): n is string => Boolean(n && n.trim()));
 
   return {
     id: String(i.id),
@@ -84,7 +99,9 @@ function mapListItem(i: ApiLeadListItem): Lead {
     taxYears,
     engagedSince: isoDate(i.engagement_started_at),
     sowSignedAt: isoDate(i.sow_signed_at) || undefined,
-    entitiesCount: i.entities_count ?? 0,
+    entitiesCount: i.entities_count ?? entityNames.length,
+    entityNames,
+    data: i.data ?? undefined,
     // latest_calc_date is Unix epoch seconds; render to an ISO date string.
     latestCalculation:
       i.latest_calc_date != null
