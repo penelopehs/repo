@@ -89,6 +89,9 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     assert body["salesperson_iduser"] == 1
     # company is read back from the seeded JSON entity.
     assert body["company"] == "Pike Diagnostics"
+    # tax_years + latest_calc_date are derived from the data blob's buckets.
+    assert body["tax_years"] == [2025, 2026]
+    assert body["latest_calc_date"] == 2026.0
 
     # The JSON blob holds the entity + an empty bucket per tax year.
     lead = db_session.query(models.CrmLead).filter(
@@ -227,16 +230,17 @@ def test_save_calculations_stores_blob_and_advances_status(client):
     assert lead["pipeline_status"] == "Lead"
 
     blob = {
-        "tax_year": 2024,
-        "total_bill": 150.0,
-        "entities": [{"entity_name": "Calc Co, PC", "grand_total": 100.0}],
+        "entities": [{"name": "Calc Co, PC"}],
+        "calculations": {"2023": {}, "2024": {}},
+        "people": [],
     }
     resp = client.put(f"/leads/{lead['id']}/calculations", json={"data": blob})
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"] == blob
-    # The headline total is read best-effort from the blob.
-    assert body["latest_calc_total"] == 150.0
+    # tax_years + latest_calc_date are derived from the blob's per-year buckets.
+    assert body["tax_years"] == [2023, 2024]
+    assert body["latest_calc_date"] == 2024.0
     # A fresh Lead is moved to "Calculation Sent".
     assert body["pipeline_status"] == "Calculation Sent"
 

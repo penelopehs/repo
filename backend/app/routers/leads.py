@@ -96,26 +96,25 @@ def _get_lead(db: Session, lead_id: int) -> models.CrmLead:
     return lead
 
 
-def _calc_total(data) -> Optional[float]:
-    """Best-effort headline total pulled from the lead's data JSON blob
-    (crm_leads.data). The blob is free-form: we look for a top-level total, sum
-    the per-year buckets under `calculations`, and for a list of saved runs fall
-    back to the latest run's total."""
-    if isinstance(data, list):
-        data = data[-1] if data else None
-    if not isinstance(data, dict):
-        return None
-    # Per-year buckets: {"calculations": {"2025": {...}, "2026": {...}}}.
-    buckets = data.get("calculations")
-    if isinstance(buckets, dict) and buckets:
-        totals = [t for t in (_calc_total(v) for v in buckets.values()) if t is not None]
-        if totals:
-            return sum(totals)
-    for key in ("total_bill", "grand_total", "total"):
-        value = data.get(key)
-        if isinstance(value, (int, float)):
-            return float(value)
-    return None
+def _lead_tax_years(data) -> List[int]:
+    """The tax years present in the lead's data blob — the keys of
+    data['calculations'] (e.g. {"2024": {}, "2025": {}}), as sorted ints."""
+    years: List[int] = []
+    if isinstance(data, dict):
+        buckets = data.get("calculations")
+        if isinstance(buckets, dict):
+            for key in buckets:
+                try:
+                    years.append(int(key))
+                except (TypeError, ValueError):
+                    continue
+    return sorted(years)
+
+
+def _latest_calc_date(data) -> Optional[float]:
+    """The most recent tax year on the lead (max of `_lead_tax_years`)."""
+    years = _lead_tax_years(data)
+    return float(max(years)) if years else None
 
 
 def _initial_data(company: Optional[str], tax_years) -> dict:
@@ -274,10 +273,11 @@ def list_leads(
             salesperson_iduser=o.salesperson_iduser,
             salesperson_name=reps.get(o.salesperson_iduser),
             client_type="Returning" if client_id and counts.get(client_id, 1) > 1 else "New",
-            latest_calc_total=_calc_total(o.data),
+            latest_calc_date=_latest_calc_date(o.data),
             created_at=o.created_at,
             sow_signed_at=o.sow_signed_at,
             engagement_started_at=o.engagement_started_at,
+            tax_years=_lead_tax_years(o.data),
         )
 
     return [_item(o) for o in leads]
@@ -410,7 +410,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         salesperson_iduser=lead.salesperson_iduser,
         salesperson_name=f"{rep.first_name} {rep.last_name}".strip() if rep else None,
         client_type=_client_type(db, client_id),
-        latest_calc_total=_calc_total(lead.data),
+        latest_calc_date=_latest_calc_date(lead.data),
         created_at=lead.created_at,
         updated_at=lead.updated_at,
         sow_signed_at=lead.sow_signed_at,
@@ -420,6 +420,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         follow_up_calls=follow_up_calls,
         intake_questions=intake_questions,
         data=lead.data,
+        tax_years=_lead_tax_years(lead.data),
     )
 
 
