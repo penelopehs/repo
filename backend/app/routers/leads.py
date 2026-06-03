@@ -119,12 +119,12 @@ def _calc_total(calculations) -> Optional[float]:
     return None
 
 
-def _initial_calculations(company: Optional[str], engagement_years) -> dict:
+def _initial_calculations(company: Optional[str], tax_years) -> dict:
     """Seed the lead's calculations JSON: one entity (the provided company /
-    entity name), an empty bucket per engagement year, and an empty people list."""
+    entity name), an empty bucket per tax year, and an empty people list."""
     return {
         "entities": [{"name": company}] if company else [],
-        "calculations": {str(year): {} for year in (engagement_years or [])},
+        "calculations": {str(year): {} for year in (tax_years or [])},
         "people": [],
     }
 
@@ -319,7 +319,7 @@ def create_lead(
     calculations = (
         body.calculations
         if body.calculations is not None
-        else _initial_calculations(body.company, body.engagement_years)
+        else _initial_calculations(body.company, body.tax_years)
     )
 
     lead = models.CrmLead(
