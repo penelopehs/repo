@@ -56,6 +56,10 @@ class LeadCreate(BaseModel):
     client_id: Optional[int] = None
     # ...or create a new client (client_name required when client_id is absent).
     client_name: Optional[str] = None
+    # Contact info carried directly on the lead.
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     # Lead fields.
     lead_source: Optional[str] = None
     notes: Optional[str] = None
@@ -64,6 +68,9 @@ class LeadCreate(BaseModel):
 
 
 class LeadUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
     pipeline_status: Optional[PipelineStatus] = None
     lead_source: Optional[str] = None
     notes: Optional[str] = None
@@ -75,6 +82,9 @@ class LeadListItem(BaseModel):
     client_id: Optional[int] = None
     client_name: str
     company: Optional[str] = None
+    full_name: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
     pipeline_status: str
     lead_source: Optional[str] = None
     salesperson_iduser: Optional[int] = None
@@ -133,8 +143,6 @@ class IntakeQuestionRead(BaseModel):
 
 
 class LeadDetail(LeadListItem):
-    email: Optional[str] = None
-    phone: Optional[str] = None
     notes: Optional[str] = None
     updated_at: Optional[datetime] = None
     sub_entities: List[SubEntityRead] = Field(default_factory=list)

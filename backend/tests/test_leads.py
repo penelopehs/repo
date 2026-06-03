@@ -15,12 +15,22 @@ from tests.conftest import make_client_with_entity
 def test_create_with_new_client_name_creates_client(client, db_session):
     resp = client.post(
         "/leads",
-        json={"client_name": "Cedar Valley Medical", "lead_source": "Referral"},
+        json={
+            "client_name": "Cedar Valley Medical",
+            "full_name": "Dr. Cedar",
+            "email": "dr@cedar.test",
+            "phone": "+1-555-0100",
+            "lead_source": "Referral",
+        },
     )
     assert resp.status_code == 201
     body = resp.json()
     assert body["pipeline_status"] == "Lead"
     assert body["client_id"] is not None
+    # Contact info is carried directly on the lead.
+    assert body["full_name"] == "Dr. Cedar"
+    assert body["email"] == "dr@cedar.test"
+    assert body["phone"] == "+1-555-0100"
 
     # A clients row was created for the named prospect.
     c = db_session.query(models.Client).filter(
@@ -30,40 +40,48 @@ def test_create_with_new_client_name_creates_client(client, db_session):
 
 
 def test_create_clientless_lead(client, db_session):
-    resp = client.post("/leads", json={"lead_source": "Inbound"})
+    resp = client.post("/leads", json={"full_name": "Harbor Lead", "lead_source": "Inbound"})
     assert resp.status_code == 201
     body = resp.json()
     assert body["client_id"] is None
-    # No client -> no company resolved and an empty client_name fallback.
+    # No client -> no company resolved; client_name falls back to the lead's name.
     assert body["company"] is None
-    assert body["client_name"] == ""
+    assert body["client_name"] == "Harbor Lead"
+
+
+def test_create_requires_full_name(client):
+    resp = client.post("/leads", json={"client_name": "No Name Co"})
+    assert resp.status_code == 422
 
 
 def test_create_stores_calculations_blob(client):
     payload = {"runs": [{"total_bill": 42.0}]}
-    resp = client.post("/leads", json={"client_name": "Calc Co", "calculations": payload})
+    resp = client.post(
+        "/leads",
+        json={"client_name": "Calc Co", "full_name": "Calc Lead", "calculations": payload},
+    )
     assert resp.status_code == 201
     body = resp.json()
     assert body["calculations"] == payload
 
 
 def test_create_with_unknown_client_id_404(client):
-    resp = client.post("/leads", json={"client_id": 99999})
+    resp = client.post("/leads", json={"client_id": 99999, "full_name": "Ghost"})
     assert resp.status_code == 404
 
 
 def test_create_without_caller_user_403(client, claims):
     # An authenticated token whose oid has no users row -> 403.
     claims["oid"] = "ghost-oid"
-    resp = client.post("/leads", json={"client_name": "Ghosts Inc"})
+    resp = client.post("/leads", json={"client_name": "Ghosts Inc", "full_name": "Ghost"})
     assert resp.status_code == 403
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
 def test_list_filter_by_status(client):
-    client.post("/leads", json={"client_name": "Lead Co"})  # stays Lead
-    b = client.post("/leads", json={"client_name": "Signed Co"}).json()
+    client.post("/leads", json={"client_name": "Lead Co", "full_name": "A"})  # stays Lead
+    b = client.post("/leads", json={"client_name": "Signed Co", "full_name": "B"}).json()
     client.patch(f"/leads/{b['id']}", json={"pipeline_status": "SOW Signed"})
 
     resp = client.get("/leads", params={"status": "Lead"})
@@ -88,7 +106,7 @@ def test_list_resolves_company_from_client_people(client, db_session):
     )
     db_session.commit()
 
-    client.post("/leads", json={"client_id": client_id})
+    client.post("/leads", json={"client_id": client_id, "full_name": "Dana Reed"})
     resp = client.get("/leads", params={"status": "Lead"})
     item = next(o for o in resp.json() if o["client_id"] == client_id)
     assert item["company"] == "Acme Labs"
@@ -102,7 +120,7 @@ def test_get_detail_404(client):
 
 def test_detail_includes_sub_entities(client, db_session):
     client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id}).json()
+    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Detail Lead"}).json()
 
     resp = client.get(f"/leads/{lead['id']}")
     assert resp.status_code == 200
@@ -114,7 +132,7 @@ def test_detail_includes_sub_entities(client, db_session):
 # ── Update / status transitions ─────────────────────────────────────────────────
 
 def test_patch_sow_signed_sets_timestamp_idempotently(client):
-    lead = client.post("/leads", json={"client_name": "Transition Co"}).json()
+    lead = client.post("/leads", json={"client_name": "Transition Co", "full_name": "T"}).json()
 
     r1 = client.patch(f"/leads/{lead['id']}", json={"pipeline_status": "SOW Signed"})
     assert r1.status_code == 200
@@ -127,7 +145,7 @@ def test_patch_sow_signed_sets_timestamp_idempotently(client):
 
 
 def test_patch_updates_calculations(client):
-    lead = client.post("/leads", json={"client_name": "Patch Calc Co"}).json()
+    lead = client.post("/leads", json={"client_name": "Patch Calc Co", "full_name": "P"}).json()
     resp = client.patch(
         f"/leads/{lead['id']}", json={"calculations": {"total": 5}}
     )
@@ -138,7 +156,7 @@ def test_patch_updates_calculations(client):
 # ── Delete ──────────────────────────────────────────────────────────────────────
 
 def test_delete_lead_keeps_client(client, db_session):
-    lead = client.post("/leads", json={"client_name": "Keep Me Co"}).json()
+    lead = client.post("/leads", json={"client_name": "Keep Me Co", "full_name": "K"}).json()
     client_id = lead["client_id"]
 
     assert client.delete(f"/leads/{lead['id']}").status_code == 204
@@ -152,7 +170,7 @@ def test_delete_lead_keeps_client(client, db_session):
 # ── Calculations ────────────────────────────────────────────────────────────────
 
 def test_save_calculations_stores_blob_and_advances_status(client):
-    lead = client.post("/leads", json={"client_name": "Calc Co"}).json()
+    lead = client.post("/leads", json={"client_name": "Calc Co", "full_name": "C"}).json()
     assert lead["pipeline_status"] == "Lead"
 
     blob = {
@@ -172,7 +190,8 @@ def test_save_calculations_stores_blob_and_advances_status(client):
 
 def test_clear_calculations(client):
     lead = client.post(
-        "/leads", json={"client_name": "Del Calc Co", "calculations": {"total": 10}}
+        "/leads",
+        json={"client_name": "Del Calc Co", "full_name": "D", "calculations": {"total": 10}},
     ).json()
     assert client.delete(f"/leads/{lead['id']}/calculations").status_code == 204
     detail = client.get(f"/leads/{lead['id']}").json()
@@ -183,7 +202,7 @@ def test_clear_calculations(client):
 
 def test_create_engagement_requires_client_entity(client):
     # Clientless lead -> cannot create an engagement (no entity to attach).
-    lead = client.post("/leads", json={"lead_source": "Inbound"}).json()
+    lead = client.post("/leads", json={"full_name": "No Entity", "lead_source": "Inbound"}).json()
     resp = client.post(
         f"/leads/{lead['id']}/engagements",
         json={"type": "R&D Tax Credit", "status": "Active"},
@@ -193,7 +212,7 @@ def test_create_engagement_requires_client_entity(client):
 
 def test_create_engagement(client, db_session):
     client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id}).json()
+    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Eng Lead"}).json()
 
     resp = client.post(
         f"/leads/{lead['id']}/engagements",
@@ -208,7 +227,7 @@ def test_create_engagement(client, db_session):
 
 def test_patch_engagement(client, db_session):
     client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id}).json()
+    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Eng Lead"}).json()
     eng = client.post(
         f"/leads/{lead['id']}/engagements",
         json={"type": "R&D Tax Credit", "status": "Active"},
@@ -222,7 +241,7 @@ def test_patch_engagement(client, db_session):
 # ── Follow-up calls ─────────────────────────────────────────────────────────────
 
 def test_follow_up_call_crud(client):
-    lead = client.post("/leads", json={"client_name": "Calls Co"}).json()
+    lead = client.post("/leads", json={"client_name": "Calls Co", "full_name": "Calls Lead"}).json()
 
     created = client.post(
         f"/leads/{lead['id']}/follow-up-calls",

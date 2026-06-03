@@ -167,14 +167,15 @@ def _people_contact_info(db: Session, client_id: int):
     return (p.firm, emails.get(chosen), phones.get(chosen))
 
 
-def _resolve_contact(db: Session, lead: models.CrmLead):
-    """company/email/phone for a lead, resolved from the client's people. A
-    clientless lead (or a client with no people yet) has no contact info."""
+def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
+    """The lead's company, resolved from the client's people (their firm). A
+    clientless lead — or a client with no people yet — has none. The lead's own
+    contact (full_name/email/phone) lives directly on crm_leads."""
     if lead.clients_idclients:
         info = _people_contact_info(db, lead.clients_idclients)
-        if info and any(info):
-            return info
-    return (None, None, None)
+        if info and info[0]:
+            return info[0]
+    return None
 
 
 # ── Pipeline list ────────────────────────────────────────────────────────────
@@ -229,9 +230,12 @@ def list_leads(
             client_name=(
                 clients[o.clients_idclients].client_name
                 if o.clients_idclients in clients
-                else (_company(o) or "")
+                else (_company(o) or o.full_name)
             ),
             company=_company(o),
+            full_name=o.full_name,
+            email=o.email,
+            phone=o.phone,
             pipeline_status=o.pipeline_status,
             lead_source=o.lead_source,
             salesperson_iduser=o.salesperson_iduser,
@@ -275,6 +279,9 @@ def create_lead(
 
     lead = models.CrmLead(
         clients_idclients=client.idclients if client else None,
+        full_name=body.full_name,
+        email=body.email,
+        phone=body.phone,
         pipeline_status=PipelineStatus.lead.value,
         lead_source=body.lead_source,
         salesperson_iduser=caller.iduser,
@@ -300,7 +307,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         if lead.clients_idclients
         else None
     )
-    company, email, phone = _resolve_contact(db, lead)
+    company = _company_for(db, lead)
     rep = (
         db.query(models.User).filter(models.User.iduser == lead.salesperson_iduser).first()
         if lead.salesperson_iduser
@@ -431,10 +438,11 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
         client_id=lead.clients_idclients,
-        client_name=client.client_name if client else (company or ""),
+        client_name=client.client_name if client else (company or lead.full_name),
         company=company,
-        email=email,
-        phone=phone,
+        full_name=lead.full_name,
+        email=lead.email,
+        phone=lead.phone,
         pipeline_status=lead.pipeline_status,
         lead_source=lead.lead_source,
         salesperson_iduser=lead.salesperson_iduser,
