@@ -32,46 +32,6 @@ interface ApiLeadListItem {
   tax_years: number[];
 }
 
-interface ApiContact {
-  id: number;
-  name: string;
-  email: string | null;
-  phone: string | null;
-}
-
-interface ApiEngagement {
-  id: number;
-  tax_years: number[];
-  yearly_billing: { year: number; billing_amount: number }[];
-}
-
-interface ApiCalculation {
-  id: number;
-  created_at: string;
-}
-
-// The per-lead detail aggregate (GET /leads/{id}, and the POST/PATCH responses).
-interface ApiLeadDetail {
-  id: number;
-  company: string | null;
-  client_name?: string | null;
-  email: string | null;
-  phone: string | null;
-  pipeline_status: string;
-  lead_source: string | null;
-  salesperson_iduser?: number | null;
-  salesperson_name: string | null;
-  client_type?: string | null;
-  created_at: string;
-  sow_signed_at?: string | null;
-  engagement_started_at: string | null;
-  notes: string | null;
-  sub_entities: { id: number }[];
-  contacts: ApiContact[];
-  engagements: ApiEngagement[];
-  calculations: ApiCalculation[];
-}
-
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
 
 const STATUS_FROM_API: Record<string, LeadStatus> = {
@@ -134,43 +94,6 @@ function mapListItem(i: ApiLeadListItem): Lead {
   };
 }
 
-// ── Mapping: backend detail → frontend Lead ─────────────────────────────────────
-
-function mapDetail(d: ApiLeadDetail): Lead {
-  const years = new Set<number>();
-  for (const e of d.engagements ?? []) {
-    for (const y of e.tax_years ?? []) years.add(y);
-    for (const b of e.yearly_billing ?? []) years.add(b.year);
-  }
-  const taxYears = toTaxYears([...years]);
-
-  // calculations come back newest-first from the backend.
-  const latestCalc = d.calculations?.[0];
-  // Prefer a contact that has an email (the backend's own preference order).
-  const primaryContact = d.contacts?.find((c) => c.email) ?? d.contacts?.[0];
-
-  return {
-    id: String(d.id),
-    fullName: primaryContact?.name ?? "",
-    company: d.company ?? d.client_name ?? "",
-    email: d.email ?? primaryContact?.email ?? "",
-    phone: d.phone ?? primaryContact?.phone ?? "",
-    source: (d.lead_source ?? "Other") as LeadSource,
-    rep: (d.salesperson_name ?? "Unassigned") as SalesRep,
-    repId: d.salesperson_iduser ?? null,
-    status: STATUS_FROM_API[d.pipeline_status] ?? "new",
-    clientType: toClientType(d.client_type),
-    engagementYears: taxYears.length,
-    taxYears,
-    engagedSince: isoDate(d.engagement_started_at),
-    sowSignedAt: isoDate(d.sow_signed_at) || undefined,
-    entitiesCount: d.sub_entities?.length ?? 0,
-    latestCalculation: latestCalc ? latestCalc.created_at.slice(0, 10) : "—",
-    addedAt: d.created_at,
-    notes: d.notes ?? undefined,
-  };
-}
-
 // ── Inputs from the dashboard dialogs ───────────────────────────────────────────
 
 export interface LeadCreateInput {
@@ -209,9 +132,9 @@ export const leadsApi = {
 
   async create(input: LeadCreateInput): Promise<Lead> {
     // `client_name` makes the backend provision a client account up-front.
-    // full_name / rep / tax_years are sent for the planned backend update;
-    // the current LeadCreate schema simply ignores unknown fields.
-    const detail = await api.post<ApiLeadDetail>("/leads", {
+    // POST /leads echoes back the created lead in the same shape as the list
+    // endpoint, so the new row is built straight from the response.
+    const item = await api.post<ApiLeadListItem>("/leads", {
       client_name: input.company,
       company: input.company,
       email: input.email,
@@ -225,7 +148,7 @@ export const leadsApi = {
       rep: input.rep,
       tax_years: input.taxYears ?? [],
     });
-    return mapDetail(detail);
+    return mapListItem(item);
   },
 
   async update(id: string, patch: Partial<Lead>): Promise<Lead> {
@@ -236,12 +159,12 @@ export const leadsApi = {
     if (patch.source !== undefined) body.lead_source = patch.source;
     if (patch.status !== undefined) body.pipeline_status = STATUS_TO_API[patch.status];
     if (patch.notes !== undefined) body.notes = patch.notes;
-    // Extras the backend ignores today (sent for the planned update).
     if (patch.fullName !== undefined) body.full_name = patch.fullName;
     if (patch.rep !== undefined) body.rep = patch.rep;
 
-    const detail = await api.patch<ApiLeadDetail>(`/leads/${id}`, body);
-    return mapDetail(detail);
+    // PATCH returns the updated lead in the same shape as the list endpoint.
+    const item = await api.patch<ApiLeadListItem>(`/leads/${id}`, body);
+    return mapListItem(item);
   },
 
   async remove(id: string): Promise<void> {
