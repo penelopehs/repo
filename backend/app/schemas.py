@@ -52,18 +52,23 @@ class ReferralChannel(BaseModel):
 # ── Leads ──────────────────────────────────────────────────────────────────────
 
 class LeadCreate(BaseModel):
-    # Either attach to an existing client...
+    # Optionally attach to an existing client account.
     client_id: Optional[int] = None
-    # ...or create a new client (client_name required when client_id is absent).
     client_name: Optional[str] = None
     # Contact info carried directly on the lead.
     full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
-    # Lead fields.
+    # The company / entity name — seeded into the calculations JSON as an entity.
+    company: Optional[str] = None
     lead_source: Optional[str] = None
+    # The assigned sales rep (users.iduser); defaults to the calling user.
+    assigned_sales_rep: Optional[int] = None
+    # Engagement (tax) years — seeded as empty buckets in the calculations JSON.
+    engagement_years: List[int] = Field(default_factory=list)
     notes: Optional[str] = None
-    # Free-form calculator state stored on the lead (crm_leads.calculations).
+    # Optional pre-built calculator state; when omitted it's seeded from
+    # `company` + `engagement_years` (see crm_leads.calculations).
     calculations: Optional[Any] = None
 
 

@@ -54,6 +54,48 @@ def test_create_requires_full_name(client):
     assert resp.status_code == 422
 
 
+def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session):
+    resp = client.post(
+        "/leads",
+        json={
+            "full_name": "Jordan Pike",
+            "company": "Pike Diagnostics",
+            "email": "jordan@pike.test",
+            "phone": "+1-555-0142",
+            "lead_source": "Webinar",
+            "assigned_sales_rep": 1,
+            "engagement_years": [2025, 2026],
+        },
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+
+    # Lead-level fields land on the row.
+    assert body["full_name"] == "Jordan Pike"
+    assert body["email"] == "jordan@pike.test"
+    assert body["phone"] == "+1-555-0142"
+    assert body["lead_source"] == "Webinar"
+    assert body["salesperson_iduser"] == 1
+    # company is read back from the seeded JSON entity.
+    assert body["company"] == "Pike Diagnostics"
+
+    # The JSON blob holds the entity + an empty bucket per engagement year.
+    lead = db_session.query(models.CrmLead).filter(
+        models.CrmLead.crm_lead_id == body["id"]
+    ).first()
+    assert lead.calculations == {
+        "entities": [{"name": "Pike Diagnostics"}],
+        "calculations": {"2025": {}, "2026": {}},
+        "people": [],
+    }
+
+
+def test_create_defaults_sales_rep_to_caller(client, db_session):
+    body = client.post("/leads", json={"full_name": "Default Rep"}).json()
+    # The seeded caller user has iduser 1.
+    assert body["salesperson_iduser"] == 1
+
+
 def test_create_stores_calculations_blob(client):
     payload = {"runs": [{"total_bill": 42.0}]}
     resp = client.post(

@@ -94,17 +94,35 @@ def _get_lead(db: Session, lead_id: int) -> models.CrmLead:
 
 def _calc_total(calculations) -> Optional[float]:
     """Best-effort headline total pulled from the lead's calculations JSON blob
-    (crm_leads.calculations). The blob is free-form, so we look for a top-level
-    total and, for a list of saved runs, fall back to the latest run's total."""
+    (crm_leads.calculations). The blob is free-form: we look for a top-level
+    total, sum the per-year buckets under `calculations`, and for a list of
+    saved runs fall back to the latest run's total."""
     data = calculations
     if isinstance(data, list):
         data = data[-1] if data else None
-    if isinstance(data, dict):
-        for key in ("total_bill", "grand_total", "total"):
-            value = data.get(key)
-            if isinstance(value, (int, float)):
-                return float(value)
+    if not isinstance(data, dict):
+        return None
+    # Per-year buckets: {"calculations": {"2025": {...}, "2026": {...}}}.
+    buckets = data.get("calculations")
+    if isinstance(buckets, dict) and buckets:
+        totals = [t for t in (_calc_total(v) for v in buckets.values()) if t is not None]
+        if totals:
+            return sum(totals)
+    for key in ("total_bill", "grand_total", "total"):
+        value = data.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
     return None
+
+
+def _initial_calculations(company: Optional[str], engagement_years) -> dict:
+    """Seed the lead's calculations JSON: one entity (the provided company /
+    entity name), an empty bucket per engagement year, and an empty people list."""
+    return {
+        "entities": [{"name": company}] if company else [],
+        "calculations": {str(year): {} for year in (engagement_years or [])},
+        "people": [],
+    }
 
 
 def _client_type(db: Session, client_id: Optional[int]) -> str:
@@ -168,9 +186,16 @@ def _people_contact_info(db: Session, client_id: int):
 
 
 def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
-    """The lead's company, resolved from the client's people (their firm). A
-    clientless lead — or a client with no people yet — has none. The lead's own
-    contact (full_name/email/phone) lives directly on crm_leads."""
+    """The lead's company / entity name. It's seeded into the calculations JSON
+    on create (entities[0].name); we fall back to the client's people firm. The
+    lead's own contact (full_name/email/phone) lives directly on crm_leads."""
+    data = lead.calculations
+    if isinstance(data, dict):
+        entities = data.get("entities")
+        if isinstance(entities, list) and entities:
+            first = entities[0]
+            if isinstance(first, dict) and first.get("name"):
+                return first["name"]
     if lead.clients_idclients:
         info = _people_contact_info(db, lead.clients_idclients)
         if info and info[0]:
@@ -277,6 +302,12 @@ def create_lead(
     # else: a clientless lead — contact info comes from the client's people, so a
     # clientless lead simply has none until it's attached to a client.
 
+    calculations = (
+        body.calculations
+        if body.calculations is not None
+        else _initial_calculations(body.company, body.engagement_years)
+    )
+
     lead = models.CrmLead(
         clients_idclients=client.idclients if client else None,
         full_name=body.full_name,
@@ -284,9 +315,9 @@ def create_lead(
         phone=body.phone,
         pipeline_status=PipelineStatus.lead.value,
         lead_source=body.lead_source,
-        salesperson_iduser=caller.iduser,
+        salesperson_iduser=body.assigned_sales_rep or caller.iduser,
         notes=body.notes,
-        calculations=body.calculations if body.calculations is not None else [],
+        calculations=calculations,
     )
     db.add(lead)
     db.commit()
