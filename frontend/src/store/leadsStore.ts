@@ -14,6 +14,7 @@ interface LeadsState {
   loading: boolean;
   error: string | null;
   fetchLeads: () => Promise<void>;
+  fetchLead: (id: string) => Promise<void>;
   addLead: (l: LeadCreateInput) => Promise<void>;
   updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
   deleteLead: (id: string) => Promise<void>;
@@ -39,6 +40,17 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         loading: false,
       });
     }
+  },
+
+  // Fetch one lead and upsert it into `leads`, so a direct load of the client
+  // profile works without first loading the whole pipeline list.
+  fetchLead: async (id) => {
+    const lead = await leadsApi.get(id);
+    set((s) => ({
+      leads: s.leads.some((l) => l.id === lead.id)
+        ? s.leads.map((l) => (l.id === lead.id ? lead : l))
+        : [...s.leads, lead],
+    }));
   },
 
   addLead: async (l) => {

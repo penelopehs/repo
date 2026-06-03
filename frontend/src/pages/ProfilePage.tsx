@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
   Calculator as CalcIcon,
+  Loader2,
 } from "lucide-react";
 import {
   BarChart,
@@ -51,6 +52,10 @@ const NO_CALLS: FollowUpCall[] = [];
 export function ProfilePage({ id }: { id: string }) {
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
+  const fetchLead = useLeadsStore((s) => s.fetchLead);
+  // Start in the loading state when the lead isn't already cached, so a direct
+  // load shows a spinner rather than a flash of "Client not found".
+  const [leadLoading, setLeadLoading] = useState(!lead);
   const byClient = useEngagementsStore((s) => s.byClient);
   const calls = useFollowUpCallsStore((s) => s.byLead[id] ?? NO_CALLS);
   const fetchCalls = useFollowUpCallsStore((s) => s.fetch);
@@ -93,6 +98,14 @@ export function ProfilePage({ id }: { id: string }) {
 
   const { engagements, entities: clientEntities } = byClient(id);
 
+  // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
+  useEffect(() => {
+    if (!lead) {
+      setLeadLoading(true);
+      void fetchLead(id).finally(() => setLeadLoading(false));
+    }
+  }, [id, lead, fetchLead]);
+
   useEffect(() => {
     void fetchCalls(id);
   }, [fetchCalls, id]);
@@ -130,6 +143,13 @@ export function ProfilePage({ id }: { id: string }) {
   ).length;
 
   if (!lead) {
+    if (leadLoading) {
+      return (
+        <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-24">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      );
+    }
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-navy">Client not found</h1>

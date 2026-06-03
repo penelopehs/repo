@@ -162,6 +162,14 @@ export const leadsApi = {
     return items.map(mapListItem);
   },
 
+  /** Fetch a single lead (GET /leads/{id}). The detail response is a superset
+   *  of the list item, so the same mapper applies. Used to hydrate the client
+   *  profile on a direct page load when the list isn't in memory yet. */
+  async get(id: string): Promise<Lead> {
+    const item = await api.get<ApiLeadListItem>(`/leads/${id}`);
+    return mapListItem(item);
+  },
+
   async create(input: LeadCreateInput): Promise<Lead> {
     // `client_name` makes the backend provision a client account up-front.
     // POST /leads echoes back the created lead in the same shape as the list
