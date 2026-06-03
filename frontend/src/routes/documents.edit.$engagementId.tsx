@@ -5,7 +5,10 @@ export const Route = createFileRoute("/documents/edit/$engagementId")({
   head: () => ({
     meta: [
       { title: "Edit Request — Documents" },
-      { name: "description", content: "Edit a document request: documents, recipients, due date and notes." },
+      {
+        name: "description",
+        content: "Edit a document request: documents, recipients, due date and notes.",
+      },
     ],
   }),
   component: EditRequestPage,

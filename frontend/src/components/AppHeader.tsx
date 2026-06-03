@@ -7,9 +7,8 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 
 const NAV = [
-  { to: "/", label: "Calculator", icon: Calculator },
+  { to: "/", label: "Sales Billing Calculator", icon: Calculator },
   { to: "/pipeline", label: "Client Dashboard", icon: Users },
-  { to: "/documents", label: "Document Requests", icon: FileText },
 ] as const;
 
 export function AppHeader() {
@@ -32,10 +31,19 @@ export function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-navy/20 bg-navy text-navy-foreground shadow-elevated">
+    <header className="sticky top-0 z-40 w-full border-b border-navy/20 bg-navy text-white shadow-elevated">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand */}
-        <Link to="/" className="flex items-center gap-3 group">
+        <Link
+          to="/"
+          search={{
+            clientName: undefined,
+            taxYears: undefined,
+            latestCalculation: undefined,
+            hasExistingCalculation: false,
+          }}
+          className="flex items-center gap-3 group"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">
             <span className="text-sm font-bold tracking-tight" style={{ color: "var(--logo)" }}>
               SB
@@ -56,9 +64,12 @@ export function AppHeader() {
               <Link
                 key={n.to}
                 to={n.to}
+                search={{}}
                 className={cn(
                   "relative inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                  active ? "bg-white/10 text-white" : "text-white/75 hover:bg-white/5 hover:text-white",
+                  active
+                    ? "bg-white/10 text-white"
+                    : "text-white/75 hover:bg-white/5 hover:text-white",
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -96,7 +107,7 @@ export function AppHeader() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-72 bg-navy text-navy-foreground border-navy/30">
+          <SheetContent side="right" className="w-72 bg-navy text-white border-navy/30">
             <nav className="mt-8 flex flex-col gap-1">
               {NAV.map((n) => {
                 const Icon = n.icon;
@@ -104,10 +115,13 @@ export function AppHeader() {
                   <Link
                     key={n.to}
                     to={n.to}
+                    search={{}}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
                       "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                      isActive(n.to) ? "bg-white/15 text-white" : "text-white/75 hover:bg-white/10 hover:text-white",
+                      isActive(n.to)
+                        ? "bg-white/15 text-white"
+                        : "text-white/75 hover:bg-white/10 hover:text-white",
                     )}
                   >
                     <Icon className="h-4 w-4" /> {n.label}
@@ -125,6 +139,7 @@ export function AppHeader() {
                 ) : (
                   <Link
                     to="/login"
+                    search={{}}
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-3 rounded-md bg-orange px-3 py-2.5 text-sm font-semibold text-orange-foreground"
                   >

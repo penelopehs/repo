@@ -4,13 +4,22 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Briefcase } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import type { EngagementType, EngagementStatus, EngagementPhase, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
@@ -40,7 +49,9 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
     setYears((p) => {
       if (p.includes(y)) {
         const next = p.filter((x) => x !== y);
-        const a = { ...amounts }; delete a[y]; setAmounts(a);
+        const a = { ...amounts };
+        delete a[y];
+        setAmounts(a);
         return next;
       }
       setAmounts((a) => ({ ...a, [y]: 6000 }));
@@ -70,7 +81,9 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-navy flex items-center gap-2"><Briefcase className="h-4 w-4" /> New Engagement</DialogTitle>
+          <DialogTitle className="text-navy flex items-center gap-2">
+            <Briefcase className="h-4 w-4" /> New Engagement
+          </DialogTitle>
           <DialogDescription>Define scope, phase, years and billing estimates.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -78,22 +91,46 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
             <div>
               <Label className="mb-1.5 block">Engagement Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as EngagementType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="mb-1.5 block">Status</Label>
               <Select value={status} onValueChange={(v) => setStatus(v as EngagementStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="mb-1.5 block">Phase</Label>
               <Select value={phase} onValueChange={(v) => setPhase(v as EngagementPhase)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{PHASES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHASES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
           </div>
@@ -106,24 +143,33 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
                 setYears([...ALL_TAX_YEARS]);
                 setAmounts(Object.fromEntries(ALL_TAX_YEARS.map((y) => [y, amounts[y] || 6000])));
               }}
-              onClear={() => { setYears([]); setAmounts({}); }}
+              onClear={() => {
+                setYears([]);
+                setAmounts({});
+              }}
             />
           </div>
           {years.length > 0 && (
             <div className="rounded-lg border border-border bg-gradient-frost p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan">Billing Estimates by Year</p>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-cyan">
+                Billing Estimates by Year
+              </p>
               <div className="grid gap-2">
                 {years.map((y) => (
                   <div key={y} className="flex items-center gap-3">
                     <span className="w-16 text-sm font-medium text-navy">{y}</span>
                     <div className="relative flex-1">
-                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        $
+                      </span>
                       <Input
                         type="number"
                         min={0}
                         className="pl-7"
                         value={amounts[y] ?? 0}
-                        onChange={(e) => setAmounts({ ...amounts, [y]: Number(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setAmounts({ ...amounts, [y]: Number(e.target.value) || 0 })
+                        }
                       />
                     </div>
                   </div>
@@ -137,8 +183,12 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
           )}
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} className="bg-navy text-navy-foreground hover:bg-navy/90">Add Engagement</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} className="bg-orange text-white hover:bg-orange/90">
+            Add Engagement
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

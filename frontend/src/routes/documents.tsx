@@ -5,9 +5,15 @@ export const Route = createFileRoute("/documents")({
   head: () => ({
     meta: [
       { title: "Document Requests — Sales Billing CRM" },
-      { name: "description", content: "Track every document request sent to engaged clients across all engagements." },
+      {
+        name: "description",
+        content: "Track every document request sent to engaged clients across all engagements.",
+      },
       { property: "og:title", content: "Document Request Overview" },
-      { property: "og:description", content: "Track every document request sent to engaged clients." },
+      {
+        property: "og:description",
+        content: "Track every document request sent to engaged clients.",
+      },
     ],
   }),
   component: DocumentsRouteComponent,

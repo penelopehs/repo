@@ -39,12 +39,7 @@ export interface Entity {
 }
 
 // Leads / Pipeline
-export type LeadStatus =
-  | "new"
-  | "calculation_sent"
-  | "sow_signed"
-  | "active_engagement"
-  | "lost";
+export type LeadStatus = "new" | "calculation_sent" | "sow_signed" | "active_engagement" | "lost";
 
 export type LeadSource =
   | "Referral"
@@ -74,10 +69,19 @@ export interface Lead {
   taxYears: TaxYear[];
   engagedSince: string;
   entitiesCount: number;
+  entityNames?: string[];
   latestCalculation: string;
   addedAt: string;
   notes?: string;
+  intakeNotes?: ProfileNote[];
   intake?: IntakeAnswers;
+}
+
+export interface ProfileNote {
+  id: string;
+  text: string;
+  createdAt: string;
+  author?: string;
 }
 
 export interface IntakeAnswers {
@@ -111,10 +115,13 @@ export interface Engagement {
 export interface ContactPerson {
   id: string;
   clientId: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: string;
+  workEmail: string;
   email: string;
-  phone: string;
+  workPhone: string;
+  mobilePhone: string;
 }
 
 export interface ClientEntity {
@@ -131,6 +138,7 @@ export interface FollowUpCall {
   date: string;
   time: string;
   notes: string;
+  completed?: boolean;
 }
 
 // Documents
@@ -168,4 +176,3 @@ export interface DocumentRequest {
   /** Optional override for the document count badge (e.g. when one type represents multiple files). */
   totalOverride?: number;
 }
-

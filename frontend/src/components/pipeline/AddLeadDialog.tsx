@@ -1,20 +1,26 @@
 // "Add New Lead" modal — validated with zod, dispatches to leads store.
-//
-// First/Last name and Company drive a client-search dropdown (GET /clients).
-// Picking a suggestion prepopulates the fields and captures the hidden epr id
-// (identity_people_roles), which is sent back with the create payload.
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { Check, Loader2, Plus } from "lucide-react";
 import type { LeadSource, TaxYear } from "@/types/crm";
@@ -25,7 +31,15 @@ import { clientsApi, type ClientContactRow } from "@/services/clients";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { ALL_TAX_YEARS } from "@/types/crm";
 
-const SOURCES: LeadSource[] = ["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"];
+const SOURCES: LeadSource[] = [
+  "Referral",
+  "Website",
+  "Cold Call",
+  "Conference",
+  "LinkedIn",
+  "Partner",
+  "Other",
+];
 
 const schema = z.object({
   firstName: z.string().trim().min(1, "Required").max(60),
@@ -33,9 +47,15 @@ const schema = z.object({
   company: z.string().trim().min(1, "Required").max(160),
   email: z.string().trim().email("Invalid email").max(255),
   phone: z.string().trim().min(7, "Invalid phone").max(40),
-  source: z.enum(["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"]),
-  // The sales rep is always the authenticated user (the field is disabled);
-  // the backend forces salesperson = caller regardless of what's sent.
+  source: z.enum([
+    "Referral",
+    "Website",
+    "Cold Call",
+    "Conference",
+    "LinkedIn",
+    "Partner",
+    "Other",
+  ]),
   rep: z.string().trim().min(1, "Required"),
 });
 
@@ -165,11 +185,11 @@ export function AddLeadDialog() {
     setSubmitting(true);
     try {
       await addLead({ ...parsed.data, eprId, taxYears: years });
-      toast.success("Lead added", {
+    toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
-      });
+    });
       resetForm();
-      setOpen(false);
+    setOpen(false);
     } catch (err) {
       toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -196,7 +216,7 @@ export function AddLeadDialog() {
           <div className="relative">
             <div className="grid grid-cols-3 gap-3">
               <Field label="First Name" error={errors.firstName}>
-                <Input
+              <Input
                   value={form.firstName}
                   onChange={(e) => setSearchField("firstName", e.target.value)}
                   onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
@@ -213,19 +233,19 @@ export function AddLeadDialog() {
                   onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
                   placeholder="Doe"
                   autoComplete="off"
-                />
-              </Field>
-              <Field label="Company / Entity" error={errors.company}>
-                <Input
-                  value={form.company}
+              />
+            </Field>
+            <Field label="Company / Entity" error={errors.company}>
+              <Input
+                value={form.company}
                   onChange={(e) => setSearchField("company", e.target.value)}
                   onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
                   onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
-                  placeholder="Acme Inc."
+                placeholder="Acme Inc."
                   autoComplete="off"
-                />
-              </Field>
-            </div>
+              />
+            </Field>
+          </div>
 
             {searchOpen && (searching || suggestions.length > 0) && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover py-1 shadow-elevated">
@@ -263,15 +283,15 @@ export function AddLeadDialog() {
                 selected={form.email}
                 onPick={(v) => set("email", v)}
               >
-                <Input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => set("email", e.target.value)}
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => set("email", e.target.value)}
                   onFocus={() => emailOptions.length > 1 && setEmailOpen(true)}
                   onBlur={() => window.setTimeout(() => setEmailOpen(false), 120)}
-                  placeholder="jane@acme.com"
+                placeholder="jane@acme.com"
                   autoComplete="off"
-                />
+              />
               </ContactPicker>
             </Field>
             <Field label="Phone" error={errors.phone}>
@@ -282,23 +302,29 @@ export function AddLeadDialog() {
                 selected={form.phone}
                 onPick={(v) => set("phone", v)}
               >
-                <Input
-                  value={form.phone}
-                  onChange={(e) => set("phone", e.target.value)}
+              <Input
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
                   onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
                   onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
-                  placeholder="(555) 123-4567"
+                placeholder="(555) 123-4567"
                   autoComplete="off"
-                />
+              />
               </ContactPicker>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Lead Source">
               <Select value={form.source} onValueChange={(v) => set("source", v as LeadSource)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {SOURCES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>

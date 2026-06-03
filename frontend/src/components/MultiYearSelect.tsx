@@ -44,7 +44,9 @@ export function MultiYearSelect({
           variant="outline"
           className={cn("w-full justify-between font-normal", className)}
         >
-          <span className={cn("truncate", value.length === 0 && "text-muted-foreground")}>{label}</span>
+          <span className={cn("truncate", value.length === 0 && "text-muted-foreground")}>
+            {label}
+          </span>
           <ChevronDown className="ml-2 h-4 w-4 opacity-60" />
         </Button>
       </PopoverTrigger>
@@ -85,8 +87,7 @@ export function MultiYearSelect({
 export function YearChips({ years, className }: { years: TaxYear[]; className?: string }) {
   if (years.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
   const isAll = years.length === ALL_TAX_YEARS.length;
-  if (isAll)
-    return <Badge className="bg-navy text-navy-foreground hover:bg-navy">All Years</Badge>;
+  if (isAll) return <Badge className="bg-navy text-white hover:bg-navy">All Years</Badge>;
   return (
     <div className={cn("flex flex-wrap gap-1", className)}>
       {years.map((y) => (

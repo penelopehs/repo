@@ -115,7 +115,9 @@ export const useDocConfigStore = create<DocConfigState>((set) => ({
   toggleContact: (engId, contactId) =>
     set((s) => {
       const cur = s.contactsByEngagement[engId] ?? [];
-      const next = cur.includes(contactId) ? cur.filter((x) => x !== contactId) : [...cur, contactId];
+      const next = cur.includes(contactId)
+        ? cur.filter((x) => x !== contactId)
+        : [...cur, contactId];
       return { contactsByEngagement: { ...s.contactsByEngagement, [engId]: next } };
     }),
   setDueDate: (engId, d) =>
@@ -124,16 +126,30 @@ export const useDocConfigStore = create<DocConfigState>((set) => ({
     set((s) => ({ notesByEngagement: { ...s.notesByEngagement, [engId]: n } })),
   reset: (engId) =>
     set((s) => {
-      const sel = { ...s.selectionsByEngagement }; delete sel[engId];
-      const con = { ...s.contactsByEngagement }; delete con[engId];
-      const dd = { ...s.dueDateByEngagement }; delete dd[engId];
-      const nt = { ...s.notesByEngagement }; delete nt[engId];
-      return { selectionsByEngagement: sel, contactsByEngagement: con, dueDateByEngagement: dd, notesByEngagement: nt };
+      const sel = { ...s.selectionsByEngagement };
+      delete sel[engId];
+      const con = { ...s.contactsByEngagement };
+      delete con[engId];
+      const dd = { ...s.dueDateByEngagement };
+      delete dd[engId];
+      const nt = { ...s.notesByEngagement };
+      delete nt[engId];
+      return {
+        selectionsByEngagement: sel,
+        contactsByEngagement: con,
+        dueDateByEngagement: dd,
+        notesByEngagement: nt,
+      };
     }),
 }));
 
 // Existing contacts shared across all engagements.
-export interface DocContact { id: string; name: string; role: string; email: string }
+export interface DocContact {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
 
 interface ContactsState {
   contacts: DocContact[];
@@ -141,9 +157,24 @@ interface ContactsState {
 }
 
 const seedContacts: DocContact[] = [
-  { id: "dc1", name: "Dr. Harpreet Gill", role: "Owner / Physician", email: "hgill@northshoresurgical.com" },
-  { id: "dc2", name: "Amanda Torres", role: "Office Manager", email: "atorres@northshoresurgical.com" },
-  { id: "dc3", name: "David Kim, CPA", role: "External Accountant", email: "dkim@brightlinecpa.com" },
+  {
+    id: "dc1",
+    name: "Dr. Harpreet Gill",
+    role: "Owner / Physician",
+    email: "hgill@northshoresurgical.com",
+  },
+  {
+    id: "dc2",
+    name: "Amanda Torres",
+    role: "Office Manager",
+    email: "atorres@northshoresurgical.com",
+  },
+  {
+    id: "dc3",
+    name: "David Kim, CPA",
+    role: "External Accountant",
+    email: "dkim@brightlinecpa.com",
+  },
 ];
 
 export const useDocContactsStore = create<ContactsState>((set, get) => ({

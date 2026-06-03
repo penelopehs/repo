@@ -10,17 +10,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
 import { useDocumentsStore } from "@/store/documentsStore";
 
-type RequestType = "Tax Returns" | "Financial Records" | "R&D Documentation" | "Corporate & Entity" | "Payroll & HR";
+type RequestType =
+  | "Tax Returns"
+  | "Financial Records"
+  | "R&D Documentation"
+  | "Corporate & Entity"
+  | "Payroll & HR";
 type Priority = "Low" | "Medium" | "High" | "Urgent";
 
 const REQUEST_TYPES: RequestType[] = [
-  "Tax Returns", "Financial Records", "R&D Documentation", "Corporate & Entity", "Payroll & HR",
+  "Tax Returns",
+  "Financial Records",
+  "R&D Documentation",
+  "Corporate & Entity",
+  "Payroll & HR",
 ];
 const PRIORITIES: Priority[] = ["Low", "Medium", "High", "Urgent"];
 const REVIEWERS = ["Michael Williams", "Sandra Wu", "David Kim, CPA", "Amanda Torres"];
@@ -59,7 +72,9 @@ export function ConfigureRequestPage() {
 
   const handleSaveDraft = () => {
     toast.success("Draft saved", {
-      description: selectedClient ? `${selectedClient.company} — ${requestType || "Untitled"}` : "Configuration draft saved.",
+      description: selectedClient
+        ? `${selectedClient.company} — ${requestType || "Untitled"}`
+        : "Configuration draft saved.",
     });
   };
 
@@ -109,10 +124,14 @@ export function ConfigureRequestPage() {
           <div className="space-y-1.5">
             <Label>Client</Label>
             <Select value={clientId} onValueChange={handleClientChange}>
-              <SelectTrigger><SelectValue placeholder="Select client..." /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select client..." />
+              </SelectTrigger>
               <SelectContent>
                 {activeLeads.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.company}</SelectItem>
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.company}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -122,7 +141,9 @@ export function ConfigureRequestPage() {
             <Label>Engagement</Label>
             <Select value={engagementId} onValueChange={setEngagementId} disabled={!clientId}>
               <SelectTrigger>
-                <SelectValue placeholder={clientId ? "Select engagement..." : "Select a client first"} />
+                <SelectValue
+                  placeholder={clientId ? "Select engagement..." : "Select a client first"}
+                />
               </SelectTrigger>
               <SelectContent>
                 {clientEngagements.map((e) => (
@@ -131,7 +152,9 @@ export function ConfigureRequestPage() {
                   </SelectItem>
                 ))}
                 {clientId && clientEngagements.length === 0 && (
-                  <div className="px-2 py-1.5 text-sm text-muted-foreground">No engagements for this client.</div>
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No engagements for this client.
+                  </div>
                 )}
               </SelectContent>
             </Select>
@@ -140,10 +163,14 @@ export function ConfigureRequestPage() {
           <div className="space-y-1.5">
             <Label>Request Type</Label>
             <Select value={requestType} onValueChange={(v) => setRequestType(v as RequestType)}>
-              <SelectTrigger><SelectValue placeholder="Select request type..." /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select request type..." />
+              </SelectTrigger>
               <SelectContent>
                 {REQUEST_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -152,10 +179,14 @@ export function ConfigureRequestPage() {
           <div className="space-y-1.5">
             <Label>Priority</Label>
             <Select value={priority} onValueChange={(v) => setPriority(v as Priority)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {PRIORITIES.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                  <SelectItem key={p} value={p}>
+                    {p}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -169,10 +200,14 @@ export function ConfigureRequestPage() {
           <div className="space-y-1.5">
             <Label>Assigned Reviewer</Label>
             <Select value={reviewer} onValueChange={setReviewer}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {REVIEWERS.map((r) => (
-                  <SelectItem key={r} value={r}>{r}</SelectItem>
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -192,7 +227,9 @@ export function ConfigureRequestPage() {
       </section>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="ghost" onClick={() => navigate({ to: "/documents" })}>Cancel</Button>
+        <Button variant="ghost" onClick={() => navigate({ to: "/documents" })}>
+          Cancel
+        </Button>
         <Button
           variant="outline"
           onClick={handleSaveDraft}

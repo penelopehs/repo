@@ -19,8 +19,12 @@ export function ReviewRequestPage() {
   const contacts = useDocContactsStore((s) => s.contacts);
   const reset = useDocConfigStore((s) => s.reset);
 
-  const selections = useDocConfigStore((s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
-  const selectedIds = useDocConfigStore((s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
+  const selections = useDocConfigStore(
+    (s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
+  const selectedIds = useDocConfigStore(
+    (s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
   const dueDate = useDocConfigStore((s) => s.dueDateByEngagement[engagementId] ?? "");
   const notes = useDocConfigStore((s) => s.notesByEngagement[engagementId] ?? "");
   const selectedContacts = contacts.filter((c) => selectedIds.includes(c.id));
@@ -29,13 +33,17 @@ export function ReviewRequestPage() {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <p className="text-navy">Engagement not found.</p>
-        <Button asChild className="mt-4"><Link to="/documents">Back to Documents</Link></Button>
+        <Button asChild className="mt-4">
+          <Link to="/documents">Back to Documents</Link>
+        </Button>
       </div>
     );
   }
 
   const send = () => {
-    toast.success("Document request sent", { description: `${request.clientName} · ${selections.length} documents to ${selectedContacts.length} contact(s)` });
+    toast.success("Document request sent", {
+      description: `${request.clientName} · ${selections.length} documents to ${selectedContacts.length} contact(s)`,
+    });
     reset(engagementId);
     navigate({ to: "/documents" });
   };
@@ -61,10 +69,16 @@ export function ReviewRequestPage() {
       <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
         <header className="border-b border-border bg-gradient-frost px-6 py-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="border-navy/30 text-navy font-mono">{request.engagementId}</Badge>
-            <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">{request.id}</Badge>
+            <Badge variant="outline" className="border-navy/30 text-navy font-mono">
+              {request.engagementId}
+            </Badge>
+            <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">
+              {request.id}
+            </Badge>
           </div>
-          <h2 className="mt-2 text-xl font-bold text-navy">Document Request — {request.clientName}</h2>
+          <h2 className="mt-2 text-xl font-bold text-navy">
+            Document Request — {request.clientName}
+          </h2>
           <p className="mt-2 text-xs text-muted-foreground">
             <span className="font-semibold">To: </span>
             {selectedContacts.map((c) => `${c.name} <${c.email}>`).join(", ") || "—"}
@@ -73,7 +87,9 @@ export function ReviewRequestPage() {
 
         <div className="space-y-6 px-6 py-5">
           <section>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Engagement</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Engagement
+            </p>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-border p-3">
                 <p className="text-xs text-muted-foreground">Client</p>
@@ -81,10 +97,14 @@ export function ReviewRequestPage() {
               </div>
               <div className="rounded-lg border border-border p-3">
                 <p className="text-xs text-muted-foreground">Tax Years</p>
-                <div className="mt-1"><YearChips years={request.taxYears} /></div>
+                <div className="mt-1">
+                  <YearChips years={request.taxYears} />
+                </div>
               </div>
               <div className="rounded-lg border border-border p-3">
-                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3 w-3" /> Due Date</p>
+                <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                  <Calendar className="h-3 w-3" /> Due Date
+                </p>
                 <p className="font-medium text-navy">{dueDate ? formatDate(dueDate) : "Not set"}</p>
               </div>
               <div className="rounded-lg border border-border p-3">
@@ -104,7 +124,9 @@ export function ReviewRequestPage() {
                   <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan" /> {d}
                 </li>
               ))}
-              {selections.length === 0 && <li className="text-sm text-muted-foreground">None selected.</li>}
+              {selections.length === 0 && (
+                <li className="text-sm text-muted-foreground">None selected.</li>
+              )}
             </ul>
           </section>
 
@@ -115,17 +137,26 @@ export function ReviewRequestPage() {
             <ul className="mt-2 space-y-1">
               {selectedContacts.map((c) => (
                 <li key={c.id} className="text-sm text-navy">
-                  {c.name} <span className="text-muted-foreground">· {c.role} · {c.email}</span>
+                  {c.name}{" "}
+                  <span className="text-muted-foreground">
+                    · {c.role} · {c.email}
+                  </span>
                 </li>
               ))}
-              {selectedContacts.length === 0 && <li className="text-sm text-muted-foreground">None selected.</li>}
+              {selectedContacts.length === 0 && (
+                <li className="text-sm text-muted-foreground">None selected.</li>
+              )}
             </ul>
           </section>
 
           {notes && (
             <section>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Additional Notes</p>
-              <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm text-navy">{notes}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Additional Notes
+              </p>
+              <p className="mt-2 whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-3 text-sm text-navy">
+                {notes}
+              </p>
             </section>
           )}
         </div>
@@ -137,7 +168,10 @@ export function ReviewRequestPage() {
             <ArrowLeft className="mr-1.5 h-4 w-4" /> Back
           </Link>
         </Button>
-        <Button onClick={send} className="bg-green text-green-foreground hover:bg-green/90 shadow-elevated">
+        <Button
+          onClick={send}
+          className="bg-green text-green-foreground hover:bg-green/90 shadow-elevated"
+        >
           <Send className="mr-1.5 h-4 w-4" /> Send Document Request
         </Button>
       </div>

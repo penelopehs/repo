@@ -11,15 +11,15 @@ export default defineConfig({
     TanStackRouterVite({
       target: "react",
       routesDirectory: "./src/routes",
-      generatedRouteTree: "./src/routeTree.gen.ts"
+      generatedRouteTree: "./src/routeTree.gen.ts",
     }),
     react(),
     tailwindcss(),
-    tsconfigPaths()
+    tsconfigPaths(),
   ],
 
   build: {
     outDir: "dist",
-    sourcemap: false
-  }
+    sourcemap: false,
+  },
 });

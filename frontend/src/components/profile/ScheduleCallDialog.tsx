@@ -4,7 +4,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Phone } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +40,9 @@ export function ScheduleCallDialog({ clientId, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-navy flex items-center gap-2"><Phone className="h-4 w-4" /> Schedule Call</DialogTitle>
+          <DialogTitle className="text-navy flex items-center gap-2">
+            <Phone className="h-4 w-4" /> Schedule Call
+          </DialogTitle>
           <DialogDescription>Add a follow-up call to this client.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
@@ -51,12 +58,21 @@ export function ScheduleCallDialog({ clientId, open, onOpenChange }: Props) {
           </div>
           <div>
             <Label className="mb-1.5 block">Notes</Label>
-            <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Agenda, prep notes..." />
+            <Textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Agenda, prep notes..."
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} className="bg-navy text-navy-foreground hover:bg-navy/90">Schedule Call</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} className="bg-orange text-white hover:bg-orange/90">
+            Schedule Call
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

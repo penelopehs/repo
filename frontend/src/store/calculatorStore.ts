@@ -64,5 +64,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     set((s) => ({ entities: s.entities.map((e) => (e.id === id ? { ...e, [k]: v } : e)) })),
   setNotes: (s) => set({ notes: s }),
   hydrateFromLead: (clientName, taxYears) =>
-    set((s) => ({ client: { ...s.client, clientName, taxYears: taxYears.length ? taxYears : s.client.taxYears } })),
+    set((s) => ({
+      client: { ...s.client, clientName, taxYears: taxYears.length ? taxYears : s.client.taxYears },
+    })),
 }));

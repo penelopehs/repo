@@ -5,7 +5,12 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,26 +54,45 @@ export function AddPersonDialog({ onAdded }: { onAdded: (c: DocContact) => void 
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle className="text-navy">New Contact</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle className="text-navy">New Contact</DialogTitle>
+        </DialogHeader>
         <form onSubmit={submit} className="grid gap-3">
           <div>
             <Label>Full Name</Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Jane Doe" />
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Jane Doe"
+            />
             {errors.name && <p className="mt-1 text-xs text-destructive">{errors.name}</p>}
           </div>
           <div>
             <Label>Role / Title</Label>
-            <Input value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="Controller" />
+            <Input
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+              placeholder="Controller"
+            />
             {errors.role && <p className="mt-1 text-xs text-destructive">{errors.role}</p>}
           </div>
           <div>
             <Label>Email</Label>
-            <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="jane@client.com" />
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="jane@client.com"
+            />
             {errors.email && <p className="mt-1 text-xs text-destructive">{errors.email}</p>}
           </div>
           <DialogFooter className="mt-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" className="bg-navy text-navy-foreground hover:bg-navy/90">Add and Select</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
+              Add and Select
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -125,10 +125,7 @@ export const useDocumentsStore = create<DocsState>((set) => ({
   requests: seed,
   addRequest: (r) =>
     set((s) => ({
-      requests: [
-        ...s.requests,
-        { ...r, id: `REQ-${Date.now()}`, items: [] },
-      ],
+      requests: [...s.requests, { ...r, id: `REQ-${Date.now()}`, items: [] }],
     })),
 }));
 

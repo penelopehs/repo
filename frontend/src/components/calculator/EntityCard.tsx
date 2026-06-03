@@ -6,7 +6,13 @@ import { ChevronDown, Trash2, Building2, DollarSign, BadgeCheck, AlertCircle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,7 +28,11 @@ interface Props {
 }
 
 const FINANCIAL_FIELDS: { k: keyof Entity; label: string; suffix?: string }[] = [
-  { k: "grossCredit", label: "Gross Credit Amount", suffix: "(Eligible with more than $6,000 USD)" },
+  {
+    k: "grossCredit",
+    label: "Gross Credit Amount",
+    suffix: "(Eligible with more than $6,000 USD)",
+  },
   { k: "w2Wages", label: "W2 Wages (Qualified Research)" },
   { k: "contractResearch", label: "Contract Research Payments" },
   { k: "supplies", label: "Supplies" },
@@ -66,7 +76,7 @@ export function EntityCard({ entity, index }: Props) {
         className="flex w-full items-center justify-between gap-3 border-b border-border bg-gradient-frost px-5 py-4 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-navy-foreground text-sm font-bold">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-white text-sm font-bold">
             {index + 1}
           </div>
           <div className="min-w-0">
@@ -85,7 +95,10 @@ export function EntityCard({ entity, index }: Props) {
               <BadgeCheck className="mr-1 h-3 w-3" /> Eligible
             </Badge>
           ) : entity.state ? (
-            <Badge variant="outline" className="border-destructive/40 text-destructive bg-destructive/5">
+            <Badge
+              variant="outline"
+              className="border-destructive/40 text-destructive bg-destructive/5"
+            >
               <AlertCircle className="mr-1 h-3 w-3" /> Not eligible
             </Badge>
           ) : null}
@@ -93,13 +106,21 @@ export function EntityCard({ entity, index }: Props) {
             type="button"
             variant="ghost"
             size="icon"
-            onClick={(e) => { e.stopPropagation(); remove(entity.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              remove(entity.id);
+            }}
             className="h-8 w-8 text-muted-foreground hover:text-destructive"
             aria-label="Remove entity"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
-          <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", open && "rotate-180")} />
+          <ChevronDown
+            className={cn(
+              "h-5 w-5 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
         </div>
       </button>
 
@@ -139,7 +160,8 @@ export function EntityCard({ entity, index }: Props) {
                             </span>
                           </TooltipTrigger>
                           <TooltipContent>
-                            Arizona, California, Georgia, Illinois, Iowa, New Jersey, New York, North Carolina, Utah.
+                            Arizona, California, Georgia, Illinois, Iowa, New Jersey, New York,
+                            North Carolina, Utah.
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -157,7 +179,10 @@ export function EntityCard({ entity, index }: Props) {
                             <span className="flex items-center gap-2">
                               {s}
                               {isStateCreditEligible(s) && (
-                                <span title="State Credit Eligible" className="inline-block h-1.5 w-1.5 rounded-full bg-green" />
+                                <span
+                                  title="State Credit Eligible"
+                                  className="inline-block h-1.5 w-1.5 rounded-full bg-green"
+                                />
                               )}
                             </span>
                           </SelectItem>
@@ -177,7 +202,13 @@ export function EntityCard({ entity, index }: Props) {
                         type="number"
                         min={0}
                         value={entity.employeeCount === "" ? "" : entity.employeeCount}
-                        onChange={(e) => update(entity.id, "employeeCount", e.target.value === "" ? "" : Number(e.target.value))}
+                        onChange={(e) =>
+                          update(
+                            entity.id,
+                            "employeeCount",
+                            e.target.value === "" ? "" : Number(e.target.value),
+                          )
+                        }
                         placeholder="0"
                       />
                     </div>
@@ -187,7 +218,13 @@ export function EntityCard({ entity, index }: Props) {
                         type="number"
                         min={0}
                         value={entity.estimatedQRAs === "" ? "" : entity.estimatedQRAs}
-                        onChange={(e) => update(entity.id, "estimatedQRAs", e.target.value === "" ? "" : Number(e.target.value))}
+                        onChange={(e) =>
+                          update(
+                            entity.id,
+                            "estimatedQRAs",
+                            e.target.value === "" ? "" : Number(e.target.value),
+                          )
+                        }
                         placeholder="0"
                       />
                     </div>
@@ -205,16 +242,28 @@ export function EntityCard({ entity, index }: Props) {
                     <div key={k}>
                       <Label className="flex items-baseline gap-2">
                         <span>{label}</span>
-                        {suffix && <span className="text-[11px] font-normal text-muted-foreground">{suffix}</span>}
+                        {suffix && (
+                          <span className="text-[11px] font-normal text-muted-foreground">
+                            {suffix}
+                          </span>
+                        )}
                       </Label>
                       <div className="relative">
-                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                          $
+                        </span>
                         <Input
                           type="number"
                           min={0}
                           className="pl-7"
                           value={entity[k] as number | ""}
-                          onChange={(e) => update(entity.id, k, (e.target.value === "" ? "" : Number(e.target.value)) as never)}
+                          onChange={(e) =>
+                            update(
+                              entity.id,
+                              k,
+                              (e.target.value === "" ? "" : Number(e.target.value)) as never,
+                            )
+                          }
                           placeholder="0"
                         />
                       </div>

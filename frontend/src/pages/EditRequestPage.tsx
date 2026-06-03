@@ -14,9 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { YearChips } from "@/components/MultiYearSelect";
 import { useDocumentsStore } from "@/store/documentsStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
-import {
-  useDocConfigStore, useDocContactsStore, DOC_CATEGORIES,
-} from "@/store/docConfigStore";
+import { useDocConfigStore, useDocContactsStore, DOC_CATEGORIES } from "@/store/docConfigStore";
 import { AddPersonDialog } from "@/components/documents/AddPersonDialog";
 import { cn } from "@/lib/utils";
 
@@ -35,8 +33,12 @@ export function EditRequestPage() {
   );
 
   const contacts = useDocContactsStore((s) => s.contacts);
-  const selections = useDocConfigStore((s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
-  const selectedContacts = useDocConfigStore((s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
+  const selections = useDocConfigStore(
+    (s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
+  const selectedContacts = useDocConfigStore(
+    (s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
   const dueDate = useDocConfigStore((s) => s.dueDateByEngagement[engagementId] ?? "");
   const notes = useDocConfigStore((s) => s.notesByEngagement[engagementId] ?? "");
   const toggleItem = useDocConfigStore((s) => s.toggleItem);
@@ -64,7 +66,9 @@ export function EditRequestPage() {
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <p className="text-navy">Engagement not found.</p>
         <Button asChild variant="outline" className="mt-4 border-cyan text-cyan hover:bg-cyan/10">
-          <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Documents</Link>
+          <Link to="/documents">
+            <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Documents
+          </Link>
         </Button>
       </div>
     );
@@ -82,8 +86,15 @@ export function EditRequestPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground hover:text-navy">
-            <Link to="/documents"><ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Documents</Link>
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 mb-2 text-muted-foreground hover:text-navy"
+          >
+            <Link to="/documents">
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Back to Documents
+            </Link>
           </Button>
           <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Documents</p>
           <h1 className="mt-1 text-3xl font-bold text-navy">Edit Request</h1>
@@ -96,26 +107,42 @@ export function EditRequestPage() {
       {/* Engagement summary */}
       <section className="rounded-2xl border border-border bg-gradient-frost p-5 shadow-card">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-navy/30 text-navy font-mono">{request.engagementId}</Badge>
-          <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">{request.id}</Badge>
+          <Badge variant="outline" className="border-navy/30 text-navy font-mono">
+            {request.engagementId}
+          </Badge>
+          <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">
+            {request.id}
+          </Badge>
         </div>
         <h2 className="mt-2 text-xl font-bold text-navy">{request.clientName}</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tax Years (All)</p>
-            <div className="mt-1.5"><YearChips years={request.taxYears} /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Tax Years (All)
+            </p>
+            <div className="mt-1.5">
+              <YearChips years={request.taxYears} />
+            </div>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entities in Scope</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Entities in Scope
+            </p>
             <ul className="mt-1.5 space-y-0.5 text-sm text-navy">
-              {clientEntities.length === 0 && <li className="text-muted-foreground">No entities on file.</li>}
+              {clientEntities.length === 0 && (
+                <li className="text-muted-foreground">No entities on file.</li>
+              )}
               {clientEntities.map((e) => (
-                <li key={e.id} className="flex items-center gap-1.5"><Building2 className="h-3 w-3 text-cyan" /> {e.name}</li>
+                <li key={e.id} className="flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3 text-cyan" /> {e.name}
+                </li>
               ))}
             </ul>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents Requested</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Documents Requested
+            </p>
             <p className="mt-1.5 text-2xl font-bold tabular-nums text-navy">{selections.length}</p>
           </div>
         </div>
@@ -129,7 +156,10 @@ export function EditRequestPage() {
             const allOn = cat.items.every((i) => selections.includes(i));
             const someOn = !allOn && cat.items.some((i) => selections.includes(i));
             return (
-              <div key={cat.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div
+                key={cat.id}
+                className="rounded-2xl border border-border bg-card p-5 shadow-card"
+              >
                 <header className="flex items-center justify-between border-b border-border pb-3">
                   <h3 className="font-semibold text-navy">{cat.title}</h3>
                   <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
@@ -146,8 +176,16 @@ export function EditRequestPage() {
                     return (
                       <li key={item}>
                         <label className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 hover:bg-accent/40">
-                          <Checkbox checked={on} onCheckedChange={() => toggleItem(engagementId, item)} className="mt-0.5" />
-                          <span className={cn("text-sm", on ? "text-navy" : "text-muted-foreground")}>{item}</span>
+                          <Checkbox
+                            checked={on}
+                            onCheckedChange={() => toggleItem(engagementId, item)}
+                            className="mt-0.5"
+                          />
+                          <span
+                            className={cn("text-sm", on ? "text-navy" : "text-muted-foreground")}
+                          >
+                            {item}
+                          </span>
                         </label>
                       </li>
                     );
@@ -170,15 +208,23 @@ export function EditRequestPage() {
             const on = selectedContacts.includes(c.id);
             return (
               <li key={c.id}>
-                <label className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-                  on ? "border-cyan bg-cyan/5" : "border-border hover:bg-accent/40",
-                )}>
-                  <Checkbox checked={on} onCheckedChange={() => toggleContact(engagementId, c.id)} className="mt-0.5" />
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                    on ? "border-cyan bg-cyan/5" : "border-border hover:bg-accent/40",
+                  )}
+                >
+                  <Checkbox
+                    checked={on}
+                    onCheckedChange={() => toggleContact(engagementId, c.id)}
+                    className="mt-0.5"
+                  />
                   <div className="min-w-0">
                     <p className="font-medium text-navy">{c.name}</p>
                     <p className="text-xs text-muted-foreground">{c.role}</p>
-                    <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {c.email}</p>
+                    <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Mail className="h-3 w-3" /> {c.email}
+                    </p>
                   </div>
                 </label>
               </li>
@@ -193,7 +239,11 @@ export function EditRequestPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label>Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(engagementId, e.target.value)} />
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(engagementId, e.target.value)}
+            />
           </div>
           <div className="sm:col-span-2">
             <Label>Additional Notes</Label>
@@ -221,7 +271,9 @@ export function EditRequestPage() {
           <Save className="mr-1.5 h-4 w-4" /> Save Changes
         </Button>
         <Button
-          onClick={() => navigate({ to: "/documents/review/$engagementId", params: { engagementId } })}
+          onClick={() =>
+            navigate({ to: "/documents/review/$engagementId", params: { engagementId } })
+          }
           disabled={selections.length === 0 || selectedContacts.length === 0}
           className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated"
         >

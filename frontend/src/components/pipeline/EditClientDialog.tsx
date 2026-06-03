@@ -5,22 +5,41 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { Pencil } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadSource, LeadStatus } from "@/types/crm";
+import type { Lead, LeadSource, LeadStatus, TaxYear } from "@/types/crm";
+import { ALL_TAX_YEARS } from "@/types/crm";
+import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 
-const SOURCES: LeadSource[] = ["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"];
-const REPS: SalesRep[] = ["David Kim", "James Carter", "Sarah Johnson", "Unassigned"];
+const SOURCES: LeadSource[] = [
+  "Referral",
+  "Website",
+  "Cold Call",
+  "Conference",
+  "LinkedIn",
+  "Partner",
+  "Other",
+];
 const STATUSES: { value: LeadStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "calculation_sent", label: "Calculation Sent" },
@@ -34,10 +53,19 @@ const schema = z.object({
   company: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(255),
   phone: z.string().trim().min(7).max(40),
-  source: z.enum(["Referral", "Website", "Cold Call", "Conference", "LinkedIn", "Partner", "Other"]),
-  // The salesperson is owned by the backend (caller) and shown read-only.
+  source: z.enum([
+    "Referral",
+    "Website",
+    "Cold Call",
+    "Conference",
+    "LinkedIn",
+    "Partner",
+    "Other",
+  ]),
   rep: z.string().trim().min(1),
   status: z.enum(["new", "calculation_sent", "sow_signed", "active_engagement", "lost"]),
+  taxYears: z.array(z.number().int()).optional(),
+  entityNames: z.string().max(2000).optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -66,13 +94,23 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     source: lead.source,
     rep: lead.rep,
     status: lead.status,
+    taxYears: lead.taxYears ?? [],
+    entityNames: (lead.entityNames ?? []).join(", "),
     notes: lead.notes ?? "",
   });
 
   useEffect(() => {
     setForm({
-      fullName: lead.fullName, company: lead.company, email: lead.email, phone: lead.phone,
-      source: lead.source, rep: lead.rep, status: lead.status, notes: lead.notes ?? "",
+      fullName: lead.fullName,
+      company: lead.company,
+      email: lead.email,
+      phone: lead.phone,
+      source: lead.source,
+      rep: lead.rep,
+      status: lead.status,
+      taxYears: lead.taxYears ?? [],
+      entityNames: (lead.entityNames ?? []).join(", "),
+      notes: lead.notes ?? "",
     });
   }, [lead]);
 
@@ -87,7 +125,11 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     }
     setSubmitting(true);
     try {
-      await update(lead.id, parsed.data);
+      const entityNames = form.entityNames
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      await update(lead.id, { ...parsed.data, taxYears: form.taxYears, entityNames });
     toast.success("Client updated", { description: form.fullName });
     setOpen(false);
     } catch (err) {
@@ -102,19 +144,55 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-navy flex items-center gap-2"><Pencil className="h-4 w-4" /> Edit Client</DialogTitle>
-          <DialogDescription>Update lead details. Changes propagate to pipeline tables and KPIs.</DialogDescription>
+          <DialogTitle className="text-navy flex items-center gap-2">
+            <Pencil className="h-4 w-4" /> Edit Client
+          </DialogTitle>
+          <DialogDescription>
+            Update lead details. Changes propagate to pipeline tables and KPIs.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
-            <Item label="Full Name"><Input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></Item>
-            <Item label="Company / Entity"><Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></Item>
-            <Item label="Email"><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Item>
-            <Item label="Phone"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Item>
+            <Item label="Full Name">
+              <Input
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              />
+            </Item>
+            <Item label="Company / Entity">
+              <Input
+                value={form.company}
+                onChange={(e) => setForm({ ...form, company: e.target.value })}
+              />
+            </Item>
+            <Item label="Email">
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
+            </Item>
+            <Item label="Phone">
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+            </Item>
             <Item label="Lead Source">
-              <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{SOURCES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.source}
+                onValueChange={(v) => setForm({ ...form, source: v as LeadSource })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
@@ -131,18 +209,60 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Status">
-              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+              <Select
+                value={form.status}
+                onValueChange={(v) => setForm({ ...form, status: v as LeadStatus })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUSES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Item>
           </div>
+          <Item label="Engagement Years">
+            <MultiYearSelect
+              value={form.taxYears}
+              onToggle={(year: TaxYear) =>
+                setForm((prev) => ({
+                  ...prev,
+                  taxYears: prev.taxYears.includes(year)
+                    ? prev.taxYears.filter((item) => item !== year)
+                    : [...prev.taxYears, year].sort((a, b) => a - b),
+                }))
+              }
+              onSelectAll={() => setForm((prev) => ({ ...prev, taxYears: [...ALL_TAX_YEARS] }))}
+              onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
+            />
+          </Item>
+          <Item label="Entity / Entities (comma separated)">
+            <Textarea
+              rows={2}
+              value={form.entityNames}
+              onChange={(e) => setForm({ ...form, entityNames: e.target.value })}
+              placeholder="Acme LLC, Northwind Holdings"
+            />
+          </Item>
           <Item label="Existing Notes">
-            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </Item>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
-            <Button type="submit" disabled={submitting} className="bg-navy text-navy-foreground hover:bg-navy/90">{submitting ? "Saving…" : "Save Changes"}</Button>
+            <Button disabled={submitting} type="button" variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button disabled={submitting} type="submit" className="bg-orange text-white hover:bg-orange/90">
+              Save Changes
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

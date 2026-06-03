@@ -12,14 +12,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { YearChips } from "@/components/MultiYearSelect";
 import { useDocumentsStore } from "@/store/documentsStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
-import {
-  useDocConfigStore, useDocContactsStore, DOC_CATEGORIES,
-} from "@/store/docConfigStore";
+import { useDocConfigStore, useDocContactsStore, DOC_CATEGORIES } from "@/store/docConfigStore";
 import { AddPersonDialog } from "@/components/documents/AddPersonDialog";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -54,8 +57,12 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
   );
 
   const contacts = useDocContactsStore((s) => s.contacts);
-  const selections = useDocConfigStore((s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
-  const selectedContacts = useDocConfigStore((s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS);
+  const selections = useDocConfigStore(
+    (s) => s.selectionsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
+  const selectedContacts = useDocConfigStore(
+    (s) => s.contactsByEngagement[engagementId] ?? EMPTY_SELECTIONS,
+  );
   const dueDate = useDocConfigStore((s) => s.dueDateByEngagement[engagementId] ?? "");
   const notes = useDocConfigStore((s) => s.notesByEngagement[engagementId] ?? "");
   const toggleItem = useDocConfigStore((s) => s.toggleItem);
@@ -91,26 +98,42 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
       {/* Engagement summary */}
       <section className="rounded-2xl border border-border bg-gradient-frost p-5 shadow-card">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="border-navy/30 text-navy font-mono">{request.engagementId}</Badge>
-          <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">{request.id}</Badge>
+          <Badge variant="outline" className="border-navy/30 text-navy font-mono">
+            {request.engagementId}
+          </Badge>
+          <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">
+            {request.id}
+          </Badge>
         </div>
         <h2 className="mt-2 text-xl font-bold text-navy">{request.clientName}</h2>
         <div className="mt-3 grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tax Years (All)</p>
-            <div className="mt-1.5"><YearChips years={request.taxYears} /></div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Tax Years (All)
+            </p>
+            <div className="mt-1.5">
+              <YearChips years={request.taxYears} />
+            </div>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entities in Scope</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Entities in Scope
+            </p>
             <ul className="mt-1.5 space-y-0.5 text-sm text-navy">
-              {clientEntities.length === 0 && <li className="text-muted-foreground">No entities on file.</li>}
+              {clientEntities.length === 0 && (
+                <li className="text-muted-foreground">No entities on file.</li>
+              )}
               {clientEntities.map((e) => (
-                <li key={e.id} className="flex items-center gap-1.5"><Building2 className="h-3 w-3 text-cyan" /> {e.name}</li>
+                <li key={e.id} className="flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3 text-cyan" /> {e.name}
+                </li>
               ))}
             </ul>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documents Requested</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Documents Requested
+            </p>
             <p className="mt-1.5 text-2xl font-bold tabular-nums text-navy">{selections.length}</p>
           </div>
         </div>
@@ -124,7 +147,10 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
             const allOn = cat.items.every((i) => selections.includes(i));
             const someOn = !allOn && cat.items.some((i) => selections.includes(i));
             return (
-              <div key={cat.id} className="rounded-2xl border border-border bg-card p-5 shadow-card">
+              <div
+                key={cat.id}
+                className="rounded-2xl border border-border bg-card p-5 shadow-card"
+              >
                 <header className="flex items-center justify-between border-b border-border pb-3">
                   <h3 className="font-semibold text-navy">{cat.title}</h3>
                   <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
@@ -141,8 +167,16 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
                     return (
                       <li key={item}>
                         <label className="flex cursor-pointer items-start gap-2 rounded-md p-1.5 hover:bg-accent/40">
-                          <Checkbox checked={on} onCheckedChange={() => toggleItem(engagementId, item)} className="mt-0.5" />
-                          <span className={cn("text-sm", on ? "text-navy" : "text-muted-foreground")}>{item}</span>
+                          <Checkbox
+                            checked={on}
+                            onCheckedChange={() => toggleItem(engagementId, item)}
+                            className="mt-0.5"
+                          />
+                          <span
+                            className={cn("text-sm", on ? "text-navy" : "text-muted-foreground")}
+                          >
+                            {item}
+                          </span>
                         </label>
                       </li>
                     );
@@ -165,15 +199,23 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
             const on = selectedContacts.includes(c.id);
             return (
               <li key={c.id}>
-                <label className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
-                  on ? "border-cyan bg-cyan/5" : "border-border hover:bg-accent/40",
-                )}>
-                  <Checkbox checked={on} onCheckedChange={() => toggleContact(engagementId, c.id)} className="mt-0.5" />
+                <label
+                  className={cn(
+                    "flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors",
+                    on ? "border-cyan bg-cyan/5" : "border-border hover:bg-accent/40",
+                  )}
+                >
+                  <Checkbox
+                    checked={on}
+                    onCheckedChange={() => toggleContact(engagementId, c.id)}
+                    className="mt-0.5"
+                  />
                   <div className="min-w-0">
                     <p className="font-medium text-navy">{c.name}</p>
                     <p className="text-xs text-muted-foreground">{c.role}</p>
-                    <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {c.email}</p>
+                    <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Mail className="h-3 w-3" /> {c.email}
+                    </p>
                   </div>
                 </label>
               </li>
@@ -188,7 +230,11 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label>Due Date</Label>
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(engagementId, e.target.value)} />
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(engagementId, e.target.value)}
+            />
           </div>
           <div className="sm:col-span-2">
             <Label>Additional Notes</Label>
@@ -205,7 +251,9 @@ function EditRequestBody({ engagementId, onClose }: { engagementId: string; onCl
 
       {/* Actions */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="ghost" onClick={onClose}>
+          Cancel
+        </Button>
         <Button
           onClick={saveChanges}
           variant="outline"

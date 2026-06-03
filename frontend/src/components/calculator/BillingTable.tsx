@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 // Billing summary table — derives per-entity bills; "Tier" column replaced with "Years".
 
 import { useMemo, useState } from "react";
@@ -65,9 +66,10 @@ export function BillingTable() {
     filtered.sort((a, b) => {
       const aV = a[sortKey === "state_bill" ? "stateBill" : sortKey] as string | number;
       const bV = b[sortKey === "state_bill" ? "stateBill" : sortKey] as string | number;
-      const cmp = typeof aV === "number" && typeof bV === "number"
-        ? aV - bV
-        : String(aV).localeCompare(String(bV));
+      const cmp =
+        typeof aV === "number" && typeof bV === "number"
+          ? aV - bV
+          : String(aV).localeCompare(String(bV));
       return sortDir === "asc" ? cmp : -cmp;
     });
     return filtered;
@@ -85,11 +87,16 @@ export function BillingTable() {
 
   const setSort = (k: SortKey) => {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(k); setSortDir("desc"); }
+    else {
+      setSortKey(k);
+      setSortDir("desc");
+    }
   };
 
   const Th = ({ k, label, right }: { k: SortKey; label: string; right?: boolean }) => (
-    <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${right ? "text-right" : "text-left"}`}>
+    <th
+      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${right ? "text-right" : "text-left"}`}
+    >
       <button onClick={() => setSort(k)} className="inline-flex items-center gap-1 hover:text-navy">
         {label} <ArrowUpDown className="h-3 w-3 opacity-50" />
       </button>
@@ -119,10 +126,14 @@ export function BillingTable() {
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-card border-b border-border">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">#</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                #
+              </th>
               <Th k="company" label="Entity / Company" />
               <Th k="state" label="State" />
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Years</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Years
+              </th>
               <Th k="sow" label="SOW Estimate" right />
               <Th k="fed" label="Federal Bill" right />
               <Th k="state_bill" label="State Bill" right />
@@ -131,25 +142,42 @@ export function BillingTable() {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.id} className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors">
+              <tr
+                key={r.id}
+                className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors"
+              >
                 <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                 <td className="px-4 py-3 font-medium text-navy">{r.company}</td>
                 <td className="px-4 py-3">{r.state}</td>
-                <td className="px-4 py-3"><YearChips years={taxYears} /></td>
+                <td className="px-4 py-3">
+                  <YearChips years={taxYears} />
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.sow)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.fed)}</td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.stateBill)}</td>
-                <td className="px-4 py-3 text-right font-semibold tabular-nums text-navy">{formatCurrency(r.total)}</td>
+                <td className="px-4 py-3 text-right font-semibold tabular-nums text-navy">
+                  {formatCurrency(r.total)}
+                </td>
               </tr>
             ))}
           </tbody>
           <tfoot>
             <tr className="bg-gradient-frost font-semibold">
-              <td colSpan={4} className="px-4 py-3 text-right text-navy">Totals</td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">{formatCurrency(totals.sow)}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">{formatCurrency(totals.fed)}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">{formatCurrency(totals.stateBill)}</td>
-              <td className="px-4 py-3 text-right tabular-nums text-orange">{formatCurrency(totals.total)}</td>
+              <td colSpan={4} className="px-4 py-3 text-right text-navy">
+                Totals
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-navy">
+                {formatCurrency(totals.sow)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-navy">
+                {formatCurrency(totals.fed)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-navy">
+                {formatCurrency(totals.stateBill)}
+              </td>
+              <td className="px-4 py-3 text-right tabular-nums text-orange">
+                {formatCurrency(totals.total)}
+              </td>
             </tr>
           </tfoot>
         </table>

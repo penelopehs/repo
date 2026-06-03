@@ -5,7 +5,10 @@ export const Route = createFileRoute("/clients/$id")({
   head: () => ({
     meta: [
       { title: "Client Profile — Sales Billing CRM" },
-      { name: "description", content: "Client overview with engagements, contacts, intake, and follow-up calls." },
+      {
+        name: "description",
+        content: "Client overview with engagements, contacts, intake, and follow-up calls.",
+      },
       { name: "robots", content: "noindex,nofollow" },
     ],
   }),

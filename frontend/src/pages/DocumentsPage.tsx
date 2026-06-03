@@ -4,8 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Mail, Calendar, FileText, FolderCheck, AlertTriangle, Layers, Clock, Pencil,
-  Search, X, Plus,
+  Mail,
+  Calendar,
+  FileText,
+  FolderCheck,
+  AlertTriangle,
+  Layers,
+  Clock,
+  Pencil,
+  Search,
+  X,
+  Plus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,10 +30,9 @@ import type { DocumentStatus, DocumentRequest } from "@/types/crm";
 
 const STATUS_META: Record<DocumentStatus, { label: string; cls: string }> = {
   received: { label: "Complete", cls: "bg-green text-green-foreground" },
-  pending:  { label: "Pending",  cls: "bg-orange text-orange-foreground" },
-  overdue:  { label: "Overdue",  cls: "bg-violet text-violet-foreground" },
+  pending: { label: "Pending", cls: "bg-orange text-orange-foreground" },
+  overdue: { label: "Overdue", cls: "bg-violet text-violet-foreground" },
 };
-
 
 type KpiFilter = "total" | "complete" | "pending" | "overdue" | null;
 
@@ -53,7 +61,6 @@ export function DocumentsPage() {
   const [query, setQuery] = useState("");
   const [kpiFilter, setKpiFilter] = useState<KpiFilter>(null);
 
-
   // Compute status per request using the SAME logic as the request card,
   // so KPI counts always match the card badges. Single source of truth.
   const statusByRequest = useMemo(() => {
@@ -72,7 +79,9 @@ export function DocumentsPage() {
   }, [requests, selectionsMap]);
 
   const kpis = useMemo(() => {
-    let complete = 0, pending = 0, overdue = 0;
+    let complete = 0,
+      pending = 0,
+      overdue = 0;
     statusByRequest.forEach((s) => {
       if (s === "received") complete++;
       else if (s === "overdue") overdue++;
@@ -84,22 +93,27 @@ export function DocumentsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return requests.filter((r) => {
-      const matchQ = !q ||
-        r.clientName.toLowerCase().includes(q) ||
-        r.recipientName.toLowerCase().includes(q);
+      const matchQ =
+        !q || r.clientName.toLowerCase().includes(q) || r.recipientName.toLowerCase().includes(q);
       if (!matchQ) return false;
       if (!kpiFilter || kpiFilter === "total") return true;
       const s = statusByRequest.get(r.id);
       switch (kpiFilter) {
-        case "complete": return s === "received";
-        case "pending":  return s === "pending";
-        case "overdue":  return s === "overdue";
+        case "complete":
+          return s === "received";
+        case "pending":
+          return s === "pending";
+        case "overdue":
+          return s === "overdue";
       }
     });
   }, [requests, query, kpiFilter, statusByRequest]);
 
   const isFiltered = !!kpiFilter || query.trim().length > 0;
-  const clearAll = () => { setQuery(""); setKpiFilter(null); };
+  const clearAll = () => {
+    setQuery("");
+    setKpiFilter(null);
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -129,28 +143,48 @@ export function DocumentsPage() {
           >
             <X className="mr-1.5 h-4 w-4" /> Clear Filter
           </Button>
-          <Button asChild className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated">
+          <Button
+            asChild
+            className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated"
+          >
             <Link to="/documents/configure">
               <Plus className="mr-1.5 h-4 w-4" /> Add New
             </Link>
           </Button>
-
         </div>
       </div>
 
       {/* KPIs — clickable filters */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KpiFilterButton active={kpiFilter === "total"}    onClick={() => setKpiFilter((c) => c === "total" ? null : "total")}>
-          <KpiCard label="Total"    value={kpis.total}    icon={Layers}        accent="navy" labelClassName="text-[#00264A]" />
+        <KpiFilterButton
+          active={kpiFilter === "total"}
+          onClick={() => setKpiFilter((c) => (c === "total" ? null : "total"))}
+        >
+          <KpiCard
+            label="Total"
+            value={kpis.total}
+            icon={Layers}
+            accent="navy"
+            labelClassName="text-[#00264A]"
+          />
         </KpiFilterButton>
-        <KpiFilterButton active={kpiFilter === "complete"} onClick={() => setKpiFilter((c) => c === "complete" ? null : "complete")}>
-          <KpiCard label="Complete" value={kpis.complete} icon={FolderCheck}   accent="green" />
+        <KpiFilterButton
+          active={kpiFilter === "complete"}
+          onClick={() => setKpiFilter((c) => (c === "complete" ? null : "complete"))}
+        >
+          <KpiCard label="Complete" value={kpis.complete} icon={FolderCheck} accent="green" />
         </KpiFilterButton>
-        <KpiFilterButton active={kpiFilter === "pending"}  onClick={() => setKpiFilter((c) => c === "pending" ? null : "pending")}>
-          <KpiCard label="Pending"  value={kpis.pending}  icon={Clock}         accent="orange" />
+        <KpiFilterButton
+          active={kpiFilter === "pending"}
+          onClick={() => setKpiFilter((c) => (c === "pending" ? null : "pending"))}
+        >
+          <KpiCard label="Pending" value={kpis.pending} icon={Clock} accent="orange" />
         </KpiFilterButton>
-        <KpiFilterButton active={kpiFilter === "overdue"}  onClick={() => setKpiFilter((c) => c === "overdue" ? null : "overdue")}>
-          <KpiCard label="Overdue"  value={kpis.overdue}  icon={AlertTriangle} accent="violet" />
+        <KpiFilterButton
+          active={kpiFilter === "overdue"}
+          onClick={() => setKpiFilter((c) => (c === "overdue" ? null : "overdue"))}
+        >
+          <KpiCard label="Overdue" value={kpis.overdue} icon={AlertTriangle} accent="violet" />
         </KpiFilterButton>
       </div>
 
@@ -169,9 +203,16 @@ export function DocumentsPage() {
         </AnimatePresence>
         {filtered.length === 0 && (
           <div className="col-span-full rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
-            <p className="text-sm text-muted-foreground">No document requests match your filters.</p>
+            <p className="text-sm text-muted-foreground">
+              No document requests match your filters.
+            </p>
             {isFiltered && (
-              <Button variant="outline" size="sm" onClick={clearAll} className="mt-3 border-cyan text-cyan hover:bg-cyan/10">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAll}
+                className="mt-3 border-cyan text-cyan hover:bg-cyan/10"
+              >
                 <X className="mr-1.5 h-3 w-3" /> Clear Filter
               </Button>
             )}
@@ -182,7 +223,15 @@ export function DocumentsPage() {
   );
 }
 
-function KpiFilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function KpiFilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -230,7 +279,6 @@ function RequestCard({ r, i, hasConfig, configSelections }: RequestCardProps) {
   const pct = totalSelected > 0 ? (receivedCount / totalSelected) * 100 : 0;
   const barCls = isComplete ? "bg-green" : isOverdue ? "bg-violet" : "bg-orange";
 
-
   return (
     <motion.div
       layout
@@ -240,15 +288,22 @@ function RequestCard({ r, i, hasConfig, configSelections }: RequestCardProps) {
       transition={{ delay: i * 0.04 }}
       className={cn(
         "rounded-2xl border bg-card shadow-card hover:shadow-elevated transition-shadow",
-        isOverdue ? "border-violet/40 ring-1 ring-violet/20" :
-        isComplete ? "border-green/40" : "border-border",
+        isOverdue
+          ? "border-violet/40 ring-1 ring-violet/20"
+          : isComplete
+            ? "border-green/40"
+            : "border-border",
       )}
     >
       <header className="flex items-start justify-between gap-3 border-b border-border p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="border-navy/30 text-navy font-mono">{r.engagementId}</Badge>
-            <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">{r.id}</Badge>
+            <Badge variant="outline" className="border-navy/30 text-navy font-mono">
+              {r.engagementId}
+            </Badge>
+            <Badge variant="outline" className="border-cyan/30 text-cyan font-mono">
+              {r.id}
+            </Badge>
           </div>
           <h3 className="mt-2 text-base font-semibold text-navy">{r.clientName}</h3>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -261,25 +316,37 @@ function RequestCard({ r, i, hasConfig, configSelections }: RequestCardProps) {
       <div className="grid gap-4 p-5">
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div>
-            <p className="font-semibold uppercase tracking-wider text-muted-foreground">Tax Years</p>
-            <div className="mt-1.5"><YearChips years={r.taxYears} /></div>
+            <p className="font-semibold uppercase tracking-wider text-muted-foreground">
+              Tax Years
+            </p>
+            <div className="mt-1.5">
+              <YearChips years={r.taxYears} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="font-semibold uppercase tracking-wider text-muted-foreground">Sent</p>
-              <p className="mt-1.5 inline-flex items-center gap-1 text-navy"><Calendar className="h-3 w-3" /> {formatDate(r.sentDate)}</p>
+              <p className="mt-1.5 inline-flex items-center gap-1 text-navy">
+                <Calendar className="h-3 w-3" /> {formatDate(r.sentDate)}
+              </p>
             </div>
             <div>
               <p className="font-semibold uppercase tracking-wider text-muted-foreground">Due</p>
-              <p className="mt-1.5 inline-flex items-center gap-1 text-navy"><Calendar className="h-3 w-3" /> {formatDate(r.dueDate)}</p>
+              <p className="mt-1.5 inline-flex items-center gap-1 text-navy">
+                <Calendar className="h-3 w-3" /> {formatDate(r.dueDate)}
+              </p>
             </div>
           </div>
         </div>
 
         <div>
           <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold uppercase tracking-wider text-muted-foreground">DOCUMENTS</span>
-            <span className="font-semibold tabular-nums text-navy">({receivedCount} / {totalSelected})</span>
+            <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+              DOCUMENTS
+            </span>
+            <span className="font-semibold tabular-nums text-navy">
+              ({receivedCount} / {totalSelected})
+            </span>
           </div>
           <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
             <motion.div
@@ -296,17 +363,23 @@ function RequestCard({ r, i, hasConfig, configSelections }: RequestCardProps) {
             <FileText className="mr-1 inline h-3 w-3" /> View document types ({totalSelected})
           </summary>
           {totalSelected === 0 ? (
-            <p className="mt-2 italic text-muted-foreground">No documents selected for this request</p>
+            <p className="mt-2 italic text-muted-foreground">
+              No documents selected for this request
+            </p>
           ) : (
             <p className="mt-3 leading-relaxed text-navy">
               {effective.map((item, idx) => {
                 const isReceived = receivedSet.has(item);
                 return (
                   <span key={item}>
-                    <span className={cn("font-medium", isReceived ? "text-green" : "text-destructive")}>
+                    <span
+                      className={cn("font-medium", isReceived ? "text-green" : "text-destructive")}
+                    >
                       {item}
                     </span>
-                    {idx < effective.length - 1 && <span className="text-muted-foreground">, </span>}
+                    {idx < effective.length - 1 && (
+                      <span className="text-muted-foreground">, </span>
+                    )}
                   </span>
                 );
               })}
@@ -317,20 +390,30 @@ function RequestCard({ r, i, hasConfig, configSelections }: RequestCardProps) {
               remain in scope (selections still managed from Configure Request). */}
           <div className="hidden">
             {DOC_CATEGORIES.map((cat) => (
-              <button key={cat.id} type="button" onClick={() => setCategoryAll(r.engagementId, cat.id, false)}>
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setCategoryAll(r.engagementId, cat.id, false)}
+              >
                 {cat.title}
               </button>
             ))}
-            <button type="button" onClick={() => toggleItem(r.engagementId, "")}>noop</button>
+            <button type="button" onClick={() => toggleItem(r.engagementId, "")}>
+              noop
+            </button>
           </div>
         </details>
 
-        <Button asChild size="sm" variant="outline" className="w-full border-cyan text-cyan hover:bg-cyan/10">
+        <Button
+          asChild
+          size="sm"
+          variant="outline"
+          className="w-full border-cyan text-cyan hover:bg-cyan/10"
+        >
           <Link to="/documents/edit/$engagementId" params={{ engagementId: r.engagementId }}>
             <Pencil className="mr-1 h-3 w-3" /> Edit Request
           </Link>
         </Button>
-
       </div>
     </motion.div>
   );

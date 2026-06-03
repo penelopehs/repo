@@ -4,29 +4,48 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
-  Building2, Layers, Calculator as CalcIcon, DollarSign, FileDown, Share2, Plus,
+  Building2,
+  Layers,
+  Calculator as CalcIcon,
+  DollarSign,
+  FileDown,
+  Share2,
+  Plus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { KpiCard } from "@/components/KpiCard";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable, computeBilled } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
-import { FILING_STATUSES } from "@/types/crm";
+import { FILING_STATUSES, type TaxYear } from "@/types/crm";
 import { leadsApi } from "@/services/leads";
+import { cn } from "@/lib/utils";
 
 export function CalculatorPage() {
   const {
-    client, setClientField, toggleTaxYear, selectAllTaxYears, clearTaxYears,
-    entityCountInput, setEntityCountInput,
-    entities, generateEntities, addEntity,
-    notes, setNotes,
+    client,
+    setClientField,
+    toggleTaxYear,
+    selectAllTaxYears,
+    clearTaxYears,
+    entityCountInput,
+    setEntityCountInput,
+    entities,
+    generateEntities,
+    addEntity,
+    notes,
+    setNotes,
   } = useCalculatorStore();
 
   const [generating, setGenerating] = useState(false);
@@ -67,19 +86,48 @@ export function CalculatorPage() {
     );
   }, [entities, filingRate]);
 
-  // Honor ?clientName=... from "New Calculation" deep links.
+  // Honor calculation deep links from the dashboard so the calculator opens with client + year context.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const q = new URLSearchParams(window.location.search);
     const name = q.get("clientName");
-    if (name && !client.clientName) setClientField("clientName", name);
-  }, [client.clientName, setClientField]);
+    const years = q.get("taxYears");
 
-  const yearsLabel = client.taxYears.length === 7
-    ? "All Tax Years"
-    : client.taxYears.length === 0
-      ? "No years selected"
-      : client.taxYears.join(", ");
+    if (name && !client.clientName) setClientField("clientName", name);
+
+    if (years) {
+      const parsed = years
+        .split(",")
+        .map((value) => Number(value))
+        .filter(
+          (value): value is TaxYear => Number.isInteger(value) && value >= 2020 && value <= 2026,
+        )
+        .sort((a, b) => a - b);
+
+      if (parsed.length > 0 && JSON.stringify(parsed) !== JSON.stringify(client.taxYears)) {
+        setClientField("taxYears", parsed);
+      }
+    }
+  }, [client.clientName, client.taxYears, setClientField]);
+
+  const hasExistingCalculationContext =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("hasExistingCalculation") === "true";
+  const latestCalculationLabel =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("latestCalculation")
+      : null;
+  const calculationContextMessage =
+    hasExistingCalculationContext && latestCalculationLabel && latestCalculationLabel !== "—"
+      ? `Existing calculation(s) found for ${client.clientName || "this client"}. Latest saved calculation: ${latestCalculationLabel}.`
+      : `No saved calculation found yet. Generate a fresh calculation for ${client.taxYears.length ? client.taxYears.join(", ") : "the selected tax years"}.`;
+
+  const yearsLabel =
+    client.taxYears.length === 7
+      ? "All Tax Years"
+      : client.taxYears.length === 0
+        ? "No years selected"
+        : client.taxYears.join(", ");
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -87,7 +135,9 @@ export function CalculatorPage() {
     generateEntities(entityCountInput);
     setGenerating(false);
     setTimeout(() => {
-      document.getElementById("entity-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById("entity-details")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   };
 
@@ -110,6 +160,16 @@ export function CalculatorPage() {
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Calculator</p>
         <h1 className="mt-1 text-3xl font-bold text-navy">Client Setup</h1>
+        <div
+          className={cn(
+            "mt-3 rounded-xl border px-4 py-3 text-sm",
+            hasExistingCalculationContext
+              ? "border-cyan/40 bg-cyan/8 text-cyan-foreground"
+              : "border-amber-200 bg-amber-50 text-amber-950",
+          )}
+        >
+          {calculationContextMessage}
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Configure the client, generate entities, and produce a billing-ready summary.
         </p>
@@ -164,7 +224,9 @@ export function CalculatorPage() {
               value={client.filingStatus}
               onValueChange={(v) => setClientField("filingStatus", v as typeof client.filingStatus)}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {FILING_STATUSES.map((f) => (
                   <SelectItem key={f.value} value={f.value}>
@@ -183,7 +245,9 @@ export function CalculatorPage() {
           <div className="w-full md:w-48">
             <Label>Number of Entities</Label>
             <Input
-              type="number" min={1} max={50}
+              type="number"
+              min={1}
+              max={50}
               value={entityCountInput}
               onChange={(e) => setEntityCountInput(Number(e.target.value) || 1)}
             />
@@ -197,7 +261,8 @@ export function CalculatorPage() {
             {generating ? "Generating..." : "Generate Entities"}
           </Button>
           <p className="text-xs text-muted-foreground md:ml-3">
-            Enter the total number of entities for this client, then click Generate to create input cards.
+            Enter the total number of entities for this client, then click Generate to create input
+            cards.
           </p>
         </div>
       </Section>
@@ -232,24 +297,58 @@ export function CalculatorPage() {
       </Section>
 
       {/* Section 4 — Billing Overview Summary (unified container) */}
-      <Section title="Billing Overview Summary" icon={<DollarSign className="h-4 w-4 text-green" />}>
-        <div className="flex flex-col gap-6 rounded-xl border border-border bg-gradient-frost p-5 lg:flex-row lg:items-start lg:justify-between">
+      <Section
+        title="Billing Overview Summary"
+        icon={<DollarSign className="h-4 w-4 text-green" />}
+      >
+        <div className="flex flex-col gap-4 rounded-xl border border-border bg-gradient-frost p-4 lg:flex-row lg:items-start lg:justify-between lg:p-5">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Overview</p>
-            <h3 className="mt-1 text-xl font-bold text-navy">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-cyan">
+              Overview
+            </p>
+            <h3 className="mt-1 text-lg font-bold text-navy lg:text-xl">
               {client.clientName || "Untitled Client"}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               <span className="font-medium text-navy">{yearsLabel}</span>
               <span className="mx-2 opacity-50">·</span>
-              <span>{entities.length} {entities.length === 1 ? "entity" : "entities"}</span>
+              <span>
+                {entities.length} {entities.length === 1 ? "entity" : "entities"}
+              </span>
             </p>
           </div>
-          <div className="grid w-full gap-4 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
-            <KpiCard label="Total Entities" value={entities.length} icon={Layers} accent="navy" />
-            <KpiCard label="Total SOW"      value={totals.sow}      icon={DollarSign} accent="orange" currency />
-            <KpiCard label="Federal Total"  value={totals.fed}      icon={CalcIcon}   accent="cyan" currency />
-            <KpiCard label="Grand Total"    value={totals.total}    icon={DollarSign} accent="green" currency />
+          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+            <KpiCard
+              compact
+              label="Total Entities"
+              value={entities.length}
+              icon={Layers}
+              accent="navy"
+            />
+            <KpiCard
+              compact
+              label="Total SOW"
+              value={totals.sow}
+              icon={DollarSign}
+              accent="orange"
+              currency
+            />
+            <KpiCard
+              compact
+              label="Federal Total"
+              value={totals.fed}
+              icon={CalcIcon}
+              accent="cyan"
+              currency
+            />
+            <KpiCard
+              compact
+              label="Grand Total"
+              value={totals.total}
+              icon={DollarSign}
+              accent="green"
+              currency
+            />
           </div>
         </div>
 
@@ -294,7 +393,12 @@ export function CalculatorPage() {
 }
 
 function Section({
-  id, icon, title, subtitle, action, children,
+  id,
+  icon,
+  title,
+  subtitle,
+  action,
+  children,
 }: {
   id?: string;
   icon?: React.ReactNode;
