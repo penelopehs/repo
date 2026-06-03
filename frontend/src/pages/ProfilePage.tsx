@@ -38,16 +38,23 @@ import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
+import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
-import type { LeadDataPerson } from "@/types/crm";
+import type { FollowUpCall, LeadDataPerson } from "@/types/crm";
+
+// Stable empty reference so the zustand selector below doesn't return a fresh
+// array on every read (which would make useSyncExternalStore loop forever).
+const NO_CALLS: FollowUpCall[] = [];
 
 export function ProfilePage({ id }: { id: string }) {
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const byClient = useEngagementsStore((s) => s.byClient);
-  const updateCall = useEngagementsStore((s) => s.updateCall);
+  const calls = useFollowUpCallsStore((s) => s.byLead[id] ?? NO_CALLS);
+  const fetchCalls = useFollowUpCallsStore((s) => s.fetch);
+  const updateCall = useFollowUpCallsStore((s) => s.update);
   const navigate = useNavigate();
   const [openCall, setOpenCall] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
@@ -84,17 +91,21 @@ export function ProfilePage({ id }: { id: string }) {
     };
   }, []);
 
-  const { engagements, entities: clientEntities, calls } = byClient(id);
+  const { engagements, entities: clientEntities } = byClient(id);
+
+  useEffect(() => {
+    void fetchCalls(id);
+  }, [fetchCalls, id]);
 
   useEffect(() => {
     const now = new Date();
     calls.forEach((c) => {
       if (!c.completed && new Date(`${c.date}T${c.time}`) < now) {
-        updateCall(c.id, { completed: true });
+        void updateCall(id, c.id, { completed: true });
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calls.length, updateCall]);
+  }, [calls.length, updateCall, id]);
 
   const chartData = useMemo(() => {
     const map = new Map<number, number>();
@@ -918,7 +929,7 @@ export function ProfilePage({ id }: { id: string }) {
                             <input
                               type="checkbox"
                               checked={!!c.completed}
-                              onChange={() => updateCall(c.id, { completed: !c.completed })}
+                              onChange={() => void updateCall(id, c.id, { completed: !c.completed })}
                               className="h-3.5 w-3.5 rounded border-border text-green-600 focus:ring-green-500"
                             />
                             Complete

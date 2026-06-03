@@ -15,25 +15,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { useEngagementsStore } from "@/store/engagementsStore";
+import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 
 interface Props {
+  /** Lead id this call belongs to (the profile is keyed by lead). */
   clientId: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }
 
 export function ScheduleCallDialog({ clientId, open, onOpenChange }: Props) {
-  const add = useEngagementsStore((s) => s.addCall);
+  const add = useFollowUpCallsStore((s) => s.add);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [time, setTime] = useState("10:00");
   const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const submit = () => {
-    add({ clientId, date, time, notes });
-    toast.success("Call scheduled", { description: `${date} at ${time}` });
-    onOpenChange(false);
-    setNotes("");
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await add(clientId, { date, time, notes });
+      toast.success("Call scheduled", { description: `${date} at ${time}` });
+      onOpenChange(false);
+      setNotes("");
+    } catch (e) {
+      toast.error("Couldn't schedule call", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -67,11 +78,15 @@ export function ScheduleCallDialog({ clientId, open, onOpenChange }: Props) {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={submit} className="bg-orange text-white hover:bg-orange/90">
-            Schedule Call
+          <Button
+            onClick={submit}
+            disabled={saving}
+            className="bg-orange text-white hover:bg-orange/90"
+          >
+            {saving ? "Scheduling…" : "Schedule Call"}
           </Button>
         </DialogFooter>
       </DialogContent>
