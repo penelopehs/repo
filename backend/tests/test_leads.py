@@ -7,16 +7,17 @@ paths.
 """
 
 from app import models
-from tests.conftest import make_client_with_entity
+from tests.conftest import make_assignment
 
 
 # ── Create ──────────────────────────────────────────────────────────────────────
 
-def test_create_with_new_client_name_creates_client(client, db_session):
+def test_create_with_epr_resolves_client(client, db_session):
+    client_id, _, epr_id = make_assignment(db_session, client_name="Cedar Valley Medical")
     resp = client.post(
         "/leads",
         json={
-            "client_name": "Cedar Valley Medical",
+            "epr_id": epr_id,
             "full_name": "Dr. Cedar",
             "email": "dr@cedar.test",
             "phone": "+1-555-0100",
@@ -26,17 +27,18 @@ def test_create_with_new_client_name_creates_client(client, db_session):
     assert resp.status_code == 201
     body = resp.json()
     assert body["pipeline_status"] == "Lead"
-    assert body["client_id"] is not None
+    # The client is resolved through the EPR assignment (epr -> entity -> client).
+    assert body["client_id"] == client_id
+    assert body["client_name"] == "Cedar Valley Medical"
     # Contact info is carried directly on the lead.
     assert body["full_name"] == "Dr. Cedar"
     assert body["email"] == "dr@cedar.test"
     assert body["phone"] == "+1-555-0100"
 
-    # A clients row was created for the named prospect.
-    c = db_session.query(models.Client).filter(
-        models.Client.idclients == body["client_id"]
-    ).first()
-    assert c is not None and c.client_name == "Cedar Valley Medical"
+
+def test_create_with_unknown_epr_id_404(client):
+    resp = client.post("/leads", json={"epr_id": 99999, "full_name": "Ghost"})
+    assert resp.status_code == 404
 
 
 def test_create_clientless_lead(client, db_session):
@@ -107,15 +109,10 @@ def test_create_stores_calculations_blob(client):
     assert body["calculations"] == payload
 
 
-def test_create_with_unknown_client_id_404(client):
-    resp = client.post("/leads", json={"client_id": 99999, "full_name": "Ghost"})
-    assert resp.status_code == 404
-
-
 def test_create_without_caller_user_403(client, claims):
     # An authenticated token whose oid has no users row -> 403.
     claims["oid"] = "ghost-oid"
-    resp = client.post("/leads", json={"client_name": "Ghosts Inc", "full_name": "Ghost"})
+    resp = client.post("/leads", json={"full_name": "Ghost"})
     assert resp.status_code == 403
 
 
@@ -133,22 +130,11 @@ def test_list_filter_by_status(client):
 
 
 def test_list_resolves_company_from_client_people(client, db_session):
-    # Contact info now comes from the client's people, not a lead profile.
-    client_id, entity_id = make_client_with_entity(db_session)
-    person = models.Person(first_name="Dana", last_name="Reed", firm="Acme Labs")
-    db_session.add(person)
-    db_session.flush()
-    db_session.add(
-        models.EntityPeopleRole(
-            entities_entity_id=entity_id, people_idperson=person.idperson, roles_idroles=1
-        )
-    )
-    db_session.add(
-        models.PeopleEmail(people_idperson=person.idperson, email="a@acme.test", is_primary=True)
-    )
-    db_session.commit()
+    # With no company seeded in the JSON, company falls back to the firm of the
+    # people behind the lead's client (resolved via epr -> entity -> client).
+    client_id, _, epr_id = make_assignment(db_session, firm="Acme Labs")
 
-    client.post("/leads", json={"client_id": client_id, "full_name": "Dana Reed"})
+    client.post("/leads", json={"epr_id": epr_id, "full_name": "Dana Reed"})
     resp = client.get("/leads", params={"status": "Lead"})
     item = next(o for o in resp.json() if o["client_id"] == client_id)
     assert item["company"] == "Acme Labs"
@@ -161,8 +147,8 @@ def test_get_detail_404(client):
 
 
 def test_detail_includes_sub_entities(client, db_session):
-    client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Detail Lead"}).json()
+    _, _, epr_id = make_assignment(db_session)
+    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Detail Lead"}).json()
 
     resp = client.get(f"/leads/{lead['id']}")
     assert resp.status_code == 200
@@ -198,14 +184,17 @@ def test_patch_updates_calculations(client):
 # ── Delete ──────────────────────────────────────────────────────────────────────
 
 def test_delete_lead_keeps_client(client, db_session):
-    lead = client.post("/leads", json={"client_name": "Keep Me Co", "full_name": "K"}).json()
-    client_id = lead["client_id"]
+    client_id, _, epr_id = make_assignment(db_session, client_name="Keep Me Co")
+    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "K"}).json()
 
     assert client.delete(f"/leads/{lead['id']}").status_code == 204
     assert client.get(f"/leads/{lead['id']}").status_code == 404
-    # The account survives the lead deletion.
+    # The account (and its EPR assignment) survive the lead deletion.
     assert db_session.query(models.Client).filter(
         models.Client.idclients == client_id
+    ).first() is not None
+    assert db_session.query(models.EntityPeopleRole).filter(
+        models.EntityPeopleRole.identity_people_roles == epr_id
     ).first() is not None
 
 
@@ -253,8 +242,8 @@ def test_create_engagement_requires_client_entity(client):
 
 
 def test_create_engagement(client, db_session):
-    client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Eng Lead"}).json()
+    _, _, epr_id = make_assignment(db_session)
+    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Eng Lead"}).json()
 
     resp = client.post(
         f"/leads/{lead['id']}/engagements",
@@ -268,8 +257,8 @@ def test_create_engagement(client, db_session):
 
 
 def test_patch_engagement(client, db_session):
-    client_id, _ = make_client_with_entity(db_session)
-    lead = client.post("/leads", json={"client_id": client_id, "full_name": "Eng Lead"}).json()
+    _, _, epr_id = make_assignment(db_session)
+    lead = client.post("/leads", json={"epr_id": epr_id, "full_name": "Eng Lead"}).json()
     eng = client.post(
         f"/leads/{lead['id']}/engagements",
         json={"type": "R&D Tax Credit", "status": "Active"},

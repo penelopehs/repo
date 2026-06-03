@@ -39,6 +39,18 @@ class Client(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClientContactRow(BaseModel):
+    """One row of the entity_people_roles join exposed by GET /clients."""
+
+    identity_people_roles: int
+    entity_name: str
+    first_name: str
+    last_name: str
+    role_name: str
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ── Referral channels ────────────────────────────────────────────────────────
 
 class ReferralChannel(BaseModel):
@@ -52,9 +64,9 @@ class ReferralChannel(BaseModel):
 # ── Leads ──────────────────────────────────────────────────────────────────────
 
 class LeadCreate(BaseModel):
-    # Optionally attach to an existing client account.
-    client_id: Optional[int] = None
-    client_name: Optional[str] = None
+    # Optional link to an existing entity_people_roles assignment
+    # (entity ↔ person ↔ role); resolves the lead's entity & client.
+    epr_id: Optional[int] = None
     # Contact info carried directly on the lead.
     full_name: str
     email: Optional[str] = None

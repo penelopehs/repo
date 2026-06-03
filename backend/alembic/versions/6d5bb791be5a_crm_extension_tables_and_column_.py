@@ -18,7 +18,7 @@ def upgrade() -> None:
     # crm_leads is created first because the child tables reference it.
     op.create_table('crm_leads',
     sa.Column('crm_lead_id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('clients_idclients', sa.Integer(), nullable=True),
+    sa.Column('epr_id', sa.Integer(), nullable=True),
     sa.Column('pipeline_status', sa.Enum('Lead', 'Calculation Sent', 'SOW Signed', 'Active Engagement', name='crm_leads_pipeline_status'), server_default='Lead', nullable=False),
     sa.Column('lead_source', sa.String(length=100), nullable=True),
     sa.Column('salesperson_iduser', sa.Integer(), nullable=True),
@@ -31,7 +31,7 @@ def upgrade() -> None:
     sa.Column('engagement_started_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
     sa.Column('updated_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'), nullable=False),
-    sa.ForeignKeyConstraint(['clients_idclients'], ['clients.idclients'], ),
+    sa.ForeignKeyConstraint(['epr_id'], ['entity_people_roles.identity_people_roles'], ),
     sa.ForeignKeyConstraint(['salesperson_iduser'], ['users.iduser'], ),
     sa.PrimaryKeyConstraint('crm_lead_id')
     )

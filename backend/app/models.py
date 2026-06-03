@@ -169,6 +169,7 @@ class EntityPeopleRole(Base):
     entities_entity_id = Column(Integer, nullable=False)
     people_idperson = Column(Integer, nullable=False)
     roles_idroles = Column(Integer, nullable=False)
+    created_at = Column(DateTime, nullable=True)
 
 
 class EngagementTypeRef(Base):
@@ -221,8 +222,10 @@ class CrmLead(Base):
     __tablename__ = "crm_leads"
 
     crm_lead_id = Column(Integer, primary_key=True, autoincrement=True)
-    clients_idclients = Column(
-        Integer, ForeignKey("clients.idclients"), nullable=True
+    epr_id = Column(
+        Integer,
+        ForeignKey("entity_people_roles.identity_people_roles"),
+        nullable=True,
     )
     pipeline_status = Column(
         PIPELINE_ENUM, nullable=False, server_default=PipelineStatus.lead.value

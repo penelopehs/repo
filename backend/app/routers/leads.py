@@ -37,22 +37,26 @@ def _caller(db: Session, claims: dict) -> models.User:
     return user
 
 
-def _default_client_status_id(db: Session) -> int:
-    """clients.client_status_idclient_status is a NOT-NULL FK. Reuse the first
-    active status (lowest sort_order) or create a default 'Active' one if the
-    reference table is empty."""
-    row = (
-        db.query(models.ClientStatusRef)
-        .filter(models.ClientStatusRef.is_active.is_(True))
-        .order_by(models.ClientStatusRef.sort_order.asc())
+def _lead_entity(db: Session, lead: models.CrmLead) -> Optional[models.Entity]:
+    """The entity a lead is attached to, via its EPR assignment
+    (crm_leads.epr_id → entity_people_roles → entities)."""
+    if not lead.epr_id:
+        return None
+    return (
+        db.query(models.Entity)
+        .join(
+            models.EntityPeopleRole,
+            models.EntityPeopleRole.entities_entity_id == models.Entity.entity_id,
+        )
+        .filter(models.EntityPeopleRole.identity_people_roles == lead.epr_id)
         .first()
     )
-    if row:
-        return row.idclient_status
-    row = models.ClientStatusRef(status_name="Active", is_active=True, sort_order=1)
-    db.add(row)
-    db.flush()
-    return row.idclient_status
+
+
+def _lead_client_id(db: Session, lead: models.CrmLead) -> Optional[int]:
+    """The client account behind a lead: epr → entity → clients_idclients."""
+    entity = _lead_entity(db, lead)
+    return entity.clients_idclients if entity else None
 
 
 def _get_or_create_engagement_type(db: Session, name: str) -> int:
@@ -128,9 +132,20 @@ def _initial_calculations(company: Optional[str], engagement_years) -> dict:
 def _client_type(db: Session, client_id: Optional[int]) -> str:
     if not client_id:
         return "New"
+    # Count leads attached to this client across ALL statuses, walking
+    # crm_leads → epr → entities → clients_idclients.
     count = (
         db.query(func.count(models.CrmLead.crm_lead_id))
-        .filter(models.CrmLead.clients_idclients == client_id)
+        .select_from(models.CrmLead)
+        .join(
+            models.EntityPeopleRole,
+            models.EntityPeopleRole.identity_people_roles == models.CrmLead.epr_id,
+        )
+        .join(
+            models.Entity,
+            models.Entity.entity_id == models.EntityPeopleRole.entities_entity_id,
+        )
+        .filter(models.Entity.clients_idclients == client_id)
         .scalar()
     )
     return "Returning" if (count or 0) > 1 else "New"
@@ -196,8 +211,9 @@ def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
             first = entities[0]
             if isinstance(first, dict) and first.get("name"):
                 return first["name"]
-    if lead.clients_idclients:
-        info = _people_contact_info(db, lead.clients_idclients)
+    client_id = _lead_client_id(db, lead)
+    if client_id:
+        info = _people_contact_info(db, client_id)
         if info and info[0]:
             return info[0]
     return None
@@ -220,16 +236,27 @@ def list_leads(
         q = q.filter(models.CrmLead.pipeline_status.in_(wanted))
     leads = q.all()
 
-    client_ids = {o.clients_idclients for o in leads if o.clients_idclients}
+    # Resolve each lead's client through its EPR assignment (epr → entity → client).
+    client_id_by_lead = {o.crm_lead_id: _lead_client_id(db, o) for o in leads}
+    client_ids = {cid for cid in client_id_by_lead.values() if cid}
     clients = {
         c.idclients: c
         for c in db.query(models.Client).filter(models.Client.idclients.in_(client_ids)).all()
     } if client_ids else {}
     # total lead count per client (across ALL statuses) -> New/Returning
     counts = dict(
-        db.query(models.CrmLead.clients_idclients, func.count())
-        .filter(models.CrmLead.clients_idclients.in_(client_ids))
-        .group_by(models.CrmLead.clients_idclients)
+        db.query(models.Entity.clients_idclients, func.count(models.CrmLead.crm_lead_id))
+        .select_from(models.CrmLead)
+        .join(
+            models.EntityPeopleRole,
+            models.EntityPeopleRole.identity_people_roles == models.CrmLead.epr_id,
+        )
+        .join(
+            models.Entity,
+            models.Entity.entity_id == models.EntityPeopleRole.entities_entity_id,
+        )
+        .filter(models.Entity.clients_idclients.in_(client_ids))
+        .group_by(models.Entity.clients_idclients)
         .all()
     ) if client_ids else {}
     rep_ids = {o.salesperson_iduser for o in leads if o.salesperson_iduser}
@@ -237,27 +264,19 @@ def list_leads(
         u.iduser: f"{u.first_name} {u.last_name}".strip()
         for u in db.query(models.User).filter(models.User.iduser.in_(rep_ids)).all()
     } if rep_ids else {}
-    people_company: dict = {}  # client_id -> company, computed lazily once per client
 
-    def _company(o: models.CrmLead) -> Optional[str]:
-        # Company is derived from the client's people; clientless leads have none.
-        if not o.clients_idclients:
-            return None
-        if o.clients_idclients not in people_company:
-            info = _people_contact_info(db, o.clients_idclients)
-            people_company[o.clients_idclients] = info[0] if info and info[0] else None
-        return people_company[o.clients_idclients]
-
-    return [
-        schemas.LeadListItem(
+    def _item(o: models.CrmLead) -> schemas.LeadListItem:
+        client_id = client_id_by_lead.get(o.crm_lead_id)
+        company = _company_for(db, o)
+        return schemas.LeadListItem(
             id=o.crm_lead_id,
-            client_id=o.clients_idclients,
+            client_id=client_id,
             client_name=(
-                clients[o.clients_idclients].client_name
-                if o.clients_idclients in clients
-                else (_company(o) or o.full_name)
+                clients[client_id].client_name
+                if client_id in clients
+                else (company or o.full_name)
             ),
-            company=_company(o),
+            company=company,
             full_name=o.full_name,
             email=o.email,
             phone=o.phone,
@@ -265,14 +284,14 @@ def list_leads(
             lead_source=o.lead_source,
             salesperson_iduser=o.salesperson_iduser,
             salesperson_name=reps.get(o.salesperson_iduser),
-            client_type="Returning" if o.clients_idclients and counts.get(o.clients_idclients, 1) > 1 else "New",
+            client_type="Returning" if client_id and counts.get(client_id, 1) > 1 else "New",
             latest_calc_total=_calc_total(o.calculations),
             created_at=o.created_at,
             sow_signed_at=o.sow_signed_at,
             engagement_started_at=o.engagement_started_at,
         )
-        for o in leads
-    ]
+
+    return [_item(o) for o in leads]
 
 
 # ── Create lead ────────────────────────────────────────────────────────────────
@@ -285,22 +304,17 @@ def create_lead(
 ):
     caller = _caller(db, claims)
 
-    client = None
-    if body.client_id:
-        client = db.query(models.Client).filter(models.Client.idclients == body.client_id).first()
-        if not client:
-            raise HTTPException(status_code=404, detail="Client not found")
-    elif body.client_name and body.client_name.strip():
-        # A named prospect becomes a client account up-front (as before).
-        client = models.Client(
-            client_name=body.client_name.strip(),
-            client_status_idclient_status=_default_client_status_id(db),
-            created_by=caller.iduser,
+    # Optionally link to an existing entity_people_roles assignment.
+    if body.epr_id is not None:
+        epr = (
+            db.query(models.EntityPeopleRole)
+            .filter(models.EntityPeopleRole.identity_people_roles == body.epr_id)
+            .first()
         )
-        db.add(client)
-        db.flush()  # populate idclients
-    # else: a clientless lead — contact info comes from the client's people, so a
-    # clientless lead simply has none until it's attached to a client.
+        if not epr:
+            raise HTTPException(
+                status_code=404, detail="Entity-people-role assignment not found"
+            )
 
     calculations = (
         body.calculations
@@ -309,7 +323,7 @@ def create_lead(
     )
 
     lead = models.CrmLead(
-        clients_idclients=client.idclients if client else None,
+        epr_id=body.epr_id,
         full_name=body.full_name,
         email=body.email,
         phone=body.phone,
@@ -333,9 +347,10 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)):
 
 
 def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
+    client_id = _lead_client_id(db, lead)
     client = (
-        db.query(models.Client).filter(models.Client.idclients == lead.clients_idclients).first()
-        if lead.clients_idclients
+        db.query(models.Client).filter(models.Client.idclients == client_id).first()
+        if client_id
         else None
     )
     company = _company_for(db, lead)
@@ -348,8 +363,10 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     # sub-entities (read) — entities belonging to the client
     entities = (
         db.query(models.Entity)
-        .filter(models.Entity.clients_idclients == lead.clients_idclients)
+        .filter(models.Entity.clients_idclients == client_id)
         .all()
+        if client_id
+        else []
     )
     entity_ids = [e.entity_id for e in entities]
     type_names = {
@@ -468,7 +485,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
 
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
-        client_id=lead.clients_idclients,
+        client_id=client_id,
         client_name=client.client_name if client else (company or lead.full_name),
         company=company,
         full_name=lead.full_name,
@@ -478,7 +495,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         lead_source=lead.lead_source,
         salesperson_iduser=lead.salesperson_iduser,
         salesperson_name=f"{rep.first_name} {rep.last_name}".strip() if rep else None,
-        client_type=_client_type(db, lead.clients_idclients),
+        client_type=_client_type(db, client_id),
         latest_calc_total=_calc_total(lead.calculations),
         created_at=lead.created_at,
         updated_at=lead.updated_at,
@@ -616,19 +633,12 @@ def create_engagement(
     lead = _get_lead(db, lead_id)
     caller = _caller(db, claims)
 
-    # Resolve the (NOT NULL) entity from the client's first entity.
-    ent = (
-        db.query(models.Entity)
-        .filter(models.Entity.clients_idclients == lead.clients_idclients)
-        .order_by(models.Entity.entity_id.asc())
-        .first()
-        if lead.clients_idclients
-        else None
-    )
+    # Resolve the (NOT NULL) entity from the lead's EPR assignment.
+    ent = _lead_entity(db, lead)
     if not ent:
         raise HTTPException(
             status_code=400,
-            detail="Cannot create an engagement: the lead has no client entity yet.",
+            detail="Cannot create an engagement: the lead has no entity yet.",
         )
     entity_id = ent.entity_id
 

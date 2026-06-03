@@ -172,3 +172,32 @@ def make_client_with_entity(db_session, *, client_name="Acme Health", entity_nam
     db_session.add(e)
     db_session.commit()
     return c.idclients, e.entity_id
+
+
+def make_assignment(
+    db_session,
+    *,
+    client_name="Acme Health",
+    entity_name="Acme Health, PC",
+    first_name="Dana",
+    last_name="Reed",
+    role_name="Owner",
+    firm=None,
+):
+    """Insert a client + entity + person + role and the entity_people_roles link
+    that joins them. Returns (client_id, entity_id, epr_id)."""
+    client_id, entity_id = make_client_with_entity(
+        db_session, client_name=client_name, entity_name=entity_name
+    )
+    person = models.Person(first_name=first_name, last_name=last_name, firm=firm)
+    role = models.PeopleRole(role_name=role_name)
+    db_session.add_all([person, role])
+    db_session.flush()
+    epr = models.EntityPeopleRole(
+        entities_entity_id=entity_id,
+        people_idperson=person.idperson,
+        roles_idroles=role.idroles,
+    )
+    db_session.add(epr)
+    db_session.commit()
+    return client_id, entity_id, epr.identity_people_roles
