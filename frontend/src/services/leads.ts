@@ -2,29 +2,34 @@
 // backend's lead-centric DTOs onto the frontend `Lead` shape used by the
 // Client Dashboard (and the store that backs it).
 //
-// The list endpoint (GET /leads) is intentionally lean — it omits tax years,
-// entity counts, and a real "latest calculation" date. To populate those table
-// columns we fetch the per-lead detail aggregate (GET /leads/{id}) for each row.
+// The list endpoint (GET /leads) is rich: it carries every column the dashboard
+// table needs (tax years, entity count, latest-calculation date, salesperson,
+// client type), so the list is mapped directly — no per-row detail fetch.
 
 import { api } from "@/services/api";
 import { ALL_TAX_YEARS } from "@/types/crm";
-import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
+import type { ClientType, Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
 
 // ── Backend DTOs (subset of backend/app/schemas.py we consume) ──────────────────
 
 interface ApiLeadListItem {
   id: number;
-  client_id: number | null;
-  client_name: string;
   company: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
   pipeline_status: string;
   lead_source: string | null;
+  salesperson_iduser: number | null;
   salesperson_name: string | null;
-  client_type: string;
-  latest_calc_total: number | null;
+  client_type: string; // "New" | "Returning"
+  /** Unix epoch seconds (Python datetime.timestamp()), null if no calculation. */
+  latest_calc_date: number | null;
   created_at: string;
   sow_signed_at: string | null;
   engagement_started_at: string | null;
+  entities_count: number;
+  tax_years: number[];
 }
 
 interface ApiContact {
@@ -45,9 +50,21 @@ interface ApiCalculation {
   created_at: string;
 }
 
-interface ApiLeadDetail extends ApiLeadListItem {
+// The per-lead detail aggregate (GET /leads/{id}, and the POST/PATCH responses).
+interface ApiLeadDetail {
+  id: number;
+  company: string | null;
+  client_name?: string | null;
   email: string | null;
   phone: string | null;
+  pipeline_status: string;
+  lead_source: string | null;
+  salesperson_iduser?: number | null;
+  salesperson_name: string | null;
+  client_type?: string | null;
+  created_at: string;
+  sow_signed_at?: string | null;
+  engagement_started_at: string | null;
   notes: string | null;
   sub_entities: { id: number }[];
   contacts: ApiContact[];
@@ -74,6 +91,49 @@ const STATUS_TO_API: Record<LeadStatus, string> = {
 
 const TAX_YEARS = new Set<number>(ALL_TAX_YEARS);
 
+const toTaxYears = (years: number[] | null | undefined): TaxYear[] =>
+  [...new Set(years ?? [])]
+    .filter((y) => TAX_YEARS.has(y))
+    .sort((a, b) => a - b) as TaxYear[];
+
+const toClientType = (v: string | null | undefined): ClientType =>
+  v === "Returning" ? "Returning" : "New";
+
+const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : "");
+
+// ── Mapping: backend list item → frontend Lead ──────────────────────────────────
+//
+// The list response is self-contained, so the dashboard table is filled entirely
+// from a single GET /leads (no per-row detail fetch).
+
+function mapListItem(i: ApiLeadListItem): Lead {
+  const taxYears = toTaxYears(i.tax_years);
+
+  return {
+    id: String(i.id),
+    fullName: i.full_name ?? "",
+    company: i.company ?? "",
+    email: i.email ?? "",
+    phone: i.phone ?? "",
+    source: (i.lead_source ?? "Other") as LeadSource,
+    rep: i.salesperson_name ?? "Unassigned",
+    repId: i.salesperson_iduser ?? null,
+    status: STATUS_FROM_API[i.pipeline_status] ?? "new",
+    clientType: toClientType(i.client_type),
+    engagementYears: taxYears.length,
+    taxYears,
+    engagedSince: isoDate(i.engagement_started_at),
+    sowSignedAt: isoDate(i.sow_signed_at) || undefined,
+    entitiesCount: i.entities_count ?? 0,
+    // latest_calc_date is Unix epoch seconds; render to an ISO date string.
+    latestCalculation:
+      i.latest_calc_date != null
+        ? new Date(i.latest_calc_date * 1000).toISOString().slice(0, 10)
+        : "—",
+    addedAt: i.created_at,
+  };
+}
+
 // ── Mapping: backend detail → frontend Lead ─────────────────────────────────────
 
 function mapDetail(d: ApiLeadDetail): Lead {
@@ -82,9 +142,7 @@ function mapDetail(d: ApiLeadDetail): Lead {
     for (const y of e.tax_years ?? []) years.add(y);
     for (const b of e.yearly_billing ?? []) years.add(b.year);
   }
-  const taxYears = [...years]
-    .filter((y) => TAX_YEARS.has(y))
-    .sort((a, b) => a - b) as TaxYear[];
+  const taxYears = toTaxYears([...years]);
 
   // calculations come back newest-first from the backend.
   const latestCalc = d.calculations?.[0];
@@ -99,10 +157,13 @@ function mapDetail(d: ApiLeadDetail): Lead {
     phone: d.phone ?? primaryContact?.phone ?? "",
     source: (d.lead_source ?? "Other") as LeadSource,
     rep: (d.salesperson_name ?? "Unassigned") as SalesRep,
+    repId: d.salesperson_iduser ?? null,
     status: STATUS_FROM_API[d.pipeline_status] ?? "new",
+    clientType: toClientType(d.client_type),
     engagementYears: taxYears.length,
     taxYears,
-    engagedSince: d.engagement_started_at ? d.engagement_started_at.slice(0, 10) : "",
+    engagedSince: isoDate(d.engagement_started_at),
+    sowSignedAt: isoDate(d.sow_signed_at) || undefined,
     entitiesCount: d.sub_entities?.length ?? 0,
     latestCalculation: latestCalc ? latestCalc.created_at.slice(0, 10) : "—",
     addedAt: d.created_at,
@@ -128,25 +189,22 @@ export interface LeadCreateInput {
 // ── Public API ──────────────────────────────────────────────────────────────────
 
 export const leadsApi = {
-  /** Fetch only the lean list and return unique company names — for autocomplete. */
+  /** Fetch the list and return unique company names — for autocomplete. */
   async listNames(): Promise<string[]> {
     const items = await api.get<ApiLeadListItem[]>("/leads");
     const seen = new Set<string>();
     for (const i of items) {
-      const name = (i.company ?? i.client_name ?? "").trim();
+      const name = (i.company ?? i.full_name ?? "").trim();
       if (name) seen.add(name);
     }
     return [...seen].sort((a, b) => a.localeCompare(b));
   },
 
-  /** List leads, then hydrate each with its detail aggregate (tax years,
-   *  entity count, latest-calculation date) the list endpoint doesn't carry. */
+  /** List leads for the dashboard table — a single request that already carries
+   *  tax years, entity count, latest-calculation date, and salesperson. */
   async list(): Promise<Lead[]> {
     const items = await api.get<ApiLeadListItem[]>("/leads");
-    const details = await Promise.all(
-      items.map((i) => api.get<ApiLeadDetail>(`/leads/${i.id}`)),
-    );
-    return details.map(mapDetail);
+    return items.map(mapListItem);
   },
 
   async create(input: LeadCreateInput): Promise<Lead> {

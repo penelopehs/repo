@@ -103,8 +103,7 @@ class LeadUpdate(BaseModel):
 class LeadListItem(BaseModel):
     id: int
     company: Optional[str] = None
-    first_name: str
-    last_name: str
+    full_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
     pipeline_status: str

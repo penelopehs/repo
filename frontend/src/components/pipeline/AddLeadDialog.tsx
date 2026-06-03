@@ -349,7 +349,9 @@ export function AddLeadDialog() {
           </Field>
           <DialogFooter className="mt-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
-            <Button type="submit" disabled={submitting} className="bg-navy text-navy-foreground hover:bg-navy/90">{submitting ? "Adding…" : "Add Lead"}</Button>
+            <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
+              Add Lead
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

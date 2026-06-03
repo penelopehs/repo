@@ -54,6 +54,9 @@ export type LeadSource =
 // string (a user's full name) rather than a fixed union.
 export type SalesRep = string;
 
+/** Whether this is a brand-new client or a returning one (GET /leads.client_type). */
+export type ClientType = "New" | "Returning";
+
 export interface Lead {
   id: string;
   fullName: string;
@@ -62,12 +65,17 @@ export interface Lead {
   phone: string;
   source: LeadSource;
   rep: SalesRep;
+  /** Backend user id of the assigned salesperson, if any. */
+  repId?: number | null;
   status: LeadStatus;
+  clientType?: ClientType;
   /** Legacy: count of years engaged (kept for backwards compat). */
   engagementYears: number;
   /** Tax years selected for this client's engagement. */
   taxYears: TaxYear[];
   engagedSince: string;
+  /** ISO date (YYYY-MM-DD) the SOW was signed, if any. */
+  sowSignedAt?: string;
   entitiesCount: number;
   entityNames?: string[];
   latestCalculation: string;

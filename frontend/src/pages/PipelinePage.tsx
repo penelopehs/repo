@@ -457,7 +457,9 @@ function PipelineTable(p: TableProps) {
               <td className="px-5 py-3">
                 <StatusBadge status={l.status} />
                 <p className="mt-1 font-medium text-navy">{l.fullName}</p>
-                <p className="text-xs text-muted-foreground">Person</p>
+                {l.clientType && (
+                  <p className="text-xs text-muted-foreground">{l.clientType} client</p>
+                )}
                 <p className="text-xs text-muted-foreground">{l.company}</p>
               </td>
               <td className="px-5 py-3">

@@ -285,8 +285,7 @@ def list_leads(
         return schemas.LeadListItem(
             id=o.crm_lead_id,
             company=_company_for(db, o),
-            first_name=o.first_name,
-            last_name=o.last_name,
+            full_name=f"{o.first_name} {o.last_name}".strip(),
             email=o.email,
             phone=o.phone,
             pipeline_status=o.pipeline_status,
@@ -423,8 +422,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
         company=company,
-        first_name=lead.first_name,
-        last_name=lead.last_name,
+        full_name=f"{lead.first_name} {lead.last_name}".strip(),
         email=lead.email,
         phone=lead.phone,
         pipeline_status=lead.pipeline_status,
