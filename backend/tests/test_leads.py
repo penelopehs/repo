@@ -32,8 +32,7 @@ def test_create_with_epr_resolves_company(client, db_session):
     assert body["pipeline_status"] == "Lead"
     assert body["company"] == "Cedar Labs"
     # Contact info is carried directly on the lead.
-    assert body["first_name"] == "Dana"
-    assert body["last_name"] == "Cedar"
+    assert body["full_name"] == "Dana Cedar"
     assert body["email"] == "dr@cedar.test"
     assert body["phone"] == "+1-555-0100"
 
@@ -54,7 +53,7 @@ def test_create_clientless_lead(client, db_session):
     body = resp.json()
     # No epr/client -> no company resolved.
     assert body["company"] is None
-    assert body["first_name"] == "Harbor"
+    assert body["full_name"] == "Harbor Lead"
 
 
 def test_create_requires_name(client):
@@ -81,8 +80,7 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     body = resp.json()
 
     # Lead-level fields land on the row.
-    assert body["first_name"] == "Jordan"
-    assert body["last_name"] == "Pike"
+    assert body["full_name"] == "Jordan Pike"
     assert body["email"] == "jordan@pike.test"
     assert body["phone"] == "+1-555-0142"
     assert body["lead_source"] == "Webinar"
@@ -153,7 +151,7 @@ def test_list_resolves_company_from_client_people(client, db_session):
 
     client.post("/leads", json={"epr_id": epr_id, "first_name": "Dana", "last_name": "Reed"})
     resp = client.get("/leads", params={"status": "Lead"})
-    item = next(o for o in resp.json() if o["first_name"] == "Dana")
+    item = next(o for o in resp.json() if o["full_name"] == "Dana Reed")
     assert item["company"] == "Acme Labs"
 
 
@@ -315,12 +313,32 @@ def test_follow_up_call_crud(client):
     call = created.json()
     assert call["completed"] is False
 
-    patched = client.patch(f"/follow-up-calls/{call['id']}", json={"completed": True})
+    # Read: list for the lead.
+    listed = client.get(f"/leads/{lead['id']}/follow-up-calls")
+    assert listed.status_code == 200
+    assert [c["id"] for c in listed.json()] == [call["id"]]
+
+    # Update: lead-scoped patch.
+    patched = client.patch(
+        f"/leads/{lead['id']}/follow-up-calls/{call['id']}", json={"completed": True}
+    )
     assert patched.status_code == 200
     assert patched.json()["completed"] is True
 
-    assert client.delete(f"/follow-up-calls/{call['id']}").status_code == 204
-    assert client.delete(f"/follow-up-calls/{call['id']}").status_code == 404
+    # 404 when the call isn't on this lead (unknown call, or wrong lead).
+    other = client.post("/leads", json={"first_name": "Other", "last_name": "Lead"}).json()
+    assert (
+        client.patch(
+            f"/leads/{other['id']}/follow-up-calls/{call['id']}", json={"completed": False}
+        ).status_code
+        == 404
+    )
+    assert (
+        client.patch(
+            f"/leads/{lead['id']}/follow-up-calls/999999", json={"completed": False}
+        ).status_code
+        == 404
+    )
 
 
 def test_follow_up_call_on_missing_lead_404(client):

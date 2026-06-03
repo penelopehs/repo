@@ -515,17 +515,32 @@ def create_follow_up_call(
     return _call_read(call)
 
 
-@router.patch("/follow-up-calls/{call_id}", response_model=schemas.FollowUpCallRead)
-def update_follow_up_call(
-    call_id: int, body: schemas.FollowUpCallUpdate, db: Session = Depends(get_db)
-):
-    call = (
+@router.get(
+    "/leads/{lead_id}/follow-up-calls",
+    response_model=List[schemas.FollowUpCallRead],
+)
+def list_follow_up_calls(lead_id: int, db: Session = Depends(get_db)):
+    _get_lead(db, lead_id)
+    calls = (
         db.query(models.CrmFollowUpCall)
-        .filter(models.CrmFollowUpCall.idcrm_follow_up_call == call_id)
-        .first()
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead_id)
+        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
+        .all()
     )
-    if not call:
-        raise HTTPException(status_code=404, detail="Follow-up call not found")
+    return [_call_read(c) for c in calls]
+
+
+@router.patch(
+    "/leads/{lead_id}/follow-up-calls/{call_id}",
+    response_model=schemas.FollowUpCallRead,
+)
+def update_follow_up_call(
+    lead_id: int,
+    call_id: int,
+    body: schemas.FollowUpCallUpdate,
+    db: Session = Depends(get_db),
+):
+    call = _get_lead_call(db, lead_id, call_id)
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(call, field, value)
     db.commit()
@@ -533,17 +548,20 @@ def update_follow_up_call(
     return _call_read(call)
 
 
-@router.delete("/follow-up-calls/{call_id}", status_code=204)
-def delete_follow_up_call(call_id: int, db: Session = Depends(get_db)):
+def _get_lead_call(db: Session, lead_id: int, call_id: int) -> models.CrmFollowUpCall:
+    """A follow-up call that belongs to `lead_id`. 404 if it doesn't exist or
+    is attached to a different lead."""
     call = (
         db.query(models.CrmFollowUpCall)
-        .filter(models.CrmFollowUpCall.idcrm_follow_up_call == call_id)
+        .filter(
+            models.CrmFollowUpCall.idcrm_follow_up_call == call_id,
+            models.CrmFollowUpCall.crm_leads_id == lead_id,
+        )
         .first()
     )
     if not call:
         raise HTTPException(status_code=404, detail="Follow-up call not found")
-    db.delete(call)
-    db.commit()
+    return call
 
 
 def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
