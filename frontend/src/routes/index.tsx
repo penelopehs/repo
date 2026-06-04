@@ -2,14 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CalculatorPage } from "@/pages/CalculatorPage";
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    clientName: typeof search.clientName === "string" ? search.clientName : undefined,
-    taxYears: typeof search.taxYears === "string" ? search.taxYears : undefined,
-    latestCalculation:
-      typeof search.latestCalculation === "string" ? search.latestCalculation : undefined,
-    hasExistingCalculation:
-      typeof search.hasExistingCalculation === "boolean" ? search.hasExistingCalculation : false,
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const raw = search.leadId;
+    const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+    return { leadId: Number.isFinite(n) ? n : undefined };
+  },
   head: () => ({
     meta: [
       { title: "R&D Billing Calculator — Sales Billing Platform" },

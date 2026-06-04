@@ -36,12 +36,7 @@ export function AppHeader() {
         {/* Brand */}
         <Link
           to="/"
-          search={{
-            clientName: undefined,
-            taxYears: undefined,
-            latestCalculation: undefined,
-            hasExistingCalculation: false,
-          }}
+          search={{ leadId: undefined }}
           className="flex items-center gap-3 group"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">

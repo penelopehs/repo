@@ -43,6 +43,7 @@ import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
+import { buildCalculationSearch } from "@/utils/calculationContext";
 import type { FollowUpCall, LeadDataPerson } from "@/types/crm";
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
@@ -966,7 +967,7 @@ export function ProfilePage({ id }: { id: string }) {
           <Button
             variant="outline"
             className="w-full border-cyan text-cyan hover:bg-cyan/10"
-            onClick={() => navigate({ to: "/", search: { clientName: lead.company } as never })}
+            onClick={() => navigate({ to: "/", search: buildCalculationSearch(lead) as never })}
           >
             <CalcIcon className="mr-1.5 h-4 w-4" /> Open Calculator
           </Button>

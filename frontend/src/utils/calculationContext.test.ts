@@ -3,7 +3,7 @@ import type { Lead } from "@/types/crm";
 import { buildCalculationSearch, hasExistingCalculation } from "./calculationContext";
 
 const lead = {
-  id: "ld_001",
+  id: "6",
   fullName: "Michael Reeves",
   company: "Nimbus Robotics, Inc.",
   email: "m.reeves@nimbusrobotics.com",
@@ -27,11 +27,6 @@ describe("calculation context helpers", () => {
   });
 
   test("builds the calculator query with client and tax year context", () => {
-    expect(buildCalculationSearch(lead)).toEqual({
-      clientName: "Nimbus Robotics, Inc.",
-      taxYears: "2023,2024",
-      latestCalculation: "2025-11-02",
-      hasExistingCalculation: true,
-    });
+    expect(buildCalculationSearch(lead)).toEqual({ leadId: 6 });
   });
 });

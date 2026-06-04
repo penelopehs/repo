@@ -1,6 +1,7 @@
 // Calculator page — multi-year client setup, eligibility-aware entities, billing dashboard.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getRouteApi } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -39,6 +40,8 @@ import {
 } from "@/types/crm";
 import { leadsApi } from "@/services/leads";
 import { cn } from "@/lib/utils";
+
+const routeApi = getRouteApi("/");
 
 // ── Entity ↔ LeadDataEntity mapping ─────────────────────────────────────────
 
@@ -89,6 +92,25 @@ function entityKey(e: LeadDataEntity): string {
   });
 }
 
+// Snapshot of the last-persisted state, used to debounce-detect real changes.
+// Held in a ref (not React state) so updating it after a save does NOT re-render
+// the page and interrupt the user's typing.
+type SavedBaseline = {
+  taxYears: TaxYear[];
+  filingStatus: FilingStatus;
+  entitiesKey: string;
+  notes: string;
+};
+
+function savedBaseline(lead: Lead): SavedBaseline {
+  return {
+    taxYears: lead.taxYears,
+    filingStatus: lead.data?.filingStatus ?? "mfj",
+    entitiesKey: (lead.data?.entities ?? []).map(entityKey).join("|"),
+    notes: lead.notes ?? "",
+  };
+}
+
 export function CalculatorPage() {
   const {
     client,
@@ -115,6 +137,7 @@ export function CalculatorPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedRef = useRef<SavedBaseline | null>(null);
 
   // Fetch all leads once on mount for client name autocomplete
   useEffect(() => {
@@ -126,21 +149,26 @@ export function CalculatorPage() {
   );
 
   // Debounced save whenever taxYears, filingStatus, or entities change after a lead is selected.
-  // Guard compares current state against selectedLead so hydration doesn't trigger a spurious save.
+  // The save fires 400ms after the last change (i.e. once the user stops typing). Change detection
+  // and the post-save baseline both live in `lastSavedRef` (a ref, not state) so a save never
+  // triggers a re-render — which previously interrupted typing and froze the inputs.
   useEffect(() => {
     if (!selectedLead) return;
+    const baseline = lastSavedRef.current;
+    if (!baseline) return;
 
-    const base: LeadData = selectedLead.data ?? { people: [], entities: [], calculations: {} };
-    const leadFilingStatus: FilingStatus = base.filingStatus ?? "mfj";
+    const currentEntitiesKey = entities.map(toLeadEntity).map(entityKey).join("|");
     const unchanged =
-      JSON.stringify(client.taxYears) === JSON.stringify(selectedLead.taxYears) &&
-      client.filingStatus === leadFilingStatus &&
-      (base.entities ?? []).map(entityKey).join("|") === entities.map(toLeadEntity).map(entityKey).join("|");
+      JSON.stringify(client.taxYears) === JSON.stringify(baseline.taxYears) &&
+      client.filingStatus === baseline.filingStatus &&
+      currentEntitiesKey === baseline.entitiesKey &&
+      notes === baseline.notes;
 
     if (unchanged) return;
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
+      const base: LeadData = selectedLead.data ?? { people: [], entities: [], calculations: {} };
       const oldCalcs = base.calculations ?? {};
       const newCalcs: Record<string, Record<string, unknown>> = {};
       for (const y of client.taxYears) {
@@ -152,16 +180,20 @@ export function CalculatorPage() {
         filingStatus: client.filingStatus,
         entities: entities.map(toLeadEntity),
       };
-      leadsApi.update(selectedLead.id, { data: updatedData }).catch(() => {});
-      setSelectedLead((prev) =>
-        prev ? { ...prev, taxYears: [...client.taxYears], data: updatedData } : null,
-      );
+      leadsApi.update(selectedLead.id, { data: updatedData, notes }).catch(() => {});
+      // Advance the baseline so the same edit isn't re-saved. Ref update → no re-render.
+      lastSavedRef.current = {
+        taxYears: [...client.taxYears],
+        filingStatus: client.filingStatus,
+        entitiesKey: currentEntitiesKey,
+        notes,
+      };
     }, 400);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [client.taxYears, client.filingStatus, entities, selectedLead]);
+  }, [client.taxYears, client.filingStatus, entities, notes, selectedLead]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -184,40 +216,33 @@ export function CalculatorPage() {
     );
   }, [entities, filingRate]);
 
-  // Honor calculation deep links from the dashboard so the calculator opens with client + year context.
+  // Deep-link hydration: when navigated from the dashboard with ?leadId=, fully hydrate the
+  // calculator from that lead once allLeads has loaded. Runs at most once (guard: !selectedLead).
+  // `leadId` comes from the router's parsed search (it round-trips the value), not from raw
+  // URLSearchParams — the router serializes search values as JSON, so the raw query would be
+  // `leadId="6"` (with quotes) and a manual parse would never match a lead id.
+  const { leadId } = routeApi.useSearch();
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const q = new URLSearchParams(window.location.search);
-    const name = q.get("clientName");
-    const years = q.get("taxYears");
+    if (!allLeads.length || selectedLead || leadId == null) return;
+    const lead = allLeads.find((l) => l.id === String(leadId));
+    if (!lead) return;
 
-    if (name && !client.clientName) setClientField("clientName", name);
-
-    if (years) {
-      const parsed = years
-        .split(",")
-        .map((value) => Number(value))
-        .filter(
-          (value): value is TaxYear => Number.isInteger(value) && value >= 2020 && value <= 2026,
-        )
-        .sort((a, b) => a - b);
-
-      if (parsed.length > 0 && JSON.stringify(parsed) !== JSON.stringify(client.taxYears)) {
-        setClientField("taxYears", parsed);
-      }
-    }
-  }, [client.clientName, client.taxYears, setClientField]);
+    const leadEntities = lead.data?.entities ?? [];
+    setSelectedLead(lead);
+    lastSavedRef.current = savedBaseline(lead);
+    setClientField("clientName", lead.fullName);
+    setClientField("taxYears", lead.taxYears);
+    setClientField("filingStatus", lead.data?.filingStatus ?? "mfj");
+    setEntities(leadEntities.map(fromLeadEntity));
+    setEntityCountInput(1);
+    setNotes(lead.notes ?? "");
+  }, [allLeads, selectedLead, leadId, setClientField, setEntities, setEntityCountInput, setNotes]);
 
   const hasExistingCalculationContext =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("hasExistingCalculation") === "true";
-  const latestCalculationLabel =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("latestCalculation")
-      : null;
+    !!selectedLead && selectedLead.latestCalculation !== "—";
   const calculationContextMessage =
-    hasExistingCalculationContext && latestCalculationLabel && latestCalculationLabel !== "—"
-      ? `Existing calculation(s) found for ${client.clientName || "this client"}. Latest saved calculation: ${latestCalculationLabel}.`
+    hasExistingCalculationContext
+      ? `Existing calculation(s) found for ${client.clientName || "this client"}. Latest saved calculation: ${selectedLead!.latestCalculation}.`
       : `No saved calculation found yet. Generate a fresh calculation for ${client.taxYears.length ? client.taxYears.join(", ") : "the selected tax years"}.`;
 
   const yearsLabel =
@@ -299,11 +324,13 @@ export function CalculatorPage() {
                       e.preventDefault();
                       const leadEntities = lead.data?.entities ?? [];
                       setSelectedLead(lead);
+                      lastSavedRef.current = savedBaseline(lead);
                       setClientField("clientName", lead.fullName);
                       setClientField("taxYears", lead.taxYears);
                       setClientField("filingStatus", lead.data?.filingStatus ?? "mfj");
                       setEntities(leadEntities.map(fromLeadEntity));
                       setEntityCountInput(Math.max(1, leadEntities.length));
+                      setNotes(lead.notes ?? "");
                       setShowSuggestions(false);
                     }}
                   >

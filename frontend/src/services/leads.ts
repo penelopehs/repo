@@ -85,6 +85,9 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
     entities: Array.isArray(data.entities) ? data.entities : [],
     calculations:
       data.calculations && typeof data.calculations === "object" ? data.calculations : {},
+    // Preserve the persisted filing status so the calculator can rehydrate it
+    // instead of always falling back to the default.
+    ...(data.filingStatus && { filingStatus: data.filingStatus }),
   };
 }
 

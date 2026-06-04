@@ -136,7 +136,7 @@ export function PipelinePage() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const goCalc = (l: Lead) => {
-    navigate({ to: "/", search: { clientName: l.company } as never });
+    navigate({ to: "/", search: buildCalculationSearch(l) as never });
   };
   const goProfile = (l: Lead) => navigate({ to: "/clients/$id", params: { id: l.id } });
 
