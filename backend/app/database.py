@@ -4,6 +4,7 @@ from urllib.parse import quote_plus
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.engine import URL
 
 load_dotenv()
 
@@ -11,6 +12,17 @@ load_dotenv()
 # MYSQL_SSL path is resolved against this, so the cert can live next to the
 # code and be found no matter what CWD the server/alembic is launched from.
 _BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def get_url():
+    return URL.create(
+        drivername="mysql+pymysql",
+        username=os.getenv("MYSQL_USER"),
+        password=str(os.getenv("MYSQL_PASSWORD")),
+        host=os.getenv("MYSQL_HOST"),
+        port=int(os.getenv("MYSQL_PORT", 3306)),
+        database=os.getenv("MYSQL_DATABASE"),
+    ).render_as_string(hide_password=False).replace("%", "%%")
 
 
 def build_database_url() -> tuple[str, dict]:
@@ -24,11 +36,7 @@ def build_database_url() -> tuple[str, dict]:
     """
     host = os.getenv("MYSQL_HOST")
     if host:
-        user = quote_plus(os.getenv("MYSQL_USER", ""))
-        password = quote_plus(os.getenv("MYSQL_PASSWORD", ""))
-        port = os.getenv("MYSQL_PORT", "3306")
-        database = os.getenv("MYSQL_DATABASE", "sales_billing")
-        url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{database}"
+        url = get_url()
 
         connect_args: dict = {}
         ssl_ca = os.getenv("MYSQL_SSL")
@@ -46,6 +54,7 @@ def build_database_url() -> tuple[str, dict]:
 
 
 DATABASE_URL, _connect_args = build_database_url()
+
 
 engine = create_engine(
     DATABASE_URL,
