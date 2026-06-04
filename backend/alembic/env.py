@@ -21,7 +21,7 @@ target_metadata = Base.metadata
 # Share the app's connection logic so migrations honour the MYSQL_* settings
 # (incl. the SSL CA cert) instead of only DATABASE_URL.
 db_url, connect_args = build_database_url()
-config.set_main_option("sqlalchemy.url", db_url)
+config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 
 
 # ── Autogenerate scoping ───────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ def get_url():
         host=os.getenv("MYSQL_HOST"),
         port=int(os.getenv("MYSQL_PORT", 3306)),
         database=os.getenv("MYSQL_DATABASE"),
-    ).render_as_string(hide_password=False).replace("%", "%%")
+    ).render_as_string(hide_password=False)
 
 
 def build_database_url() -> tuple[str, dict]:
