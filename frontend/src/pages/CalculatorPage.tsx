@@ -28,9 +28,66 @@ import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable, computeBilled } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
-import { FILING_STATUSES, type TaxYear } from "@/types/crm";
+import {
+  FILING_STATUSES,
+  type Entity,
+  type FilingStatus,
+  type Lead,
+  type LeadData,
+  type LeadDataEntity,
+  type TaxYear,
+} from "@/types/crm";
 import { leadsApi } from "@/services/leads";
 import { cn } from "@/lib/utils";
+
+// ── Entity ↔ LeadDataEntity mapping ─────────────────────────────────────────
+
+function toLeadEntity(e: Entity): LeadDataEntity {
+  return {
+    name: e.companyName,
+    ...(e.state && { state: e.state }),
+    ...(e.employeeCount !== "" && { employeeCount: e.employeeCount }),
+    ...(e.estimatedQRAs !== "" && { estimatedQRAs: e.estimatedQRAs }),
+    ...(e.grossCredit !== "" && { grossCredit: e.grossCredit }),
+    ...(e.w2Wages !== "" && { w2Wages: e.w2Wages }),
+    ...(e.contractResearch !== "" && { contractResearch: e.contractResearch }),
+    ...(e.supplies !== "" && { supplies: e.supplies }),
+    ...(e.otherQualified !== "" && { otherQualified: e.otherQualified }),
+    ...(e.notes && { notes: e.notes }),
+  };
+}
+
+function fromLeadEntity(e: LeadDataEntity, index: number): Entity {
+  return {
+    id: `ent_lead_${index}_${Math.random().toString(36).slice(2, 7)}`,
+    companyName: e.name ?? "",
+    state: e.state ?? "",
+    employeeCount: e.employeeCount ?? "",
+    estimatedQRAs: e.estimatedQRAs ?? "",
+    grossCredit: e.grossCredit ?? "",
+    w2Wages: e.w2Wages ?? "",
+    contractResearch: e.contractResearch ?? "",
+    supplies: e.supplies ?? "",
+    otherQualified: e.otherQualified ?? "",
+    notes: e.notes ?? "",
+  };
+}
+
+// Normalised string key for change-detection (excludes transient `id`).
+function entityKey(e: LeadDataEntity): string {
+  return JSON.stringify({
+    name: e.name ?? "",
+    state: e.state ?? "",
+    employeeCount: e.employeeCount ?? "",
+    estimatedQRAs: e.estimatedQRAs ?? "",
+    grossCredit: e.grossCredit ?? "",
+    w2Wages: e.w2Wages ?? "",
+    contractResearch: e.contractResearch ?? "",
+    supplies: e.supplies ?? "",
+    otherQualified: e.otherQualified ?? "",
+    notes: e.notes ?? "",
+  });
+}
 
 export function CalculatorPage() {
   const {
@@ -42,6 +99,7 @@ export function CalculatorPage() {
     entityCountInput,
     setEntityCountInput,
     entities,
+    setEntities,
     generateEntities,
     addEntity,
     notes,
@@ -52,18 +110,58 @@ export function CalculatorPage() {
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  const [allLeadNames, setAllLeadNames] = useState<string[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionRef = useRef<HTMLDivElement>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch all lead names once on mount for client name autocomplete
+  // Fetch all leads once on mount for client name autocomplete
   useEffect(() => {
-    leadsApi.listNames().then(setAllLeadNames).catch(() => {});
+    leadsApi.list().then(setAllLeads).catch(() => {});
   }, []);
 
-  const suggestions = allLeadNames.filter((name) =>
-    name.toLowerCase().includes(client.clientName.toLowerCase()),
+  const suggestions = allLeads.filter((l) =>
+    l.fullName.toLowerCase().includes(client.clientName.toLowerCase()),
   );
+
+  // Debounced save whenever taxYears, filingStatus, or entities change after a lead is selected.
+  // Guard compares current state against selectedLead so hydration doesn't trigger a spurious save.
+  useEffect(() => {
+    if (!selectedLead) return;
+
+    const base: LeadData = selectedLead.data ?? { people: [], entities: [], calculations: {} };
+    const leadFilingStatus: FilingStatus = base.filingStatus ?? "mfj";
+    const unchanged =
+      JSON.stringify(client.taxYears) === JSON.stringify(selectedLead.taxYears) &&
+      client.filingStatus === leadFilingStatus &&
+      (base.entities ?? []).map(entityKey).join("|") === entities.map(toLeadEntity).map(entityKey).join("|");
+
+    if (unchanged) return;
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      const oldCalcs = base.calculations ?? {};
+      const newCalcs: Record<string, Record<string, unknown>> = {};
+      for (const y of client.taxYears) {
+        newCalcs[String(y)] = (oldCalcs[String(y)] as Record<string, unknown>) ?? {};
+      }
+      const updatedData: LeadData = {
+        ...base,
+        calculations: newCalcs,
+        filingStatus: client.filingStatus,
+        entities: entities.map(toLeadEntity),
+      };
+      leadsApi.update(selectedLead.id, { data: updatedData }).catch(() => {});
+      setSelectedLead((prev) =>
+        prev ? { ...prev, taxYears: [...client.taxYears], data: updatedData } : null,
+      );
+    }, 400);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [client.taxYears, client.filingStatus, entities, selectedLead]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -193,17 +291,23 @@ export function CalculatorPage() {
             />
             {showSuggestions && suggestions.length > 0 && (
               <ul className="absolute z-50 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
-                {suggestions.map((name) => (
+                {suggestions.map((lead) => (
                   <li
-                    key={name}
+                    key={lead.id}
                     className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
                     onMouseDown={(e) => {
                       e.preventDefault();
-                      setClientField("clientName", name);
+                      const leadEntities = lead.data?.entities ?? [];
+                      setSelectedLead(lead);
+                      setClientField("clientName", lead.fullName);
+                      setClientField("taxYears", lead.taxYears);
+                      setClientField("filingStatus", lead.data?.filingStatus ?? "mfj");
+                      setEntities(leadEntities.map(fromLeadEntity));
+                      setEntityCountInput(Math.max(1, leadEntities.length));
                       setShowSuggestions(false);
                     }}
                   >
-                    {name}
+                    {lead.fullName}
                   </li>
                 ))}
               </ul>

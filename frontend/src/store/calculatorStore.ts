@@ -28,12 +28,13 @@ interface CalculatorState {
   selectAllTaxYears: () => void;
   clearTaxYears: () => void;
   setEntityCountInput: (n: number) => void;
+  setEntities: (entities: Entity[]) => void;
   generateEntities: (n: number) => void;
   addEntity: () => void;
   removeEntity: (id: string) => void;
   updateEntity: <K extends keyof Entity>(id: string, k: K, v: Entity[K]) => void;
   setNotes: (s: string) => void;
-  hydrateFromLead: (clientName: string, taxYears: TaxYear[]) => void;
+  hydrateFromLead: (clientName: string, taxYears: TaxYear[], filingStatus?: FilingStatus) => void;
 }
 
 export const useCalculatorStore = create<CalculatorState>((set) => ({
@@ -56,6 +57,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   selectAllTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [...ALL_TAX_YEARS] } })),
   clearTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [] } })),
   setEntityCountInput: (n) => set({ entityCountInput: Math.max(1, Math.min(50, n)) }),
+  setEntities: (entities) => set({ entities }),
   generateEntities: (n) =>
     set(() => ({ entities: Array.from({ length: n }, (_, i) => newEntity(i)) })),
   addEntity: () => set((s) => ({ entities: [...s.entities, newEntity(s.entities.length)] })),
@@ -63,8 +65,13 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   updateEntity: (id, k, v) =>
     set((s) => ({ entities: s.entities.map((e) => (e.id === id ? { ...e, [k]: v } : e)) })),
   setNotes: (s) => set({ notes: s }),
-  hydrateFromLead: (clientName, taxYears) =>
+  hydrateFromLead: (clientName, taxYears, filingStatus) =>
     set((s) => ({
-      client: { ...s.client, clientName, taxYears: taxYears.length ? taxYears : s.client.taxYears },
+      client: {
+        ...s.client,
+        clientName,
+        taxYears: taxYears.length ? taxYears : s.client.taxYears,
+        ...(filingStatus ? { filingStatus } : {}),
+      },
     })),
 }));

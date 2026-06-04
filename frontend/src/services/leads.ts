@@ -155,7 +155,7 @@ export const leadsApi = {
     const items = await api.get<ApiLeadListItem[]>("/leads");
     const seen = new Set<string>();
     for (const i of items) {
-      const name = (i.company ?? i.full_name ?? "").trim();
+      const name = (i.full_name ?? i.company ?? "").trim();
       if (name) seen.add(name);
     }
     return [...seen].sort((a, b) => a.localeCompare(b));

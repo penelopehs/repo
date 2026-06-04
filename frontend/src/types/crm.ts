@@ -59,6 +59,15 @@ export type ClientType = "New" | "Returning";
 
 export interface LeadDataEntity {
   name: string;
+  state?: string;
+  employeeCount?: number | "";
+  estimatedQRAs?: number | "";
+  grossCredit?: number | "";
+  w2Wages?: number | "";
+  contractResearch?: number | "";
+  supplies?: number | "";
+  otherQualified?: number | "";
+  notes?: string;
 }
 
 /** A person/contact stored on the lead's `data.people[]`. Frontend-managed
@@ -81,6 +90,7 @@ export interface LeadData {
   entities: LeadDataEntity[];
   /** Keyed by tax year (e.g. "2021"); the value shape is calculation-specific. */
   calculations: Record<string, Record<string, unknown>>;
+  filingStatus?: FilingStatus;
 }
 
 export interface Lead {
