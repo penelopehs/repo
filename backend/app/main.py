@@ -12,7 +12,11 @@ from app.routers import clients, leads, referral_channels, users
 # migration (crm extension). We deliberately do NOT call Base.metadata.create_all
 # here — run `alembic upgrade head` to provision the crm_* tables.
 
-app = FastAPI(title="Sales Billing API")
+app = FastAPI(
+    title="Sales Billing API",
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+)
 
 # Never combine a wildcard origin with credentials — it's an invalid/unsafe
 # CORS configuration. Auth is bearer-token based, so credentials are only

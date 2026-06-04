@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     azure_client_secret: str
     jwt_audience: str
     cors_origins: list[str] = ["*"]
+    debug: bool = False
     # SharePoint site to test, e.g. hostname "contoso.sharepoint.com" and
     # server-relative path "/sites/MasterClientDirectory".
 
