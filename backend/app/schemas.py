@@ -90,13 +90,23 @@ class LeadCreate(BaseModel):
 
 
 class LeadUpdate(BaseModel):
+    # Link to an existing entity_people_roles assignment (entity ↔ person ↔
+    # role); resolves the lead's entity & client. Pass null to unlink.
+    epr_id: Optional[int] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     pipeline_status: Optional[PipelineStatus] = None
     lead_source: Optional[str] = None
+    # The assigned sales rep (users.iduser).
+    salesperson_iduser: Optional[int] = None
     notes: Optional[str] = None
+    # Status-transition timestamps are normally stamped automatically when
+    # pipeline_status advances; exposed here for manual correction.
+    sow_signed_at: Optional[datetime] = None
+    engagement_started_at: Optional[datetime] = None
+    # Calculator state (crm_leads.data) — company/entities/tax-years live here.
     data: Optional[Any] = None
 
 
@@ -104,6 +114,8 @@ class LeadListItem(BaseModel):
     id: int
     company: Optional[str] = None
     full_name: str
+    first_name: str
+    last_name: str
     email: Optional[str] = None
     phone: Optional[str] = None
     pipeline_status: str

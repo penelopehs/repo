@@ -206,6 +206,50 @@ def test_patch_updates_data(client):
     assert resp.json()["data"] == {"total": 5}
 
 
+def test_patch_updates_all_fields(client, db_session):
+    rep = models.User(
+        azure_ad_user_id="rep-oid", email="rep@test.local",
+        first_name="Sales", last_name="Rep",
+    )
+    db_session.add(rep)
+    db_session.commit()
+    _, _, epr_id = make_assignment(
+        db_session, client_name="Reassign Co", firm="Reassign Firm"
+    )
+
+    lead = client.post("/leads", json={"first_name": "Before", "last_name": "Patch"}).json()
+    resp = client.patch(
+        f"/leads/{lead['id']}",
+        json={
+            "epr_id": epr_id,
+            "first_name": "After",
+            "last_name": "Patched",
+            "email": "after@test.local",
+            "phone": "+1-555-0199",
+            "lead_source": "Outbound",
+            "salesperson_iduser": rep.iduser,
+            "notes": "updated",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["full_name"] == "After Patched"
+    assert body["email"] == "after@test.local"
+    assert body["phone"] == "+1-555-0199"
+    assert body["lead_source"] == "Outbound"
+    assert body["salesperson_iduser"] == rep.iduser
+    assert body["salesperson_name"] == "Sales Rep"
+    assert body["notes"] == "updated"
+    # epr re-link resolves the lead's company (falls back to the client's firm).
+    assert body["company"] == "Reassign Firm"
+
+
+def test_patch_unknown_epr_404(client):
+    lead = client.post("/leads", json={"first_name": "Bad", "last_name": "Epr"}).json()
+    resp = client.patch(f"/leads/{lead['id']}", json={"epr_id": 999999})
+    assert resp.status_code == 404
+
+
 # ── Delete ──────────────────────────────────────────────────────────────────────
 
 def test_delete_lead_keeps_client(client, db_session):

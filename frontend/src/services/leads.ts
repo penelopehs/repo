@@ -24,6 +24,8 @@ interface ApiLeadListItem {
   id: number;
   company: string | null;
   full_name: string;
+  first_name: string;
+  last_name: string;
   email: string | null;
   phone: string | null;
   pipeline_status: string;
@@ -102,6 +104,8 @@ function mapListItem(i: ApiLeadListItem): Lead {
   return {
     id: String(i.id),
     fullName: i.full_name ?? "",
+    firstName: i.first_name ?? "",
+    lastName: i.last_name ?? "",
     company: i.company ?? "",
     email: i.email ?? "",
     phone: i.phone ?? "",
@@ -191,17 +195,20 @@ export const leadsApi = {
     return mapListItem(item);
   },
 
+  // Mirrors the backend LeadUpdate contract. Note: company, entities and tax
+  // years are NOT top-level columns — they live in the `data` blob, so callers
+  // change them by passing an updated `data` (see EditClientDialog).
   async update(id: string, patch: Partial<Lead>): Promise<Lead> {
     const body: Record<string, unknown> = {};
-    if (patch.company !== undefined) body.company = patch.company;
+    if (patch.firstName !== undefined) body.first_name = patch.firstName;
+    if (patch.lastName !== undefined) body.last_name = patch.lastName;
     if (patch.email !== undefined) body.email = patch.email;
     if (patch.phone !== undefined) body.phone = patch.phone;
     if (patch.source !== undefined) body.lead_source = patch.source;
     if (patch.status !== undefined) body.pipeline_status = STATUS_TO_API[patch.status];
+    if (patch.repId !== undefined) body.salesperson_iduser = patch.repId;
     if (patch.notes !== undefined) body.notes = patch.notes;
     if (patch.data !== undefined) body.data = patch.data;
-    if (patch.fullName !== undefined) body.full_name = patch.fullName;
-    if (patch.rep !== undefined) body.rep = patch.rep;
 
     // PATCH returns the updated lead in the same shape as the list endpoint.
     const item = await api.patch<ApiLeadListItem>(`/leads/${id}`, body);

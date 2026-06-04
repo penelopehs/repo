@@ -286,6 +286,8 @@ def list_leads(
             id=o.crm_lead_id,
             company=_company_for(db, o),
             full_name=f"{o.first_name} {o.last_name}".strip(),
+            first_name=o.first_name,
+            last_name=o.last_name,
             email=o.email,
             phone=o.phone,
             pipeline_status=o.pipeline_status,
@@ -424,6 +426,8 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         id=lead.crm_lead_id,
         company=company,
         full_name=f"{lead.first_name} {lead.last_name}".strip(),
+        first_name=lead.first_name,
+        last_name=lead.last_name,
         email=lead.email,
         phone=lead.phone,
         pipeline_status=lead.pipeline_status,
@@ -464,6 +468,18 @@ def update_lead(
 ):
     lead = _get_lead(db, lead_id)
     data = body.model_dump(exclude_unset=True)
+
+    # Validate a re-linked EPR assignment (matches create); null unlinks.
+    if data.get("epr_id") is not None:
+        epr = (
+            db.query(models.EntityPeopleRole)
+            .filter(models.EntityPeopleRole.identity_people_roles == data["epr_id"])
+            .first()
+        )
+        if not epr:
+            raise HTTPException(
+                status_code=404, detail="Entity-people-role assignment not found"
+            )
 
     new_status = data.get("pipeline_status")
     if isinstance(new_status, PipelineStatus):

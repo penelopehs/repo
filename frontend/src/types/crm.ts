@@ -86,6 +86,8 @@ export interface LeadData {
 export interface Lead {
   id: string;
   fullName: string;
+  firstName: string;
+  lastName: string;
   company: string;
   email: string;
   phone: string;

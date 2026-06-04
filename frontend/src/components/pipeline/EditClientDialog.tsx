@@ -28,8 +28,6 @@ import type { Lead, LeadSource, LeadStatus, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { useLeadsStore } from "@/store/leadsStore";
-import { useUsersStore } from "@/store/usersStore";
-import { userFullName } from "@/services/users";
 
 const SOURCES: LeadSource[] = [
   "Referral",
@@ -49,7 +47,8 @@ const STATUSES: { value: LeadStatus; label: string }[] = [
 ];
 
 const schema = z.object({
-  fullName: z.string().trim().min(1).max(120),
+  firstName: z.string().trim().min(1).max(60),
+  lastName: z.string().trim().min(1).max(60),
   company: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(255),
   phone: z.string().trim().min(7).max(40),
@@ -62,7 +61,6 @@ const schema = z.object({
     "Partner",
     "Other",
   ]),
-  rep: z.string().trim().min(1),
   status: z.enum(["new", "calculation_sent", "sow_signed", "active_engagement", "lost"]),
   taxYears: z.array(z.number().int()).optional(),
   entityNames: z.string().max(2000).optional(),
@@ -81,13 +79,10 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   const open = openProp ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const update = useLeadsStore((s) => s.updateLead);
-  const users = useUsersStore((s) => s.users);
-  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
 
-  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
-
-  const [form, setForm] = useState({
-    fullName: lead.fullName,
+  const buildForm = () => ({
+    firstName: lead.firstName,
+    lastName: lead.lastName,
     company: lead.company,
     email: lead.email,
     phone: lead.phone,
@@ -95,23 +90,15 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     rep: lead.rep,
     status: lead.status,
     taxYears: lead.taxYears ?? [],
-    entityNames: (lead.entityNames ?? []).join(", "),
+    entityNames: (lead.entityNames ?? []).join(",\n"),
     notes: lead.notes ?? "",
   });
 
+  const [form, setForm] = useState(buildForm);
+
   useEffect(() => {
-    setForm({
-      fullName: lead.fullName,
-      company: lead.company,
-      email: lead.email,
-      phone: lead.phone,
-      source: lead.source,
-      rep: lead.rep,
-      status: lead.status,
-      taxYears: lead.taxYears ?? [],
-      entityNames: (lead.entityNames ?? []).join(", "),
-      notes: lead.notes ?? "",
-    });
+    setForm(buildForm());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead]);
 
   const [submitting, setSubmitting] = useState(false);
@@ -125,13 +112,39 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     }
     setSubmitting(true);
     try {
-      const entityNames = form.entityNames
-        .split(",")
+      // company, entities and tax years live in the `data` blob (the PATCH
+      // endpoint has no top-level columns for them). Rebuild it from the form,
+      // preserving people and any existing per-year calculation buckets.
+      const base = lead.data ?? { people: [], entities: [], calculations: {} };
+      const company = parsed.data.company.trim();
+      const extraEntities = (parsed.data.entityNames ?? "")
+        .split(/[,\n]/)
         .map((s) => s.trim())
-        .filter(Boolean);
-      await update(lead.id, { ...parsed.data, taxYears: form.taxYears, entityNames });
-    toast.success("Client updated", { description: form.fullName });
-    setOpen(false);
+        .filter(Boolean)
+        .filter((n) => n !== company);
+      const entities = (company ? [company, ...extraEntities] : extraEntities).map((name) => ({
+        name,
+      }));
+      const calculations: Record<string, Record<string, unknown>> = {};
+      for (const y of form.taxYears) {
+        calculations[String(y)] = base.calculations[String(y)] ?? {};
+      }
+      const data = { ...base, entities, calculations };
+
+      await update(lead.id, {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        email: parsed.data.email,
+        phone: parsed.data.phone,
+        source: parsed.data.source,
+        status: parsed.data.status,
+        notes: parsed.data.notes,
+        data,
+      });
+      toast.success("Client updated", {
+        description: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
+      });
+      setOpen(false);
     } catch (err) {
       toast.error("Couldn't update client", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -153,10 +166,16 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
-            <Item label="Full Name">
+            <Item label="First Name">
               <Input
-                value={form.fullName}
-                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                value={form.firstName}
+                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+              />
+            </Item>
+            <Item label="Last Name">
+              <Input
+                value={form.lastName}
+                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
               />
             </Item>
             <Item label="Company / Entity">
@@ -196,15 +215,14 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              <Select value={form.rep} disabled>
-                <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
+              <Select value={form.rep || "Unassigned"} disabled>
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
                 <SelectContent>
-                  {form.rep && !users.some((u) => userFullName(u) === form.rep) && (
-                    <SelectItem value={form.rep}>{form.rep}</SelectItem>
-                  )}
-                  {users.map((u) => (
-                    <SelectItem key={u.iduser} value={userFullName(u)}>{userFullName(u)}</SelectItem>
-                  ))}
+                  <SelectItem value={form.rep || "Unassigned"}>
+                    {form.rep || "Unassigned"}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </Item>
@@ -241,12 +259,16 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
             />
           </Item>
-          <Item label="Entity / Entities (comma separated)">
+          <Item label="Entity / Entities (one per line)">
             <Textarea
-              rows={2}
+              rows={Math.max(3, form.entityNames.split("\n").length + 1)}
               value={form.entityNames}
-              onChange={(e) => setForm({ ...form, entityNames: e.target.value })}
-              placeholder="Acme LLC, Northwind Holdings"
+              onChange={(e) => {
+                const val = e.target.value;
+                const first = val.split(/[,\n]/)[0]?.trim() ?? "";
+                setForm({ ...form, entityNames: val, company: first || form.company });
+              }}
+              placeholder={"Acme LLC,\nNorthwind Holdings"}
             />
           </Item>
           <Item label="Existing Notes">
