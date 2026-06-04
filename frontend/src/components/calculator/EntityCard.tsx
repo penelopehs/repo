@@ -70,10 +70,12 @@ export function EntityCard({ entity, index }: Props) {
       transition={{ duration: 0.35, ease: "easeOut" }}
       className="overflow-hidden rounded-xl border border-border bg-card shadow-card hover:shadow-elevated transition-shadow"
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 border-b border-border bg-gradient-frost px-5 py-4 text-left"
+        onKeyDown={(e) => e.key === "Enter" || e.key === " " ? setOpen((o) => !o) : undefined}
+        className="flex w-full cursor-pointer items-center justify-between gap-3 border-b border-border bg-gradient-frost px-5 py-4 text-left"
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-white text-sm font-bold">
@@ -122,7 +124,7 @@ export function EntityCard({ entity, index }: Props) {
             )}
           />
         </div>
-      </button>
+      </div>
 
       <AnimatePresence initial={false}>
         {open && (
