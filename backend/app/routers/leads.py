@@ -302,6 +302,7 @@ def list_leads(
             entities_count=_entities_count(o.data),
             tax_years=_lead_tax_years(o.data),
             data=o.data,
+            notes=o.notes,
         )
 
     return [_item(o) for o in leads]

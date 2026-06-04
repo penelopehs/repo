@@ -130,6 +130,7 @@ class LeadListItem(BaseModel):
     entities_count: int
     tax_years: List[int] = Field(default_factory=list)
     data: Any = None
+    notes: Optional[str] = None
 
 
 

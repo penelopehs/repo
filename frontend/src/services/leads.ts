@@ -42,6 +42,7 @@ interface ApiLeadListItem {
   tax_years: number[];
   // Per-lead aggregate (people, entities, calculations-by-year). Matches LeadData.
   data: LeadData | null;
+  notes: string | null;
 }
 
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
@@ -127,6 +128,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
         ? new Date(i.latest_calc_date * 1000).toISOString().slice(0, 10)
         : "—",
     addedAt: i.created_at,
+    notes: i.notes ?? undefined,
   };
 }
 
