@@ -165,7 +165,7 @@ export function DocumentsPage() {
             value={kpis.total}
             icon={Layers}
             accent="navy"
-            labelClassName="text-[#00264A]"
+            labelClassName="text-foreground"
           />
         </KpiFilterButton>
         <KpiFilterButton

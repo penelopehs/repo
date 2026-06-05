@@ -24,10 +24,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadSource, LeadStatus, TaxYear } from "@/types/crm";
+import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
-import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { useLeadsStore } from "@/store/leadsStore";
+import { MultiYearSelect } from "@/components/MultiYearSelect";
 
 const SOURCES: LeadSource[] = [
   "Referral",
@@ -120,7 +120,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       const extraEntities = (parsed.data.entityNames ?? "")
         .split(/[,\n]/)
         .map((s) => s.trim())
-        .filter(Boolean)
+          .filter(Boolean)
         .filter((n) => n !== company);
       const entities = (company ? [company, ...extraEntities] : extraEntities).map((name) => ({
         name,
@@ -140,11 +140,11 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         status: parsed.data.status,
         notes: parsed.data.notes,
         data,
-      });
+    });
       toast.success("Client updated", {
         description: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
       });
-      setOpen(false);
+    setOpen(false);
     } catch (err) {
       toast.error("Couldn't update client", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -215,14 +215,14 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              <Select value={form.rep || "Unassigned"} disabled>
+              <Select value={form.rep || "Unassigned"}>
                 <SelectTrigger>
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={form.rep || "Unassigned"}>
                     {form.rep || "Unassigned"}
-                  </SelectItem>
+                    </SelectItem>
                 </SelectContent>
               </Select>
             </Item>
@@ -259,7 +259,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
             />
           </Item>
-          <Item label="Entity / Entities (one per line)">
+          <Item label="Entity / Entities (comma separated, one per line)">
             <Textarea
               rows={Math.max(3, form.entityNames.split("\n").length + 1)}
               value={form.entityNames}

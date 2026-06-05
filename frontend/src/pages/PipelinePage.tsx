@@ -14,14 +14,12 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  Eye,
   Calculator,
   FileSignature,
   Pencil,
   Trash2,
   MoreHorizontal,
   X,
-  PlayCircle
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -202,7 +200,7 @@ export function PipelinePage() {
             value={kpis.total}
             icon={Layers}
             accent="navy"
-            labelClassName="text-[#00264A]"
+            labelClassName="text-foreground"
             mini
           />
         </KpiButton>
@@ -260,15 +258,15 @@ export function PipelinePage() {
 
         <PipelineTable
           rows={paged}
-          sortField={sortField} sortDir={sortDir} onSort={onSort}
-          onProfile={goProfile} onCalc={goCalc} onEdit={(l) => setEditing(l)}
+          sortField={sortField}
+          sortDir={sortDir}
+          onSort={onSort}
+          onProfile={goProfile}
+          onCalc={goCalc}
+          onEdit={(l) => setEditing(l)}
           onSignSow={async (l) => {
             try { await setStatus(l.id, "sow_signed"); toast.success("SOW signed", { description: l.company }); }
             catch (e) { toast.error("Couldn't sign SOW", { description: e instanceof Error ? e.message : undefined }); }
-          }}
-          onStartEng={async (l) => {
-            try { await promote(l.id); toast.success("Engagement started", { description: l.company }); }
-            catch (e) { toast.error("Couldn't start engagement", { description: e instanceof Error ? e.message : undefined }); }
           }}
           onDelete={(l) => setPendingDelete(l.id)}
           emptyText={loading ? "Loading leads…" : "No leads match your filters."}
@@ -382,7 +380,6 @@ interface TableProps {
   onCalc: (l: Lead) => void;
   onEdit: (l: Lead) => void;
   onSignSow: (l: Lead) => void;
-  onStartEng: (l: Lead) => void;
   onDelete: (l: Lead) => void;
   emptyText?: string;
 }
@@ -452,14 +449,12 @@ function PipelineTable(p: TableProps) {
               layout
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors"
+              className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors cursor-pointer"
             >
               <td className="px-5 py-3">
                 <StatusBadge status={l.status} />
                 <p className="mt-1 font-medium text-navy">{l.fullName}</p>
-                {l.clientType && (
-                  <p className="text-xs text-muted-foreground">{l.clientType} client</p>
-                )}
+                <p className="text-xs text-muted-foreground">Person</p>
                 <p className="text-xs text-muted-foreground">{l.company}</p>
               </td>
               <td className="px-5 py-3">
@@ -473,7 +468,7 @@ function PipelineTable(p: TableProps) {
                 {l.latestCalculation === "—" ? "—" : formatDate(l.latestCalculation)}
               </td>
               <td className="px-5 py-3 text-muted-foreground">{formatDate(l.addedAt)}</td>
-              <td className="px-5 py-3 text-right">
+              <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -481,9 +476,6 @@ function PipelineTable(p: TableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => p.onProfile(l)}>
-                      <Eye className="mr-2 h-4 w-4" /> View
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => p.onEdit(l)}>
                       <Pencil className="mr-2 h-4 w-4" /> Edit
                     </DropdownMenuItem>

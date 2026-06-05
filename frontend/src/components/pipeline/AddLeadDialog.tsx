@@ -22,8 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Loader2, Plus } from "lucide-react";
-import type { LeadSource, TaxYear } from "@/types/crm";
+import {Check, Loader2, Plus } from "lucide-react";
+import type { LeadSource, SalesRep, TaxYear } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
@@ -188,7 +188,9 @@ export function AddLeadDialog() {
     toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
     });
-      resetForm();
+    setForm(initial);
+    setYears([]);
+    setErrors({});
     setOpen(false);
     } catch (err) {
       toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
@@ -348,7 +350,9 @@ export function AddLeadDialog() {
             />
           </Field>
           <DialogFooter className="mt-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
             <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
               Add Lead
             </Button>
@@ -359,10 +363,13 @@ export function AddLeadDialog() {
   );
 }
 
-// Wraps an input and, when the picked client carries more than one email/phone,
-// shows the alternates as a dropdown sized to the field.
 function ContactPicker({
-  options, open, setOpen, selected, onPick, children,
+  options,
+  open,
+  setOpen,
+  selected,
+  onPick,
+  children,
 }: {
   options: string[];
   open: boolean;

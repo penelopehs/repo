@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 
 interface Props {
-  /** Lead id this call belongs to (the profile is keyed by lead). */
   clientId: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -35,9 +34,9 @@ export function ScheduleCallDialog({ clientId, open, onOpenChange }: Props) {
     setSaving(true);
     try {
       await add(clientId, { date, time, notes });
-      toast.success("Call scheduled", { description: `${date} at ${time}` });
-      onOpenChange(false);
-      setNotes("");
+    toast.success("Call scheduled", { description: `${date} at ${time}` });
+    onOpenChange(false);
+    setNotes("");
     } catch (e) {
       toast.error("Couldn't schedule call", {
         description: e instanceof Error ? e.message : undefined,

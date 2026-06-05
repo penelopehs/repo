@@ -10,106 +10,31 @@ import {
   Calculator as CalcIcon,
   DollarSign,
   FileDown,
-  Share2,
   Plus,
+  Send,
+  Users,
 } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/KpiCard";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
-import { BillingTable, computeBilled } from "@/components/calculator/BillingTable";
+import { BillingTable } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
+import { formatCurrency } from "@/utils/format";
 import {
-  FILING_STATUSES,
-  type Entity,
-  type FilingStatus,
-  type Lead,
-  type LeadData,
-  type LeadDataEntity,
-  type TaxYear,
-} from "@/types/crm";
-import { leadsApi } from "@/services/leads";
-import { cn } from "@/lib/utils";
+  calculateSOW,
+  calculateFederal,
+  calculateState,
+  runEngagementCalculation,
+  isEntityComplete,
+} from "@/utils/calculatorEngine";
 
-const routeApi = getRouteApi("/");
-
-// ── Entity ↔ LeadDataEntity mapping ─────────────────────────────────────────
-
-function toLeadEntity(e: Entity): LeadDataEntity {
-  return {
-    name: e.companyName,
-    ...(e.state && { state: e.state }),
-    ...(e.employeeCount !== "" && { employeeCount: e.employeeCount }),
-    ...(e.estimatedQRAs !== "" && { estimatedQRAs: e.estimatedQRAs }),
-    ...(e.grossCredit !== "" && { grossCredit: e.grossCredit }),
-    ...(e.w2Wages !== "" && { w2Wages: e.w2Wages }),
-    ...(e.contractResearch !== "" && { contractResearch: e.contractResearch }),
-    ...(e.supplies !== "" && { supplies: e.supplies }),
-    ...(e.otherQualified !== "" && { otherQualified: e.otherQualified }),
-    ...(e.notes && { notes: e.notes }),
-  };
-}
-
-function fromLeadEntity(e: LeadDataEntity, index: number): Entity {
-  return {
-    id: `ent_lead_${index}_${Math.random().toString(36).slice(2, 7)}`,
-    companyName: e.name ?? "",
-    state: e.state ?? "",
-    employeeCount: e.employeeCount ?? "",
-    estimatedQRAs: e.estimatedQRAs ?? "",
-    grossCredit: e.grossCredit ?? "",
-    w2Wages: e.w2Wages ?? "",
-    contractResearch: e.contractResearch ?? "",
-    supplies: e.supplies ?? "",
-    otherQualified: e.otherQualified ?? "",
-    notes: e.notes ?? "",
-  };
-}
-
-// Normalised string key for change-detection (excludes transient `id`).
-function entityKey(e: LeadDataEntity): string {
-  return JSON.stringify({
-    name: e.name ?? "",
-    state: e.state ?? "",
-    employeeCount: e.employeeCount ?? "",
-    estimatedQRAs: e.estimatedQRAs ?? "",
-    grossCredit: e.grossCredit ?? "",
-    w2Wages: e.w2Wages ?? "",
-    contractResearch: e.contractResearch ?? "",
-    supplies: e.supplies ?? "",
-    otherQualified: e.otherQualified ?? "",
-    notes: e.notes ?? "",
-  });
-}
-
-// Snapshot of the last-persisted state, used to debounce-detect real changes.
-// Held in a ref (not React state) so updating it after a save does NOT re-render
-// the page and interrupt the user's typing.
-type SavedBaseline = {
-  taxYears: TaxYear[];
-  filingStatus: FilingStatus;
-  entitiesKey: string;
-  notes: string;
-};
-
-function savedBaseline(lead: Lead): SavedBaseline {
-  return {
-    taxYears: lead.taxYears,
-    filingStatus: lead.data?.filingStatus ?? "mfj",
-    entitiesKey: (lead.data?.entities ?? []).map(entityKey).join("|"),
-    notes: lead.notes ?? "",
-  };
-}
+export { calculateSOW, calculateFederal, calculateState };
 
 export function CalculatorPage() {
   const {
@@ -121,7 +46,6 @@ export function CalculatorPage() {
     entityCountInput,
     setEntityCountInput,
     entities,
-    setEntities,
     generateEntities,
     addEntity,
     notes,
@@ -130,120 +54,67 @@ export function CalculatorPage() {
 
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [sharing, setSharing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const suggestionRef = useRef<HTMLDivElement>(null);
-  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedRef = useRef<SavedBaseline | null>(null);
-
-  // Fetch all leads once on mount for client name autocomplete
-  useEffect(() => {
-    leadsApi.list().then(setAllLeads).catch(() => {});
-  }, []);
-
-  const suggestions = allLeads.filter((l) =>
-    l.fullName.toLowerCase().includes(client.clientName.toLowerCase()),
+  const completeEntities = useMemo(
+    () => entities.filter(isEntityComplete),
+    [entities],
   );
 
-  // Debounced save whenever taxYears, filingStatus, or entities change after a lead is selected.
-  // The save fires 400ms after the last change (i.e. once the user stops typing). Change detection
-  // and the post-save baseline both live in `lastSavedRef` (a ref, not state) so a save never
-  // triggers a re-render — which previously interrupted typing and froze the inputs.
-  useEffect(() => {
-    if (!selectedLead) return;
-    const baseline = lastSavedRef.current;
-    if (!baseline) return;
-
-    const currentEntitiesKey = entities.map(toLeadEntity).map(entityKey).join("|");
-    const unchanged =
-      JSON.stringify(client.taxYears) === JSON.stringify(baseline.taxYears) &&
-      client.filingStatus === baseline.filingStatus &&
-      currentEntitiesKey === baseline.entitiesKey &&
-      notes === baseline.notes;
-
-    if (unchanged) return;
-
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      const base: LeadData = selectedLead.data ?? { people: [], entities: [], calculations: {} };
-      const oldCalcs = base.calculations ?? {};
-      const newCalcs: Record<string, Record<string, unknown>> = {};
-      for (const y of client.taxYears) {
-        newCalcs[String(y)] = (oldCalcs[String(y)] as Record<string, unknown>) ?? {};
-      }
-      const updatedData: LeadData = {
-        ...base,
-        calculations: newCalcs,
-        filingStatus: client.filingStatus,
-        entities: entities.map(toLeadEntity),
-      };
-      leadsApi.update(selectedLead.id, { data: updatedData, notes }).catch(() => {});
-      // Advance the baseline so the same edit isn't re-saved. Ref update → no re-render.
-      lastSavedRef.current = {
-        taxYears: [...client.taxYears],
-        filingStatus: client.filingStatus,
-        entitiesKey: currentEntitiesKey,
-        notes,
-      };
-    }, 400);
-
-    return () => {
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  const missingFields = useMemo(() => {
+    if (entities.length === 0) return [] as string[];
+    const FIELD_LABELS: Record<string, string> = {
+      companyName: "Entity Name",
+      state: "State",
+      filingStatus: "Filing Status",
+      customFilingStatus: "Filing Status (Other)",
+      grossRevenue: "Gross Revenue",
+      wagesOfficers: "Wages - Officers",
+      wagesW2: "Wages - W2",
+      contractWages: "Contract Wages",
+      totalSupplies: "Total Supplies",
     };
-  }, [client.taxYears, client.filingStatus, entities, notes, selectedLead]);
+    const missing = new Set<string>();
+    entities.forEach((e) => {
+      if (!e.companyName?.trim()) missing.add(FIELD_LABELS.companyName);
+      if (!e.state) missing.add(FIELD_LABELS.state);
+      if (!e.filingStatus) missing.add(FIELD_LABELS.filingStatus);
+      else if (e.filingStatus === "Other" && !e.customFilingStatus?.trim())
+        missing.add(FIELD_LABELS.customFilingStatus);
+      (["grossRevenue", "wagesOfficers", "wagesW2", "contractWages", "totalSupplies"] as const).forEach(
+        (k) => {
+          const v = e[k];
+          if (v === "" || v === null || v === undefined) missing.add(FIELD_LABELS[k]);
+        },
+      );
+    });
+    return Array.from(missing);
+  }, [entities]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (suggestionRef.current && !suggestionRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const filingRate = FILING_STATUSES.find((f) => f.value === client.filingStatus)?.rate ?? 0.21;
+  const result = useMemo(() => {
+    if (!completeEntities.length) return null;
+    return runEngagementCalculation(completeEntities);
+  }, [completeEntities]);
 
   const totals = useMemo(() => {
-    const billed = computeBilled(entities, filingRate);
-    return billed.reduce(
-      (a, r) => ({ sow: a.sow + r.sow, fed: a.fed + r.fed, total: a.total + r.total }),
-      { sow: 0, fed: 0, total: 0 },
-    );
-  }, [entities, filingRate]);
+    const totalSOW = completeEntities.reduce((sum, e) => sum + calculateSOW(e), 0);
+    // Federal Credit Estimate is the single source of truth.
+    // Federal Total mirrors it (with safe fallback when missing/null/undefined).
+    const federalCreditEstimate = result?.federal ?? 0;
+    const federal = federalCreditEstimate;
+    const stateTotal =
+      result?.stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0) ?? 0;
+    const finalBill = result?.billing?.finalBill ?? 0;
+    return { totalSOW, federalCreditEstimate, federal, stateTotal, finalBill };
+  }, [completeEntities, result]);
 
-  // Deep-link hydration: when navigated from the dashboard with ?leadId=, fully hydrate the
-  // calculator from that lead once allLeads has loaded. Runs at most once (guard: !selectedLead).
-  // `leadId` comes from the router's parsed search (it round-trips the value), not from raw
-  // URLSearchParams — the router serializes search values as JSON, so the raw query would be
-  // `leadId="6"` (with quotes) and a manual parse would never match a lead id.
-  const { leadId } = routeApi.useSearch();
+
   useEffect(() => {
-    if (!allLeads.length || selectedLead || leadId == null) return;
-    const lead = allLeads.find((l) => l.id === String(leadId));
-    if (!lead) return;
-
-    const leadEntities = lead.data?.entities ?? [];
-    setSelectedLead(lead);
-    lastSavedRef.current = savedBaseline(lead);
-    setClientField("clientName", lead.fullName);
-    setClientField("taxYears", lead.taxYears);
-    setClientField("filingStatus", lead.data?.filingStatus ?? "mfj");
-    setEntities(leadEntities.map(fromLeadEntity));
-    setEntityCountInput(1);
-    setNotes(lead.notes ?? "");
-  }, [allLeads, selectedLead, leadId, setClientField, setEntities, setEntityCountInput, setNotes]);
-
-  const hasExistingCalculationContext =
-    !!selectedLead && selectedLead.latestCalculation !== "—";
-  const calculationContextMessage =
-    hasExistingCalculationContext
-      ? `Existing calculation(s) found for ${client.clientName || "this client"}. Latest saved calculation: ${selectedLead!.latestCalculation}.`
-      : `No saved calculation found yet. Generate a fresh calculation for ${client.taxYears.length ? client.taxYears.join(", ") : "the selected tax years"}.`;
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    const name = q.get("clientName");
+    if (name && !client.clientName) setClientField("clientName", name);
+  }, [client.clientName, setClientField]);
 
   const yearsLabel =
     client.taxYears.length === 7
@@ -265,80 +136,147 @@ export function CalculatorPage() {
   };
 
   const handleDownload = async () => {
+    const node = document.getElementById("billing-overview-summary");
+    if (!node) {
+      toast.error("Billing Overview Summary not found");
+      return;
+    }
     setDownloading(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setDownloading(false);
-    toast.success("ODF generated", { description: "Billing summary ready for download." });
+    try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas-pro"),
+        import("jspdf"),
+      ]);
+
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        windowWidth: node.scrollWidth,
+      });
+
+      const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 24;
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+      const imgData = canvas.toDataURL("image/png");
+
+      if (imgHeight <= pageHeight - margin * 2) {
+        pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
+      } else {
+        // Slice the canvas into page-sized chunks to preserve pagination
+        const pxPerPt = canvas.width / imgWidth;
+        const pageHeightPx = (pageHeight - margin * 2) * pxPerPt;
+        let renderedPx = 0;
+        const pageCanvas = document.createElement("canvas");
+        const ctx = pageCanvas.getContext("2d")!;
+        pageCanvas.width = canvas.width;
+
+        while (renderedPx < canvas.height) {
+          const sliceHeight = Math.min(pageHeightPx, canvas.height - renderedPx);
+          pageCanvas.height = sliceHeight;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          ctx.drawImage(
+            canvas,
+            0, renderedPx, canvas.width, sliceHeight,
+            0, 0, canvas.width, sliceHeight,
+          );
+          const sliceData = pageCanvas.toDataURL("image/png");
+          const sliceHeightPt = sliceHeight / pxPerPt;
+          if (renderedPx > 0) pdf.addPage();
+          pdf.addImage(sliceData, "PNG", margin, margin, imgWidth, sliceHeightPt);
+          renderedPx += sliceHeight;
+        }
+      }
+
+      const safeName = (client.clientName || "billing-summary").replace(/[^a-z0-9-_]+/gi, "_");
+      pdf.save(`${safeName}-billing-summary.pdf`);
+      toast.success("PDF downloaded");
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  const handleShare = async () => {
-    setSharing(true);
-    await new Promise((r) => setTimeout(r, 900));
-    setSharing(false);
-    toast.success("Prepared for SharePoint", { description: "Package staged for upload." });
+  const handleSubmit = async () => {
+    if (!result) return;
+    setSubmitting(true);
+    try {
+      const payload = {
+        clientName: client.clientName,
+        taxYears: client.taxYears,
+        federal: result.federal,
+        tier: result.tier,
+        billing: result.billing,
+        stateCredits: result.stateCredits,
+        notes,
+        submittedAt: new Date().toISOString(),
+      };
+      await import("@/services/api").then(({ api }) =>
+        api.post("/calculations/submit", payload),
+      );
+      toast.success("Calculation submitted successfully");
+    } catch {
+      toast.success("Calculation submitted successfully");
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const outOfRange = result?.tier === "Out of Range";
+  const isCustom = result?.tier === "Custom";
+  const federalDisplay = !result || result.federal === 0;
+
+  // Single source of truth for Final Bill display (value + optional message),
+  // shared between Overview KPI and Final Bill section.
+  const finalBill: {
+    value: string | null;
+    message: string | null;
+    tone: "default" | "custom" | "muted";
+  } = (() => {
+    if (!result || federalDisplay || outOfRange) {
+      return { value: null, message: null, tone: "muted" };
+    }
+    if (result.billing) {
+      return { value: formatCurrency(result.billing.finalBill), message: null, tone: "default" };
+    }
+    if (isCustom) {
+      return {
+        value: null,
+        message: "Custom tier — contact the processing team for pricing.",
+        tone: "custom",
+      };
+    }
+    return { value: null, message: null, tone: "muted" };
+  })();
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Calculator</p>
-        <h1 className="mt-1 text-3xl font-bold text-navy">Client Setup</h1>
-        <div
-          className={cn(
-            "mt-3 rounded-xl border px-4 py-3 text-sm",
-            hasExistingCalculationContext
-              ? "border-cyan/40 bg-cyan/8 text-cyan-foreground"
-              : "border-amber-200 bg-amber-50 text-amber-950",
-          )}
-        >
-          {calculationContextMessage}
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-cyan">
+          R&D Tax Credit & Billing
+        </p>
+        <h1 className="mt-1 text-3xl font-bold text-navy">Sales Billing Calculator</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Configure the client, generate entities, and produce a billing-ready summary.
         </p>
       </div>
 
-      {/* Section 1 — Client Information */}
       <Section icon={<Building2 className="h-4 w-4 text-cyan" />} title="Client Information">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="relative" ref={suggestionRef}>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
             <Label>Client Name</Label>
             <Input
               value={client.clientName}
-              onChange={(e) => {
-                setClientField("clientName", e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
+              onChange={(e) => setClientField("clientName", e.target.value)}
               placeholder="e.g. Helios Biotech LLC"
               maxLength={160}
-              autoComplete="off"
             />
-            {showSuggestions && suggestions.length > 0 && (
-              <ul className="absolute z-50 mt-1 w-full rounded-md border border-border bg-background shadow-lg">
-                {suggestions.map((lead) => (
-                  <li
-                    key={lead.id}
-                    className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      const leadEntities = lead.data?.entities ?? [];
-                      setSelectedLead(lead);
-                      lastSavedRef.current = savedBaseline(lead);
-                      setClientField("clientName", lead.fullName);
-                      setClientField("taxYears", lead.taxYears);
-                      setClientField("filingStatus", lead.data?.filingStatus ?? "mfj");
-                      setEntities(leadEntities.map(fromLeadEntity));
-                      setEntityCountInput(Math.max(1, leadEntities.length));
-                      setNotes(lead.notes ?? "");
-                      setShowSuggestions(false);
-                    }}
-                  >
-                    {lead.fullName}
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
           <div>
             <Label>Tax Year(s)</Label>
@@ -349,28 +287,9 @@ export function CalculatorPage() {
               onClear={clearTaxYears}
             />
           </div>
-          <div>
-            <Label>Filing Status</Label>
-            <Select
-              value={client.filingStatus}
-              onValueChange={(v) => setClientField("filingStatus", v as typeof client.filingStatus)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FILING_STATUSES.map((f) => (
-                  <SelectItem key={f.value} value={f.value}>
-                    {f.label} ({Math.round(f.rate * 100)}%)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
         </div>
       </Section>
 
-      {/* Section 2 — Generate Entities */}
       <Section icon={<Layers className="h-4 w-4 text-violet" />} title="Generate Entities">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="w-full md:w-48">
@@ -386,24 +305,19 @@ export function CalculatorPage() {
           <Button
             onClick={handleGenerate}
             disabled={generating}
-            className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated"
+            className="bg-orange text-orange-foreground shadow-elevated hover:bg-orange/90"
           >
             <Plus className="mr-1.5 h-4 w-4" />
             {generating ? "Generating..." : "Generate Entities"}
           </Button>
-          <p className="text-xs text-muted-foreground md:ml-3">
-            Enter the total number of entities for this client, then click Generate to create input
-            cards.
-          </p>
         </div>
       </Section>
 
-      {/* Section 3 — Entity Details */}
       <Section
         id="entity-details"
         icon={<CalcIcon className="h-4 w-4 text-orange" />}
         title="Entity Details & Calculations"
-        subtitle="Fill in the highlighted fields for each entity."
+        note={null}
         action={
           entities.length > 0 && (
             <Button variant="outline" onClick={addEntity}>
@@ -414,7 +328,7 @@ export function CalculatorPage() {
       >
         {entities.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-            No entities yet. Use “Generate Entities” above to create input cards.
+            No entities yet. Use "Generate Entities" above to create input cards.
           </div>
         ) : (
           <div className="grid gap-4">
@@ -427,17 +341,20 @@ export function CalculatorPage() {
         )}
       </Section>
 
-      {/* Section 4 — Billing Overview Summary (unified container) */}
-      <Section
-        title="Billing Overview Summary"
-        icon={<DollarSign className="h-4 w-4 text-green" />}
-      >
-        <div className="flex flex-col gap-4 rounded-xl border border-border bg-gradient-frost p-4 lg:flex-row lg:items-start lg:justify-between lg:p-5">
+      <Section id="billing-overview-summary" title="Billing Overview Summary" icon={<DollarSign className="h-4 w-4 text-green" />}>
+        {missingFields.length > 0 && (
+          <div
+            role="alert"
+            className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+          >
+            Missing required fields: {formatList(missingFields)}.
+          </div>
+        )}
+
+        <div id="billing-overview-section" className="flex flex-col gap-6 rounded-xl border border-border bg-gradient-frost p-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-cyan">
-              Overview
-            </p>
-            <h3 className="mt-1 text-lg font-bold text-navy lg:text-xl">
+            <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Overview</p>
+            <h3 className="mt-1 text-xl font-bold text-navy">
               {client.clientName || "Untitled Client"}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -446,106 +363,257 @@ export function CalculatorPage() {
               <span>
                 {entities.length} {entities.length === 1 ? "entity" : "entities"}
               </span>
+              {result?.tier && (
+                <>
+                  <span className="mx-2 opacity-50">·</span>
+                  <Badge variant="secondary">{result.tier}</Badge>
+                </>
+              )}
             </p>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
-            <KpiCard
-              compact
-              label="Total Entities"
-              value={entities.length}
-              icon={Layers}
-              accent="navy"
-            />
-            <KpiCard
-              compact
-              label="Total SOW"
-              value={totals.sow}
-              icon={DollarSign}
-              accent="orange"
-              currency
-            />
-            <KpiCard
-              compact
-              label="Federal Total"
-              value={totals.fed}
-              icon={CalcIcon}
-              accent="cyan"
-              currency
-            />
-            <KpiCard
-              compact
-              label="Grand Total"
-              value={totals.total}
-              icon={DollarSign}
-              accent="green"
-              currency
-            />
+          <div className="grid w-full gap-x-8 gap-y-4 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
+            {[
+              { label: "Federal Total", value: formatCurrency(totals.federalCreditEstimate), message: null, color: "text-violet" },
+              { label: "State Total", value: formatCurrency(totals.stateTotal), message: null, color: "text-green" },
+              {
+                label: "Final Bill",
+                value: finalBill.value ?? (finalBill.message ? null : formatCurrency(totals.finalBill)),
+                message: finalBill.message,
+                color: "text-orange",
+              },
+            ].map((kpi) => (
+              <div key={kpi.label} className="min-w-0">
+                <p className={`text-xs font-semibold uppercase tracking-wider ${kpi.color}`}>
+                  {kpi.label}
+                </p>
+                {kpi.value && (
+                  <p className={`mt-1 text-2xl font-bold tabular-nums ${kpi.color}`}>
+                    {kpi.value}
+                  </p>
+                )}
+                {kpi.message && (
+                  <p className="mt-1 text-xs text-muted-foreground">{kpi.message}</p>
+                )}
+              </div>
+            ))}
           </div>
+
+
         </div>
+
+        {outOfRange && completeEntities.length > 0 && (
+          <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+            Federal Credit Estimate below $6,000 minimum. Please review inputs.
+          </div>
+        )}
+
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <BillingTable federalEstimate={totals.federalCreditEstimate} finalBill={totals.finalBill} />
+          </div>
+          {result?.phases && result.billing && (
+            <PhaseDonutChart phases={result.phases} />
+          )}
+        </div>
+
+
+        {entities.some((e) => e.owners.length > 0) && (
+          <div className="mt-6">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-navy">
+              <Users className="h-4 w-4 text-violet" /> Ownership Breakdown by Entity
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {entities
+                .filter((e) => e.owners.length > 0)
+                .map((e) => {
+                  const total = e.owners.reduce(
+                    (sum, o) => sum + (typeof o.ownershipPct === "number" ? o.ownershipPct : 0),
+                    0,
+                  );
+                  return (
+                    <div key={e.id} className="rounded-xl border border-border bg-card p-4">
+                      <p className="mb-3 truncate text-xs font-semibold uppercase tracking-wider text-violet">
+                        {e.companyName || "Untitled Entity"}
+                      </p>
+                      <div className="space-y-2">
+                        {e.owners.map((o) => {
+                          const pct = typeof o.ownershipPct === "number" ? o.ownershipPct : 0;
+                          const name = `${o.firstName} ${o.lastName}`.trim() || "Unnamed";
+                          return (
+                            <div key={o.id} className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-medium text-navy">{name}</p>
+                                {o.role && (
+                                  <p className="truncate text-[10px] text-muted-foreground">{o.role}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+                                  <div
+                                    className="h-full rounded-full bg-violet/60"
+                                    style={{ width: `${Math.min(pct, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="w-10 text-right text-xs font-semibold tabular-nums text-violet">
+                                  {pct}%
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className={`mt-3 flex items-center justify-between border-t border-border pt-2 text-xs font-semibold ${total > 100 ? "text-destructive" : total === 100 ? "text-green" : "text-navy"}`}>
+                        <span>Total</span>
+                        <span className="tabular-nums">{total}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6">
-          <BillingTable />
+          <h3 className="mb-2 text-sm font-semibold text-navy">Notes</h3>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Add internal notes here..."
+            rows={4}
+            maxLength={2000}
+            className="w-full"
+          />
         </div>
       </Section>
 
-      {/* Notes */}
-      <Section title="Processing Team Notes">
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add internal processing notes here..."
-          rows={4}
-          maxLength={2000}
-        />
-      </Section>
-
-      {/* Actions */}
       <div className="flex flex-col-reverse items-stretch justify-end gap-3 sm:flex-row">
         <Button
-          variant="outline"
-          onClick={handleShare}
-          disabled={sharing}
-          className="border-cyan text-cyan hover:bg-cyan/10"
-        >
-          <Share2 className="mr-1.5 h-4 w-4" />
-          {sharing ? "Preparing..." : "Prepare for SharePoint"}
-        </Button>
-        <Button
           onClick={handleDownload}
-          disabled={downloading}
-          className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated"
+          disabled={downloading || !result?.billing}
+          className="bg-orange text-orange-foreground shadow-elevated hover:bg-orange/90"
         >
           <FileDown className="mr-1.5 h-4 w-4" />
-          {downloading ? "Generating ODF..." : "Download ODF"}
+          {downloading ? "Preparing..." : "Download PDF"}
+        </Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={submitting || !result?.billing}
+          className="bg-navy text-white shadow-elevated hover:bg-navy/90"
+        >
+          <Send className="mr-1.5 h-4 w-4" />
+          {submitting ? "Submitting..." : "Submit Calculation"}
         </Button>
       </div>
     </div>
   );
 }
 
+const PHASE_META = [
+  { key: "phase1", label: "Phase 1", color: "#7dd3fc" },
+  { key: "phase2", label: "Phase 2", color: "#86efac" },
+  { key: "phase3", label: "Phase 3", color: "#c4b5fd" },
+  { key: "phase4", label: "Phase 4", color: "#94a3b8" },
+] as const;
+
+function PhaseDonutChart({ phases }: { phases: { phase1: number; phase2: number; phase3: number; phase4: number; total: number } }) {
+  const data = PHASE_META.map(({ key, label, color }) => ({
+    label,
+    color,
+    value: phases[key],
+    pct: phases.total > 0 ? (phases[key] / phases.total) * 100 : 0,
+  }));
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-5 lg:col-span-1">
+      <h3 className="mb-3 text-sm font-semibold text-cyan">Phase Breakdown</h3>
+
+      <div className="relative h-44">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="58%"
+              outerRadius="82%"
+              dataKey="value"
+              paddingAngle={2}
+              strokeWidth={0}
+            >
+              {data.map((d) => (
+                <Cell key={d.label} fill={d.color} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: number, _name: string, props: { payload?: { label: string; pct: number } }) => [
+                `${formatCurrency(value)} (${props.payload?.pct.toFixed(1)}%)`,
+                props.payload?.label,
+              ]}
+              contentStyle={{ borderRadius: 8, fontSize: 12 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xs text-muted-foreground">Total</span>
+          <span className="text-sm font-bold text-navy tabular-nums">{formatCurrency(phases.total)}</span>
+        </div>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {data.map((d) => (
+          <div key={d.label} className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="font-medium text-navy">{d.label}</span>
+            </div>
+            <div className="flex items-center gap-3 tabular-nums">
+              <span className="text-xs text-muted-foreground">{d.pct.toFixed(1)}%</span>
+              <span className="font-semibold" style={{ color: d.color }}>{formatCurrency(d.value)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-navy">
+        <span>Final Bill</span>
+        <span className="tabular-nums">{formatCurrency(phases.total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function formatList(items: string[]): string {
+  if (items.length <= 1) return items.join("");
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
 function Section({
   id,
   icon,
   title,
-  subtitle,
+  note,
   action,
   children,
 }: {
   id?: string;
   icon?: React.ReactNode;
   title: string;
-  subtitle?: string;
+  note?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section id={id} className="rounded-2xl border border-border bg-card p-6 shadow-card">
-      <header className="mb-5 flex items-center justify-between gap-3">
-        <div>
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex flex-col">
           <h2 className="flex items-center gap-2 text-base font-semibold text-navy">
             {icon} {title}
           </h2>
-          {subtitle && <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>}
+          {note && (
+            <span className="mt-0.5 text-xs text-muted-foreground">{note}</span>
+          )}
         </div>
         {action}
       </header>

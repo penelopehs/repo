@@ -51,3 +51,11 @@ export const apiRequest: SilentRequest = {
 };
 
 export const msalInstance = new PublicClientApplication(msalConfig);
+
+// Synchronous auth check usable outside React (e.g. router `beforeLoad`
+// guards). Matches `useIsAuthenticated()` semantics — true when MSAL holds at
+// least one signed-in account. Safe to call after bootstrap() has run
+// `initialize()`, which always completes before the router mounts.
+export function isAuthenticated(): boolean {
+  return msalInstance.getAllAccounts().length > 0;
+}

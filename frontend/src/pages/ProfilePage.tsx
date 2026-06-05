@@ -240,7 +240,7 @@ export function ProfilePage({ id }: { id: string }) {
         </Button>
       </div>
 
-      <div className="rounded-[18px] border border-[#e2e8f0] bg-white p-6 sm:p-7 shadow-[0_2px_8px_rgba(0,0,0,0.05)] mb-5 flex flex-wrap items-start justify-between gap-5">
+      <div className="rounded-[18px] border border-border bg-card p-6 sm:p-7 shadow-card mb-5 flex flex-wrap items-start justify-between gap-5">
         <div className="flex items-center gap-4 min-w-[280px]">
           <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-navy text-white text-base font-bold tracking-wide shadow-sm">
             {lead.fullName

@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AcquireIQ Sales Platform — Project Documentation</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1B2A4A; --cyan: #2E8B8B; --green: #3A7D5A;
+      --orange: #D97706; --light: #F8FAFC; --muted: #64748B; --border: #E2E8F0;
+    }
+    body { font-family: 'Inter', sans-serif; font-size: 13px; color: #1E293B; background: #fff; line-height: 1.6; }
+
+    /* Cover */
+    .cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: space-between; padding: 64px 72px; background: var(--navy); color: #fff; page-break-after: always; }
+    .cover-logo { display: flex; align-items: center; gap: 12px; }
+    .cover-logo-mark { width: 44px; height: 44px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #7ECACA; }
+    .cover-logo-name { font-size: 13px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+    .cover-body { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 24px; }
+    .cover-tag { font-size: 11px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: #7ECACA; }
+    .cover-title { font-size: clamp(2.4rem, 5vw, 3.8rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+    .cover-title span { color: #7ECACA; }
+    .cover-sub { font-size: 15px; color: rgba(255,255,255,0.55); max-width: 520px; line-height: 1.7; }
+    .cover-author-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 16px; max-width: 460px; }
+    .cover-author-avatar { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #2E8B8B, #1B2A4A); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; color: #7ECACA; flex-shrink: 0; border: 2px solid rgba(126,202,202,0.3); }
+    .cover-author-name { font-size: 15px; font-weight: 700; color: #fff; }
+    .cover-author-title { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+    .cover-meta { display: flex; gap: 40px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap; }
+    .cover-meta-item label { font-size: 10px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.35); display: block; margin-bottom: 4px; }
+    .cover-meta-item span { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.8); }
+    .cover-footer { font-size: 11px; color: rgba(255,255,255,0.2); letter-spacing: 0.1em; text-transform: uppercase; }
+
+    /* Pages */
+    .page { padding: 56px 72px; page-break-after: always; }
+    .page:last-child { page-break-after: avoid; }
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: var(--cyan); margin-bottom: 6px; }
+    h1.section-title { font-size: 26px; font-weight: 800; color: var(--navy); letter-spacing: -0.02em; margin-bottom: 32px; padding-bottom: 14px; border-bottom: 2px solid var(--border); }
+    h2 { font-size: 15px; font-weight: 700; color: var(--navy); margin: 28px 0 10px; }
+    h3 { font-size: 13px; font-weight: 600; color: var(--navy); margin: 16px 0 7px; }
+    p { margin-bottom: 10px; color: #334155; }
+    ul, ol { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 5px; color: #334155; }
+    code { background: #F1F5F9; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 11px; font-family: 'Courier New', monospace; color: var(--navy); }
+
+    /* Cards */
+    .card { background: var(--light); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; }
+    .card-title { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+    .card p { margin: 0; font-size: 12.5px; }
+
+    /* Grids */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+
+    /* Stats */
+    .stat-box { background: var(--light); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; text-align: center; }
+    .stat-box .stat-label { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+    .stat-box .stat-value { font-size: 22px; font-weight: 800; color: var(--navy); }
+
+    /* Badges */
+    .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 9px; border-radius: 20px; }
+    .badge-cyan   { background: rgba(46,139,139,0.1);  color: var(--cyan); }
+    .badge-green  { background: rgba(58,125,90,0.1);   color: var(--green); }
+    .badge-orange { background: rgba(217,119,6,0.1);   color: var(--orange); }
+    .badge-navy   { background: rgba(27,42,74,0.08);   color: var(--navy); }
+    .badge-red    { background: rgba(220,38,38,0.08);  color: #DC2626; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+    th { background: var(--navy); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 10px 14px; text-align: left; }
+    th:first-child { border-radius: 8px 0 0 0; } th:last-child { border-radius: 0 8px 0 0; }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #F8FAFC; }
+
+    /* Code block */
+    .code-block { background: #0F172A; color: #7ECACA; font-family: 'Courier New', monospace; font-size: 11.5px; padding: 16px 18px; border-radius: 8px; margin-bottom: 14px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+    .code-block .comment { color: #475569; }
+    .code-block .key { color: #93C5FD; }
+
+    /* Timeline */
+    .timeline { list-style: none; padding: 0; position: relative; }
+    .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .timeline li { padding-left: 36px; position: relative; margin-bottom: 20px; }
+    .timeline li::before { content: ''; position: absolute; left: 4px; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: var(--cyan); border: 3px solid #fff; box-shadow: 0 0 0 2px var(--cyan); }
+    .timeline-title { font-weight: 700; color: var(--navy); font-size: 13px; }
+    .timeline-commit { font-family: 'Courier New', monospace; font-size: 10px; background: #F1F5F9; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); margin-left: 6px; }
+    .timeline-desc { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    /* Highlight */
+    .highlight-row td { background: rgba(46,139,139,0.06) !important; font-weight: 600; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+    /* Author banner */
+    .author-banner { background: linear-gradient(135deg, var(--navy), #2E3F60); border-radius: 12px; padding: 20px 24px; display: flex; align-items: center; gap: 18px; margin-bottom: 28px; }
+    .author-avatar { width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #2E8B8B, #1B2A4A); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; color: #7ECACA; flex-shrink: 0; border: 2px solid rgba(126,202,202,0.4); }
+    .author-info { color: #fff; }
+    .author-name { font-size: 16px; font-weight: 800; }
+    .author-role { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+    .author-company { font-size: 11px; color: #7ECACA; margin-top: 2px; font-weight: 600; letter-spacing: 0.05em; }
+
+    /* Print */
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .cover { min-height: 100vh; } .no-print { display: none; } }
+
+    /* Print button */
+    .print-btn { position: fixed; bottom: 28px; right: 28px; background: var(--navy); color: #fff; border: none; border-radius: 50px; padding: 12px 28px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 20px rgba(0,0,0,0.2); font-family: 'Inter', sans-serif; transition: background 0.2s; z-index: 1000; }
+    .print-btn:hover { background: #2E3F60; }
+  </style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">⬇ Save as PDF</button>
+
+<!-- ══════════ COVER ══════════ -->
+<div class="cover">
+  <div class="cover-logo">
+    <div class="cover-logo-mark">AI</div>
+    <span class="cover-logo-name">AcquireIQ</span>
+  </div>
+
+  <div class="cover-body">
+    <p class="cover-tag">Project Documentation — Full Sprint Summary</p>
+    <h1 class="cover-title">Sales Billing<br/><span>Platform</span><br/>Development</h1>
+    <p class="cover-sub">
+      A complete record of all features designed, built, and deployed on the AcquireIQ
+      Sales Platform frontend — including branding, UI/UX, calculator engine, billing logic,
+      state credit data, repository management, and live deployment.
+    </p>
+    <div class="cover-author-box">
+      <div class="cover-author-avatar">SS</div>
+      <div>
+        <div class="cover-author-name">Sainimere Sema</div>
+        <div class="cover-author-title">Software Engineer</div>
+        <div style="font-size:11px; color:#7ECACA; margin-top:2px; font-weight:600;">Acquire R&amp;D Tax Credits</div>
+      </div>
+    </div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><label>Project</label><span>AcquireIQ Sales Platform</span></div>
+      <div class="cover-meta-item"><label>Repository</label><span>Acquire-Wealth-Collective/sales</span></div>
+      <div class="cover-meta-item"><label>Date</label><span>June 2026</span></div>
+      <div class="cover-meta-item"><label>Status</label><span>Deployed ✓</span></div>
+    </div>
+  </div>
+
+  <p class="cover-footer">© 2026 Acquire Wealth Collective — Confidential</p>
+</div>
+
+
+<!-- ══════════ PAGE 1 — ABOUT THE ENGINEER ══════════ -->
+<div class="page">
+  <p class="section-label">01 — Author</p>
+  <h1 class="section-title">About the Engineer</h1>
+
+  <div class="author-banner">
+    <div class="author-avatar">SS</div>
+    <div class="author-info">
+      <div class="author-name">Sainimere Sema</div>
+      <div class="author-role">Software Engineer</div>
+      <div class="author-company">Acquire R&amp;D Tax Credits</div>
+    </div>
+  </div>
+
+  <p>
+    All work documented in this report was designed, developed, and deployed by
+    <strong>Sainimere Sema</strong>, Software Engineer at Acquire R&amp;D Tax Credits.
+    This sprint covered the full frontend build of the AcquireIQ Sales Platform —
+    from initial branding and UI design through to a fully functional billing calculator,
+    live deployment on GitHub Pages, and backend repository coordination.
+  </p>
+
+  <h2>Scope of Work</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Frontend Development</div>
+      <p>Built the complete React/TypeScript frontend including all pages, components, state management, routing, and business logic.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Calculator Engine Design</div>
+      <p>Designed and implemented the R&amp;D tax credit calculation engine from scratch — including federal, state, tier, and billing phase logic.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">UI/UX Design</div>
+      <p>Designed all visual elements including the login page, navigation, entity cards, billing table, and overview dashboard.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">DevOps & Deployment</div>
+      <p>Managed the full Git workflow — branching, committing, merging to main, and deploying to GitHub Pages via gh-pages.</p>
+    </div>
+  </div>
+
+  <h2>Project Stats</h2>
+  <div class="grid-4">
+    <div class="stat-box"><span class="stat-label">Total Commits</span><span class="stat-value">24+</span></div>
+    <div class="stat-box"><span class="stat-label">Files Changed</span><span class="stat-value">14+</span></div>
+    <div class="stat-box"><span class="stat-label">Lines Added</span><span class="stat-value">869+</span></div>
+    <div class="stat-box"><span class="stat-label">Deployments</span><span class="stat-value">Live ✓</span></div>
+  </div>
+</div>
+
+
+<!-- ══════════ PAGE 2 — PROJECT OVERVIEW ══════════ -->
+<div class="page">
+  <p class="section-label">02 — Overview</p>
+  <h1 class="section-title">Project Overview</h1>
+
+  <p>
+    The AcquireIQ Sales Platform is an enterprise-grade, browser-based application built for
+    the Acquire Wealth Collective sales team. It centralizes R&amp;D tax credit calculations,
+    multi-entity client billing, pipeline management, document tracking, and engagement profiling.
+  </p>
+
+  <h2>Tech Stack</h2>
+  <div class="grid-2">
+    <div class="card"><div class="card-title">Frontend Framework</div><p>React 19 with TypeScript, TanStack Router for file-based routing, Zustand for global state management.</p></div>
+    <div class="card"><div class="card-title">UI & Styling</div><p>Tailwind CSS v4, shadcn/ui component library, Framer Motion for animations, Recharts for data visualization.</p></div>
+    <div class="card"><div class="card-title">PDF Export</div><p>html2canvas-pro + jsPDF for client-side PDF generation of billing summaries — no server required.</p></div>
+    <div class="card"><div class="card-title">Build & Deployment</div><p>Vite 7 for bundling. Live at: <strong>acquire-wealth-collective.github.io/sales/</strong></p></div>
+  </div>
+
+  <h2>Application Pages</h2>
+  <table>
+    <thead><tr><th>Page</th><th>Route</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Login</strong></td><td>/login</td><td>Authentication — username or email + password</td></tr>
+      <tr><td><strong>Sales Billing Calculator</strong></td><td>/</td><td>Multi-entity R&amp;D tax credit calculator with PDF export</td></tr>
+      <tr><td><strong>Client Dashboard</strong></td><td>/pipeline</td><td>CRM pipeline with lead status tracking</td></tr>
+      <tr><td><strong>Client Profile</strong></td><td>/clients/:id</td><td>Engagement history and client details</td></tr>
+      <tr><td><strong>Documents</strong></td><td>/documents</td><td>Document request management and tracking</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════ PAGE 3 — BRANDING & UI DESIGN ══════════ -->
+<div class="page">
+  <p class="section-label">03 — Branding & Design</p>
+  <h1 class="section-title">Branding & UI Design</h1>
+
+  <p>
+    A significant portion of this sprint was dedicated to establishing the visual identity
+    of the platform — from color palette decisions to login page animations and navigation structure.
+  </p>
+
+  <h2>Color Palette Overhaul</h2>
+  <p>
+    The original teal-based color scheme (<code>#193441</code>, <code>#143c4f</code>) was replaced
+    throughout the entire application with a refined <strong>Deep Navy Blue</strong> palette to give
+    the platform a more professional, enterprise-grade appearance.
+  </p>
+  <div class="grid-3">
+    <div class="card"><div class="card-title" style="color:#1B2A4A;">Deep Navy — #1B2A4A</div><p>Primary brand color. Used for headers, text, and backgrounds.</p></div>
+    <div class="card"><div class="card-title" style="color:#0D1B2A;">Dark Background — #0D1B2A</div><p>Login page and dark mode backgrounds.</p></div>
+    <div class="card"><div class="card-title" style="color:#2E8B8B;">Cyan Accent — #2E8B8B</div><p>Interactive elements, highlights, and section labels.</p></div>
+    <div class="card"><div class="card-title" style="color:#3A7D5A;">Green — #3A7D5A</div><p>Eligibility badges and positive status indicators.</p></div>
+    <div class="card"><div class="card-title" style="color:#D97706;">Orange — #D97706</div><p>CTAs, active nav indicators, and billing totals.</p></div>
+    <div class="card"><div class="card-title">Neutral Blue Palette</div><p>#FCFFF5 / #D1DBBD / #91AA9D — applied across dark/light mode surfaces.</p></div>
+  </div>
+
+  <h2>Dark / Light Mode Toggle</h2>
+  <p>
+    Implemented a full dark/light mode system with a sun/moon toggle button in the navigation bar.
+    User preference is persisted via the <code>themeStore</code> (Zustand) so the selected theme
+    is remembered across sessions.
+  </p>
+
+  <h2>AcquireIQ Rebrand</h2>
+  <p>
+    The platform was rebranded from "Acquire Sales" to <strong>AcquireIQ</strong> across all pages and components:
+  </p>
+  <ul>
+    <li>App header logo initials updated (<code>AS</code> → <code>AI</code>)</li>
+    <li>Brand name updated across all route page titles</li>
+    <li>Nav label refined — left brand shows "Acquire Sales", nav tab shows "Sales Billing Calculator"</li>
+    <li>Files updated: <code>AppHeader.tsx</code>, <code>LoginPage.tsx</code>, all route files</li>
+  </ul>
+
+  <h2>Navigation & Header</h2>
+  <ul>
+    <li>Sticky deep navy header with active route underline indicator (orange bar)</li>
+    <li>Desktop nav with icon + label links</li>
+    <li>Mobile responsive slide-out sheet navigation</li>
+    <li>Authenticated-only nav links — non-authenticated users only see Log In</li>
+    <li>Sign-out button shows logged-in user's display name</li>
+    <li>Dark/light mode toggle in desktop nav</li>
+  </ul>
+</div>
+
+
+<!-- ══════════ PAGE 4 — LOGIN PAGE ══════════ -->
+<div class="page">
+  <p class="section-label">04 — Login Page</p>
+  <h1 class="section-title">Login Page Design</h1>
+
+  <p>
+    The login page went through multiple design iterations, each building on the previous
+    to create a polished, enterprise-grade authentication experience.
+  </p>
+
+  <h2>Design Evolution</h2>
+  <ul class="timeline">
+    <li>
+      <div class="timeline-title">Initial Login Redesign <span class="timeline-commit">d97f786</span></div>
+      <div class="timeline-desc">Replaced the original login with a dramatic dark layout: deep <code>#0D1B2A</code> background, dot grid pattern, bold split-panel typography, glassmorphism card form with backdrop blur.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Particle Network Canvas Added <span class="timeline-commit">a8d1ac8</span></div>
+      <div class="timeline-desc">Added an interactive animated canvas background — moving dots connected by lines with mouse repulsion physics. Created entirely with the Canvas 2D API, no external libraries.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Revenue Chart Streams Canvas <span class="timeline-commit">2f27581</span></div>
+      <div class="timeline-desc">Replaced the particle network with live scrolling financial chart streams — 4 animated revenue lines with gradient fills, glowing leading dots, pulsing rings, and faint grid/axis labels. More relevant to the R&amp;D tax credit context.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Form Simplified <span class="timeline-commit">8136d3c</span></div>
+      <div class="timeline-desc">Consolidated separate Username + Email fields into a single "Username or Email" field. Cleaner UX, same Zod validation.</div>
+    </li>
+  </ul>
+
+  <h2>Final Login Page Features</h2>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Left Panel (Desktop)</div>
+      <p>AcquireIQ branding, bold headline "THE NEW STANDARD IN R&amp;D TAX BILLING", feature chips, enterprise tagline, animated entrance.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Right Panel — Form</div>
+      <p>Glassmorphism card with Username or Email + Password fields, error display, animated submit button, Zod schema validation.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Animated Background</div>
+      <p>4 live revenue chart streams with smooth sine-wave motion, gradient fills, glowing leading dots, and subtle financial grid lines — all Canvas 2D.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Ambient Glow Effects</div>
+      <p>Radial gradient blur overlays in navy and teal give the dark background depth without impacting performance.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════ PAGE 5 — CALCULATOR ENGINE ══════════ -->
+<div class="page">
+  <p class="section-label">05 — Core Feature</p>
+  <h1 class="section-title">Sales Billing Calculator Engine</h1>
+
+  <p>
+    The most significant technical deliverable of this sprint — a purpose-built financial
+    calculation engine for R&amp;D tax credit estimation and client billing.
+    All logic lives in <code>src/utils/calculatorEngine.tsx</code>, keeping the UI purely presentational.
+  </p>
+
+  <h2>Calculation Steps</h2>
+  <div class="grid-2">
+    <div class="card"><div class="card-title">Step 1 — Entity Formulas</div><p>Per-entity SOW estimate from 3 formula components (F2 = 2% gross, F3 = 3% gross, F50 = wages/supplies weighted).</p></div>
+    <div class="card"><div class="card-title">Step 2 — Federal Credit</div><p>Aggregate federal credit across all entities using 4 conditional weightings based on officer wage and contract research ratios.</p></div>
+    <div class="card"><div class="card-title">Step 3 — State Credit</div><p>Per-entity state credit using the federal estimate, each state's utilization cap, and the applicable state tax rate.</p></div>
+    <div class="card"><div class="card-title">Step 4 — Tier & Final Bill</div><p>Federal credit maps to a billing tier → percentage rate → final billable amount → 4 payment phases.</p></div>
+  </div>
+
+  <h2>Billing Tiers</h2>
+  <table>
+    <thead><tr><th>Tier</th><th>Federal Credit Range</th><th>Billing Rate</th></tr></thead>
+    <tbody>
+      <tr><td>Micro</td><td>$6,000 – $25,000</td><td>21.3%</td></tr>
+      <tr><td>Starter</td><td>$25,001 – $50,000</td><td>20.8%</td></tr>
+      <tr><td>Core</td><td>$50,001 – $75,000</td><td>18.6%</td></tr>
+      <tr><td>Growth</td><td>$75,001 – $100,000</td><td>17.5%</td></tr>
+      <tr><td>Expansion</td><td>$100,001 – $150,000</td><td>17.0%</td></tr>
+      <tr><td>Elite</td><td>$150,001 – $250,000</td><td>14.6%</td></tr>
+      <tr><td>Strategic</td><td>$250,001 – $350,000</td><td>13.3%</td></tr>
+      <tr><td>Executive</td><td>$350,001 – $5,000,000</td><td>13.0%</td></tr>
+      <tr><td>Custom</td><td>$5,000,001+</td><td>Contact team</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Payment Phase Breakdown</h2>
+  <ul>
+    <li><strong>Phase 1</strong> — Up to $6,000 (upfront retainer)</li>
+    <li><strong>Phase 2</strong> — One third of the remaining balance</li>
+    <li><strong>Phase 3</strong> — One third of the remaining balance</li>
+    <li><strong>Phase 4</strong> — One third of the remaining balance</li>
+  </ul>
+</div>
+
+
+<!-- ══════════ PAGE 6 — STATE CREDIT DATA ══════════ -->
+<div class="page">
+  <p class="section-label">06 — State Credits</p>
+  <h1 class="section-title">State Credit Calculation Data</h1>
+
+  <p>State R&amp;D tax credits are calculated per entity. Each eligible state has a <strong>utilization cap</strong> (portion of federal credit that qualifies) and a <strong>state tax rate</strong> applied to that amount.</p>
+
+  <div class="code-block"><span class="comment">// Formula</span>
+<span class="key">creditUtilizationAmount</span> = federal × utilizationCap
+<span class="key">stateCreditEstimate</span>     = creditUtilizationAmount × taxRate</div>
+
+  <h2>Eligible States</h2>
+  <table>
+    <thead><tr><th>State</th><th>Utilization Cap</th><th>State Tax Rate</th></tr></thead>
+    <tbody>
+      <tr class="highlight-row"><td>California</td><td>75%</td><td>13.3%</td></tr>
+      <tr class="highlight-row"><td>New York</td><td>75%</td><td>10.9%</td></tr>
+      <tr class="highlight-row"><td>New Jersey</td><td>70%</td><td>10.75%</td></tr>
+      <tr class="highlight-row"><td>Massachusetts</td><td>80%</td><td>9.0%</td></tr>
+      <tr class="highlight-row"><td>Georgia</td><td>85%</td><td>5.75%</td></tr>
+      <tr class="highlight-row"><td>Utah</td><td>75%</td><td>4.65%</td></tr>
+      <tr class="highlight-row"><td>Illinois</td><td>30%</td><td>4.95%</td></tr>
+      <tr class="highlight-row"><td>Colorado</td><td>100%</td><td>4.4%</td></tr>
+      <tr class="highlight-row"><td>Arizona</td><td>60%</td><td>2.5%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Federal Credit Conditions</h2>
+  <table>
+    <thead><tr><th>Condition</th><th>Trigger</th><th>F50</th><th>F3</th><th>F2</th></tr></thead>
+    <tbody>
+      <tr><td><strong>1</strong></td><td>Officer W2 &gt; 10% of Gross Revenue</td><td>85%</td><td>10%</td><td>5%</td></tr>
+      <tr><td><strong>2</strong></td><td>Contract wages &gt; 40% of all wages</td><td>55%</td><td>30%</td><td>15%</td></tr>
+      <tr><td><strong>3</strong></td><td>Officer W2 &lt; 5% of Gross Revenue</td><td>50%</td><td>35%</td><td>15%</td></tr>
+      <tr><td><strong>4</strong></td><td>Default</td><td>70%</td><td>20%</td><td>10%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════ PAGE 7 — UI CHANGES ══════════ -->
+<div class="page">
+  <p class="section-label">07 — UI & UX</p>
+  <h1 class="section-title">Calculator Page & UI Changes</h1>
+
+  <h2>Calculator Page — Full Rebuild</h2>
+  <ul>
+    <li>Real-time KPI overview: SOW Total, Federal Total, State Total, Final Bill</li>
+    <li>Billing tier badge shown next to client name (Micro, Core, Elite, etc.)</li>
+    <li>Phase breakdown panel with color-coded progress bars (Phases 1–4)</li>
+    <li>Missing fields alert — lists exactly which required fields are incomplete</li>
+    <li><strong>PDF Export</strong> — one-click download of Billing Overview Summary as paginated PDF</li>
+    <li>Notes field for internal processing team comments</li>
+    <li>Client name pre-filled from URL query param deep links</li>
+  </ul>
+
+  <h2>Entities Summary Table</h2>
+  <ul>
+    <li>Per-entity independent calculations (each entity shows its own Federal, State, and Final Bill)</li>
+    <li>Columns: Entity, State, Years, Federal Estimate, State Estimate, Final Bill</li>
+    <li>Sortable columns, filter bar, totals footer row</li>
+  </ul>
+
+  <h2>Entity Card — Input Fields Updated</h2>
+  <div class="grid-2">
+    <div>
+      <h3>Previous Fields</h3>
+      <ul>
+        <li>Gross Credit Amount</li>
+        <li>W2 Wages (Qualified Research)</li>
+        <li>Contract Research Payments</li>
+        <li>Supplies</li>
+        <li>Other Qualified Expenses</li>
+        <li>Estimated QRAs</li>
+      </ul>
+    </div>
+    <div>
+      <h3>New Fields</h3>
+      <ul>
+        <li>Gross Revenue</li>
+        <li>Officer W2 Wages</li>
+        <li>W2 Wages (Qualified Research)</li>
+        <li>Contract Research Payments</li>
+        <li>Supplies</li>
+        <li><strong>Entity Filing Type</strong> (C-Corp, S-Corp, LLC, etc.)</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Eligibility Logic Updated</h2>
+  <ul>
+    <li>Eligibility now driven by <code>STATE_DATA</code> in the engine (single source of truth)</li>
+    <li>Updated eligible states: added <strong>Colorado</strong> and <strong>Massachusetts</strong>; removed Iowa and North Carolina</li>
+    <li>Full eligibility requires company name, state, filing type, and all 5 numeric financial fields</li>
+  </ul>
+</div>
+
+
+<!-- ══════════ PAGE 8 — DATA MODEL ══════════ -->
+<div class="page">
+  <p class="section-label">08 — Data Model</p>
+  <h1 class="section-title">Data Model & Architecture</h1>
+
+  <h2>Entity Type — Updated Schema</h2>
+  <div class="code-block"><span class="comment">// src/types/crm.ts</span>
+<span class="key">interface Entity</span> {
+  id:                  string
+  companyName:         string
+  state:               string
+  employeeCount:       number | ""
+  filingStatus:        string     <span class="comment">// C-Corp, S-Corp, LLC, Partnership, etc.</span>
+  customFilingStatus?: string     <span class="comment">// when filingStatus === "Other"</span>
+  grossRevenue:        number | ""
+  wagesOfficers:       number | ""
+  wagesW2:             number | ""
+  contractWages:       number | ""
+  totalSupplies:       number | ""
+  notes:               string
+}</div>
+
+  <h2>State Management — Zustand Stores</h2>
+  <table>
+    <thead><tr><th>Store</th><th>Manages</th></tr></thead>
+    <tbody>
+      <tr><td><code>calculatorStore</code></td><td>Client info, entity list (add/remove/update/generate), processing notes</td></tr>
+      <tr><td><code>authStore</code></td><td>Authentication state, user info, login/logout</td></tr>
+      <tr><td><code>themeStore</code></td><td>Dark/light mode preference, persisted across sessions</td></tr>
+      <tr><td><code>leadsStore</code></td><td>CRM pipeline lead data</td></tr>
+      <tr><td><code>documentsStore</code></td><td>Document request tracking</td></tr>
+      <tr><td><code>engagementsStore</code></td><td>Client engagement history</td></tr>
+    </tbody>
+  </table>
+
+  <h2>New Files Created</h2>
+  <table>
+    <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/utils/calculatorEngine.tsx</code></td><td>Complete R&amp;D tax credit calculation engine</td></tr>
+      <tr><td><code>src/types/declarations.d.ts</code></td><td>TypeScript declarations for html2canvas-pro</td></tr>
+      <tr><td><code>public/favicon.svg</code></td><td>App favicon</td></tr>
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ══════════ PAGE 9 — FULL COMMIT HISTORY ══════════ -->
+<div class="page">
+  <p class="section-label">09 — Git History</p>
+  <h1 class="section-title">Full Commit History</h1>
+
+  <ul class="timeline">
+    <li>
+      <div class="timeline-title">Calculator engine overhaul, billing table, login simplification <span class="timeline-commit">8136d3c</span></div>
+      <div class="timeline-desc">New calculatorEngine.tsx, rebuilt BillingTable with per-entity columns, rewrote CalculatorPage, simplified login to username or email + password. 14 files, 869 insertions.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Fix: remove stale TanStack Start SSR declarations <span class="timeline-commit">dd31561</span></div>
+      <div class="timeline-desc">Removed outdated SSR type declarations from routeTree.gen.ts for SPA compatibility.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Fix: revert nav tab to "Sales Billing Calculator" <span class="timeline-commit">8c882c6</span></div>
+      <div class="timeline-desc">Kept AcquireIQ for the left brand mark only; nav tab label restored to "Sales Billing Calculator" for clarity.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Rebrand to AcquireIQ <span class="timeline-commit">9463542</span></div>
+      <div class="timeline-desc">Updated app name, initials (AS→AI), nav label, and all page titles across AppHeader, LoginPage, and all route files.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Revenue chart streams canvas on login page <span class="timeline-commit">2f27581</span></div>
+      <div class="timeline-desc">Replaced particle network with 4 animated revenue chart lines — scrolling sine-wave motion, gradient fills, glowing leading dots, pulsing rings, and financial grid labels. Pure Canvas 2D.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Interactive particle network canvas <span class="timeline-commit">a8d1ac8</span></div>
+      <div class="timeline-desc">Added animated particle network background to login page — moving dots with connecting lines and mouse repulsion physics. Built with Canvas 2D API.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Login page full redesign <span class="timeline-commit">d97f786</span></div>
+      <div class="timeline-desc">Dramatic dark layout with #0D1B2A background, bold split-panel typography, glassmorphism form card with backdrop blur.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Replace all teal colors with deep navy #0D1B2A <span class="timeline-commit">b3777dd</span></div>
+      <div class="timeline-desc">Full-app color replacement — #193441 and #143c4f replaced with deep navy throughout all components, dark mode, and AppHeader.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Apply Neutral Blue palette to dark/light modes <span class="timeline-commit">3859dda</span></div>
+      <div class="timeline-desc">Established the full design token system: #FCFFF5 / #D1DBBD / #91AA9D / #3E606F / #193441 across light and dark surfaces.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Dark/light mode toggle added <span class="timeline-commit">b1c3eb0</span></div>
+      <div class="timeline-desc">Sun/moon button in nav bar, persisted preference via themeStore, full theme switching across the entire app.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Navigation, pipeline, profile enhancements <span class="timeline-commit">2315f81</span></div>
+      <div class="timeline-desc">Multiple navigation updates, pipeline entity display improvements, profile page enhancements, and bug fixes.</div>
+    </li>
+    <li>
+      <div class="timeline-title">SPA vite config restored for GitHub Pages <span class="timeline-commit">fc0bec3</span></div>
+      <div class="timeline-desc">Restored SPA-compatible vite config and entry files after TanStack Start SSR was removed.</div>
+    </li>
+    <li>
+      <div class="timeline-title">Auto-deploy CI to GitHub Pages <span class="timeline-commit">1dd7659</span></div>
+      <div class="timeline-desc">Added GitHub Actions workflow to automatically deploy to GitHub Pages on push to main.</div>
+    </li>
+  </ul>
+</div>
+
+
+<!-- ══════════ PAGE 10 — REPO & DEPLOYMENT ══════════ -->
+<div class="page">
+  <p class="section-label">10 — Infrastructure</p>
+  <h1 class="section-title">Repository Management & Deployment</h1>
+
+  <h2>Repository Details</h2>
+  <table>
+    <thead><tr><th>Property</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Organization</td><td>Acquire-Wealth-Collective</td></tr>
+      <tr><td>Frontend Repo</td><td>Acquire-Wealth-Collective/sales</td></tr>
+      <tr><td>Backend Repo</td><td>Acquire-Wealth-Collective/sales_billinng</td></tr>
+      <tr><td>Feature Branch</td><td>sainimere-sales-page</td></tr>
+      <tr><td>Main Branch</td><td>main</td></tr>
+      <tr><td>Live URL</td><td>https://acquire-wealth-collective.github.io/sales/</td></tr>
+      <tr><td>Deployment</td><td>GitHub Pages via gh-pages branch</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Git Workflow</h2>
+  <p>All development was done on the <code>sainimere-sales-page</code> feature branch and merged to <code>main</code> via a clean fast-forward push (no conflicts). The branch was strictly ahead of main at merge time.</p>
+
+  <h2>sales2 Repository Work</h2>
+  <p>
+    A second repository (<code>sales2</code>) was cloned and populated with unique files from the
+    <code>sales</code> branch. Sainimere performed a selective merge — copying only files
+    that did not already exist in sales2, preserving sales2's existing files where paths overlapped.
+    22 files were copied and pushed in a single commit.
+  </p>
+
+  <h2>Backend Repository Status</h2>
+  <p>
+    The backend repository (<code>sales_billinng</code>) was reviewed and found to contain
+    a project skeleton: Express.js + MySQL2 dependencies declared, Azure MySQL database
+    configured (<code>acquire.mysql.database.azure.com</code>), but no server code implemented yet.
+    Frontend integration is ready to proceed once the backend API is built — only
+    <code>src/services/api.ts</code> will need to be updated with live endpoint URLs.
+  </p>
+
+  <h2>Files Changed Summary</h2>
+  <table>
+    <thead><tr><th>File</th><th>Status</th><th>Summary</th></tr></thead>
+    <tbody>
+      <tr><td><code>src/utils/calculatorEngine.tsx</code></td><td><span class="badge badge-green">New</span></td><td>Full calculation engine</td></tr>
+      <tr><td><code>src/types/declarations.d.ts</code></td><td><span class="badge badge-green">New</span></td><td>html2canvas-pro types</td></tr>
+      <tr><td><code>public/favicon.svg</code></td><td><span class="badge badge-green">New</span></td><td>App favicon</td></tr>
+      <tr><td><code>src/pages/CalculatorPage.tsx</code></td><td><span class="badge badge-orange">Updated</span></td><td>Full rebuild with engine, PDF, phases</td></tr>
+      <tr><td><code>src/components/calculator/BillingTable.tsx</code></td><td><span class="badge badge-orange">Updated</span></td><td>Per-entity columns, Final Bill</td></tr>
+      <tr><td><code>src/components/calculator/EntityCard.tsx</code></td><td><span class="badge badge-orange">Updated</span></td><td>New fields, filing type, eligibility</td></tr>
+      <tr><td><code>src/types/crm.ts</code></td><td><span class="badge badge-orange">Updated</span></td><td>Entity interface new fields</td></tr>
+      <tr><td><code>src/store/calculatorStore.ts</code></td><td><span class="badge badge-orange">Updated</span></td><td>New entity field initialization</td></tr>
+      <tr><td><code>src/store/themeStore.ts</code></td><td><span class="badge badge-green">New</span></td><td>Dark/light mode persistence</td></tr>
+      <tr><td><code>src/components/AppHeader.tsx</code></td><td><span class="badge badge-orange">Updated</span></td><td>Rebrand, dark mode toggle, nav</td></tr>
+      <tr><td><code>src/pages/LoginPage.tsx</code></td><td><span class="badge badge-orange">Updated</span></td><td>Canvas animation, form simplification</td></tr>
+      <tr><td><code>package.json</code></td><td><span class="badge badge-orange">Updated</span></td><td>html2canvas-pro added</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="divider"/>
+  <div class="card" style="border-color: var(--cyan); background: rgba(46,139,139,0.04); margin-top: 20px;">
+    <div class="card-title" style="color: var(--cyan); font-size:14px;">Live Application</div>
+    <p style="font-size:14px; font-weight:700; color: var(--navy); margin-top:4px;">https://acquire-wealth-collective.github.io/sales/</p>
+    <p style="margin-top:4px;">Deployed June 2026 · GitHub Pages · Build #24 · Author: Sainimere Sema</p>
+  </div>
+
+  <p style="margin-top: 32px; font-size: 11px; color: var(--muted); text-align: center;">
+    AcquireIQ Sales Platform · Developed by Sainimere Sema, Software Engineer · Acquire R&amp;D Tax Credits · June 2026
+  </p>
+</div>
+
+</body>
+</html>

@@ -1,21 +1,30 @@
 // Calculator store — manages client info, multi-year tax selection, and dynamic entity cards.
 
 import { create } from "zustand";
-import type { ClientInfo, Entity, FilingStatus, TaxYear } from "@/types/crm";
+import type { ClientInfo, Entity, EntityOwner, FilingStatus, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
+
+const newOwner = (): EntityOwner => ({
+  id: `own_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+  firstName: "",
+  lastName: "",
+  role: "",
+  ownershipPct: "",
+});
 
 const newEntity = (i: number): Entity => ({
   id: `ent_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
   companyName: "",
   state: "",
   employeeCount: "",
-  estimatedQRAs: "",
-  grossCredit: "",
-  w2Wages: "",
-  contractResearch: "",
-  supplies: "",
-  otherQualified: "",
+  filingStatus: "",
+  grossRevenue: "",
+  wagesOfficers: "",
+  wagesW2: "",
+  contractWages: "",
+  totalSupplies: "",
   notes: "",
+  owners: [],
 });
 
 interface CalculatorState {
@@ -28,13 +37,15 @@ interface CalculatorState {
   selectAllTaxYears: () => void;
   clearTaxYears: () => void;
   setEntityCountInput: (n: number) => void;
-  setEntities: (entities: Entity[]) => void;
   generateEntities: (n: number) => void;
   addEntity: () => void;
   removeEntity: (id: string) => void;
   updateEntity: <K extends keyof Entity>(id: string, k: K, v: Entity[K]) => void;
+  addOwner: (entityId: string) => void;
+  removeOwner: (entityId: string, ownerId: string) => void;
+  updateOwner: <K extends keyof EntityOwner>(entityId: string, ownerId: string, k: K, v: EntityOwner[K]) => void;
   setNotes: (s: string) => void;
-  hydrateFromLead: (clientName: string, taxYears: TaxYear[], filingStatus?: FilingStatus) => void;
+  hydrateFromLead: (clientName: string, taxYears: TaxYear[]) => void;
 }
 
 export const useCalculatorStore = create<CalculatorState>((set) => ({
@@ -57,26 +68,40 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   selectAllTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [...ALL_TAX_YEARS] } })),
   clearTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [] } })),
   setEntityCountInput: (n) => set({ entityCountInput: Math.max(1, Math.min(50, n)) }),
-  setEntities: (entities) => set({ entities }),
   generateEntities: (n) =>
-    set((s) => ({
-      entities: [
-        ...s.entities,
-        ...Array.from({ length: n }, (_, i) => newEntity(s.entities.length + i)),
-      ],
-    })),
+    set(() => ({ entities: Array.from({ length: n }, (_, i) => newEntity(i)) })),
   addEntity: () => set((s) => ({ entities: [...s.entities, newEntity(s.entities.length)] })),
   removeEntity: (id) => set((s) => ({ entities: s.entities.filter((e) => e.id !== id) })),
   updateEntity: (id, k, v) =>
     set((s) => ({ entities: s.entities.map((e) => (e.id === id ? { ...e, [k]: v } : e)) })),
-  setNotes: (s) => set({ notes: s }),
-  hydrateFromLead: (clientName, taxYears, filingStatus) =>
+  addOwner: (entityId) =>
     set((s) => ({
-      client: {
-        ...s.client,
-        clientName,
-        taxYears: taxYears.length ? taxYears : s.client.taxYears,
-        ...(filingStatus ? { filingStatus } : {}),
-      },
+      entities: s.entities.map((e) =>
+        e.id === entityId ? { ...e, owners: [...e.owners, newOwner()] } : e,
+      ),
+    })),
+  removeOwner: (entityId, ownerId) =>
+    set((s) => ({
+      entities: s.entities.map((e) =>
+        e.id === entityId
+          ? { ...e, owners: e.owners.filter((o) => o.id !== ownerId) }
+          : e,
+      ),
+    })),
+  updateOwner: (entityId, ownerId, k, v) =>
+    set((s) => ({
+      entities: s.entities.map((e) =>
+        e.id === entityId
+          ? {
+              ...e,
+              owners: e.owners.map((o) => (o.id === ownerId ? { ...o, [k]: v } : o)),
+            }
+          : e,
+      ),
+    })),
+  setNotes: (s) => set({ notes: s }),
+  hydrateFromLead: (clientName, taxYears) =>
+    set((s) => ({
+      client: { ...s.client, clientName, taxYears: taxYears.length ? taxYears : s.client.taxYears },
     })),
 }));

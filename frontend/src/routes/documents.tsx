@@ -1,10 +1,10 @@
-import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
+﻿import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { DocumentsPage } from "@/pages/DocumentsPage";
 
 export const Route = createFileRoute("/documents")({
   head: () => ({
     meta: [
-      { title: "Document Requests — Sales Billing CRM" },
+      { title: "Document Requests — AcquireIQ" },
       {
         name: "description",
         content: "Track every document request sent to engaged clients across all engagements.",

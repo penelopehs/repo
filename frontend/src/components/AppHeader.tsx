@@ -1,10 +1,13 @@
+// Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
+
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Calculator, Users, LogIn, LogOut, FileText, Menu } from "lucide-react";
+import { Calculator, Users, LogIn, LogOut, FileText, Menu, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 import { useMsal, useIsAuthenticated } from "@azure/msal-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useThemeStore } from "@/store/themeStore";
 
 const NAV = [
   { to: "/", label: "Sales Billing Calculator", icon: Calculator },
@@ -18,6 +21,7 @@ export function AppHeader() {
   const account = instance.getActiveAccount();
   const displayName = account?.name ?? account?.username;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { theme, toggleTheme } = useThemeStore();
 
   const isActive = (to: string) =>
     to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
@@ -52,7 +56,7 @@ export function AppHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {NAV.map((n) => {
+          {isAuthenticated && NAV.map((n) => {
             const active = isActive(n.to);
             const Icon = n.icon;
             return (
@@ -75,6 +79,16 @@ export function AppHeader() {
               </Link>
             );
           })}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="ml-1 text-white/75 hover:bg-white/10 hover:text-white"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           {isAuthenticated ? (
             <Button
               type="button"
@@ -104,7 +118,7 @@ export function AppHeader() {
           </SheetTrigger>
           <SheetContent side="right" className="w-72 bg-navy text-white border-navy/30">
             <nav className="mt-8 flex flex-col gap-1">
-              {NAV.map((n) => {
+              {isAuthenticated && NAV.map((n) => {
                 const Icon = n.icon;
                 return (
                   <Link

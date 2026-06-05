@@ -3,7 +3,9 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  redirect,
   useRouter,
+  useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
 import {
@@ -17,8 +19,10 @@ import { Loader2 } from "lucide-react";
 import { reportError } from "../lib/error-reporting";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { isAuthenticated } from "@/lib/auth/authConfig";
 import { LoginPage } from "@/pages/LoginPage";
 import { Toaster } from "@/components/ui/sonner";
+import { useThemeStore } from "@/store/themeStore";
 
 function NotFoundComponent() {
   return (
@@ -61,7 +65,6 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
-            type="button"
             onClick={() => {
               router.invalidate();
               reset();
@@ -84,6 +87,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Guard every route with Microsoft (MSAL) auth. Unauthenticated users are
+  // redirected to /login. The /login route itself is exempt to avoid a loop.
+  // Runs client-side after bootstrap()'s initialize()/handleRedirectPromise(),
+  // so the auth state is settled before this fires.
+  beforeLoad: ({ location }) => {
+    if (!isAuthenticated() && !location.pathname.endsWith("/login")) {
+      throw redirect({ to: "/login" });
+    }
+  },
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
@@ -91,10 +103,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { location } = useRouterState();
+  const isLoginPage = location.pathname === "/login" || location.pathname === "/sales/login";
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   return (
     <AuthProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
         <AuthGate />
         <Toaster richColors position="top-right" />
       </QueryClientProvider>
@@ -121,11 +140,11 @@ function AuthGate() {
   return (
     <>
       <AuthenticatedTemplate>
-        <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
           <AppHeader />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
-        </div>
+        <Outlet />
+      </div>
       </AuthenticatedTemplate>
       <UnauthenticatedTemplate>
         <LoginPage />
@@ -133,3 +152,4 @@ function AuthGate() {
     </>
   );
 }
+

@@ -1,71 +1,119 @@
-/* eslint-disable react-refresh/only-export-components */
-// Billing summary table — derives per-entity bills; "Tier" column replaced with "Years".
+// Billing summary table — pure UI; all math comes from calculatorEngine.ts.
 
 import { useMemo, useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCalculatorStore } from "@/store/calculatorStore";
-import { FILING_STATUSES, type Entity } from "@/types/crm";
-import { isStateCreditEligible } from "@/constants/states";
-import { formatCurrency, toNumber } from "@/utils/format";
+import type { Entity } from "@/types/crm";
+import { formatCurrency } from "@/utils/format";
 import { YearChips } from "@/components/MultiYearSelect";
+import {
+  calculateFederal,
+  calculateState,
+  entityFormulas,
+  isEntityComplete,
+} from "@/utils/calculatorEngine";
 
-type SortKey = "company" | "state" | "sow" | "fed" | "state_bill" | "total";
+type SortKey =
+  | "company"
+  | "state"
+  | "formula2"
+  | "formula3"
+  | "formula50"
+  | "sow"
+  | "federal"
+  | "stateUtil"
+  | "state_bill";
 
 export interface BilledEntity {
   id: string;
   company: string;
   state: string;
+  formula2: number;
+  formula3: number;
+  formula50: number;
   sow: number;
-  fed: number;
+  federalShare: number;
+  stateUtil: number;
   stateBill: number;
-  total: number;
+  stateUtilCap: number | null;
+  stateTaxRate: number | null;
 }
 
-export function computeBilled(entities: Entity[], filingRate: number): BilledEntity[] {
+export function buildEntityRows(entities: Entity[]): BilledEntity[] {
+  const complete = entities.filter(isEntityComplete);
+  const federal = complete.length ? calculateFederal(complete).federal : 0;
+  const totalSOW = complete.reduce((sum, e) => sum + entityFormulas(e).sowEstimate, 0);
+
   return entities.map((e) => {
-    const qre =
-      toNumber(e.w2Wages) +
-      toNumber(e.contractResearch) +
-      toNumber(e.supplies) +
-      toNumber(e.otherQualified);
-    const gross = toNumber(e.grossCredit) || qre * 0.065;
-    const fed = gross * (1 - filingRate);
-    const stateBill = isStateCreditEligible(e.state) ? gross * 0.18 : 0;
-    const sow = Math.max(7500, gross * 0.08);
-    const total = sow + fed * 0.12 + stateBill * 0.15;
-    return {
+    const base = {
       id: e.id,
       company: e.companyName || "Untitled Entity",
       state: e.state || "—",
-      sow,
-      fed,
-      stateBill,
-      total,
+    };
+    if (!isEntityComplete(e)) {
+      return {
+        ...base,
+        formula2: 0,
+        formula3: 0,
+        formula50: 0,
+        sow: 0,
+        federalShare: 0,
+        stateUtil: 0,
+        stateBill: 0,
+        stateUtilCap: null,
+        stateTaxRate: null,
+      };
+    }
+    const f = entityFormulas(e);
+    const federalShare = totalSOW > 0 ? federal * (f.sowEstimate / totalSOW) : 0;
+    const st = calculateState(e.state, federalShare);
+    return {
+      ...base,
+      formula2: f.formula2,
+      formula3: f.formula3,
+      formula50: f.formula50,
+      sow: f.sowEstimate,
+      federalShare,
+      stateUtil: st.creditUtilizationAmount,
+      stateBill: st.stateCreditEstimate,
+      stateUtilCap: st.stateData?.utilizationCap ?? null,
+      stateTaxRate: st.stateData?.taxRate ?? null,
     };
   });
 }
 
-export function BillingTable() {
+export function BillingTable({ federalEstimate, finalBill }: { federalEstimate: number; finalBill: number }) {
   const entities = useCalculatorStore((s) => s.entities);
-  const filing = useCalculatorStore((s) => s.client.filingStatus);
   const taxYears = useCalculatorStore((s) => s.client.taxYears);
-  const rate = FILING_STATUSES.find((f) => f.value === filing)?.rate ?? 0.21;
 
   const [query, setQuery] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortKey, setSortKey] = useState<SortKey>("sow");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const rows = useMemo(() => {
-    const billed = computeBilled(entities, rate);
+    const billed = buildEntityRows(entities);
     const filtered = billed.filter(
       (r) =>
         r.company.toLowerCase().includes(query.toLowerCase()) ||
         r.state.toLowerCase().includes(query.toLowerCase()),
     );
+    const keyMap: Record<SortKey, keyof BilledEntity | null> = {
+      company: "company",
+      state: "state",
+      formula2: "formula2",
+      formula3: "formula3",
+      formula50: "formula50",
+      sow: "sow",
+      federal: null,
+      stateUtil: "stateUtil",
+      state_bill: "stateBill",
+    };
     filtered.sort((a, b) => {
-      const aV = a[sortKey === "state_bill" ? "stateBill" : sortKey] as string | number;
-      const bV = b[sortKey === "state_bill" ? "stateBill" : sortKey] as string | number;
+      const k = keyMap[sortKey];
+      if (!k) return 0;
+      const aV = a[k] as string | number;
+      const bV = b[k] as string | number;
       const cmp =
         typeof aV === "number" && typeof bV === "number"
           ? aV - bV
@@ -73,16 +121,19 @@ export function BillingTable() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return filtered;
-  }, [entities, rate, query, sortKey, sortDir]);
+  }, [entities, query, sortKey, sortDir]);
 
   const totals = rows.reduce(
     (acc, r) => ({
+      formula2: acc.formula2 + r.formula2,
+      formula3: acc.formula3 + r.formula3,
+      formula50: acc.formula50 + r.formula50,
       sow: acc.sow + r.sow,
-      fed: acc.fed + r.fed,
+      federalShare: acc.federalShare + r.federalShare,
+      stateUtil: acc.stateUtil + r.stateUtil,
       stateBill: acc.stateBill + r.stateBill,
-      total: acc.total + r.total,
     }),
-    { sow: 0, fed: 0, stateBill: 0, total: 0 },
+    { formula2: 0, formula3: 0, formula50: 0, sow: 0, federalShare: 0, stateUtil: 0, stateBill: 0 },
   );
 
   const setSort = (k: SortKey) => {
@@ -95,9 +146,12 @@ export function BillingTable() {
 
   const Th = ({ k, label, right }: { k: SortKey; label: string; right?: boolean }) => (
     <th
-      className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground ${right ? "text-right" : "text-left"}`}
+      className={`px-4 py-3 text-xs font-semibold tracking-wider text-muted-foreground ${right ? "text-right" : "text-left"}`}
     >
-      <button onClick={() => setSort(k)} className="inline-flex items-center gap-1 hover:text-navy">
+      <button
+        onClick={() => setSort(k)}
+        className={`inline-flex items-center gap-1 hover:text-navy ${right ? "justify-end" : ""}`}
+      >
         {label} <ArrowUpDown className="h-3 w-3 opacity-50" />
       </button>
     </th>
@@ -114,7 +168,7 @@ export function BillingTable() {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-card">
       <div className="flex items-center justify-between gap-3 border-b border-border bg-gradient-frost px-4 py-3">
-        <h3 className="text-sm font-semibold text-navy">Entities Summary</h3>
+        <h3 className="text-sm font-semibold text-cyan">Entities Summary</h3>
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -124,27 +178,28 @@ export function BillingTable() {
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-card border-b border-border">
+          <thead className="sticky top-0 border-b border-border bg-card">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground">
                 #
               </th>
-              <Th k="company" label="Entity / Company" />
+              <Th k="company" label="Entity" />
               <Th k="state" label="State" />
-              <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 text-left text-xs font-semibold tracking-wider text-muted-foreground">
                 Years
               </th>
-              <Th k="sow" label="SOW Estimate" right />
-              <Th k="fed" label="Federal Bill" right />
-              <Th k="state_bill" label="State Bill" right />
-              <Th k="total" label="Total" right />
+              <Th k="federal" label="Federal Estimate" right />
+              <Th k="state_bill" label="State Estimate" right />
+              <th className="px-4 py-3 text-right text-xs font-semibold tracking-wider text-muted-foreground">
+                Final Bill
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
               <tr
                 key={r.id}
-                className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors"
+                className="border-b border-border transition-colors last:border-0 hover:bg-accent/40"
               >
                 <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                 <td className="px-4 py-3 font-medium text-navy">{r.company}</td>
@@ -152,11 +207,14 @@ export function BillingTable() {
                 <td className="px-4 py-3">
                   <YearChips years={taxYears} />
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.sow)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.fed)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(r.stateBill)}</td>
-                <td className="px-4 py-3 text-right font-semibold tabular-nums text-navy">
-                  {formatCurrency(r.total)}
+                <td className="px-4 py-3 text-center tabular-nums text-violet">
+                  {formatCurrency(r.federalShare)}
+                </td>
+                <td className="px-4 py-3 text-center tabular-nums font-semibold text-orange">
+                  {r.stateBill > 0 ? formatCurrency(r.stateBill) : <span className="text-muted-foreground text-xs">No state credit</span>}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums font-semibold text-green">
+                  {formatCurrency(finalBill)}
                 </td>
               </tr>
             ))}
@@ -166,17 +224,14 @@ export function BillingTable() {
               <td colSpan={4} className="px-4 py-3 text-right text-navy">
                 Totals
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">
-                {formatCurrency(totals.sow)}
+              <td className="px-4 py-3 text-center tabular-nums text-violet">
+                {formatCurrency(totals.federalShare)}
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">
-                {formatCurrency(totals.fed)}
-              </td>
-              <td className="px-4 py-3 text-right tabular-nums text-navy">
+              <td className="px-4 py-3 text-center tabular-nums text-orange">
                 {formatCurrency(totals.stateBill)}
               </td>
-              <td className="px-4 py-3 text-right tabular-nums text-orange">
-                {formatCurrency(totals.total)}
+              <td className="px-4 py-3 text-right tabular-nums text-green">
+                {formatCurrency(finalBill)}
               </td>
             </tr>
           </tfoot>

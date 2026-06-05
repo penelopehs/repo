@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { PipelinePage } from "@/pages/PipelinePage";
 
 export const Route = createFileRoute("/pipeline")({
   head: () => ({
     meta: [
-      { title: "Client Pipeline — Sales Billing CRM" },
+      { title: "Client Pipeline — AcquireIQ" },
       {
         name: "description",
         content: "Manage leads, send proposals, and track active client engagements.",

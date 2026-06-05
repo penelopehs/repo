@@ -24,18 +24,28 @@ export interface ClientInfo {
   filingStatus: FilingStatus;
 }
 
+export interface EntityOwner {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  ownershipPct: number | "";
+}
+
 export interface Entity {
   id: string;
   companyName: string;
   state: string;
   employeeCount: number | "";
-  estimatedQRAs: number | "";
-  grossCredit: number | "";
-  w2Wages: number | "";
-  contractResearch: number | "";
-  supplies: number | "";
-  otherQualified: number | "";
+  filingStatus: string;
+  customFilingStatus?: string;
+  grossRevenue: number | "";
+  wagesOfficers: number | "";
+  wagesW2: number | "";
+  contractWages: number | "";
+  totalSupplies: number | "";
   notes: string;
+  owners: EntityOwner[];
 }
 
 // Leads / Pipeline

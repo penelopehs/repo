@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import {
@@ -43,15 +43,15 @@ async function bootstrap() {
       const payload = event.payload as AuthenticationResult;
       if (payload.account) {
         msalInstance.setActiveAccount(payload.account);
-      }
+}
     }
   });
 
-  createRoot(document.getElementById("root")!).render(
-    <StrictMode>
-      <RouterProvider router={router} />
-    </StrictMode>,
-  );
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <RouterProvider router={router} />
+  </StrictMode>
+);
 }
 
 void bootstrap();
