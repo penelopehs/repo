@@ -25,6 +25,7 @@ import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
+import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import {
   calculateSOW,
@@ -35,6 +36,8 @@ import {
 } from "@/utils/calculatorEngine";
 
 export { calculateSOW, calculateFederal, calculateState };
+
+const routeApi = getRouteApi("/");
 
 export function CalculatorPage() {
   const {
@@ -48,9 +51,18 @@ export function CalculatorPage() {
     entities,
     generateEntities,
     addEntity,
+    loadLeadEntities,
     notes,
     setNotes,
   } = useCalculatorStore();
+
+  // Lead context: when arriving from the pipeline as /?leadId=<id>, pull the
+  // lead's full name into the Client Information section.
+  const { leadId } = routeApi.useSearch();
+  const leads = useLeadsStore((s) => s.leads);
+  const getLead = useLeadsStore((s) => s.getLead);
+  const fetchLead = useLeadsStore((s) => s.fetchLead);
+  const hydratedLeadId = useRef<number | null>(null);
 
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -110,11 +122,23 @@ export function CalculatorPage() {
 
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const q = new URLSearchParams(window.location.search);
-    const name = q.get("clientName");
-    if (name && !client.clientName) setClientField("clientName", name);
-  }, [client.clientName, setClientField]);
+    if (leadId == null) return;
+    const id = String(leadId);
+    const lead = getLead(id);
+    if (!lead) {
+      // Not in the store yet (e.g. deep link / page refresh) — fetch it; the
+      // resulting `leads` update re-runs this effect to hydrate the name.
+      void fetchLead(id).catch(() => {});
+      return;
+    }
+    // Hydrate the client name and entities once per leadId so manual edits
+    // aren't clobbered by later `leads` store updates.
+    if (hydratedLeadId.current === leadId) return;
+    hydratedLeadId.current = leadId;
+    setClientField("clientName", lead.fullName);
+    const leadEntities = lead.data?.entities ?? [];
+    if (leadEntities.length) loadLeadEntities(leadEntities);
+  }, [leadId, leads, getLead, fetchLead, setClientField, loadLeadEntities]);
 
   const yearsLabel =
     client.taxYears.length === 7

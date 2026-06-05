@@ -1,7 +1,14 @@
 // Calculator store — manages client info, multi-year tax selection, and dynamic entity cards.
 
 import { create } from "zustand";
-import type { ClientInfo, Entity, EntityOwner, FilingStatus, TaxYear } from "@/types/crm";
+import type {
+  ClientInfo,
+  Entity,
+  EntityOwner,
+  FilingStatus,
+  LeadDataEntity,
+  TaxYear,
+} from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
 
 const newOwner = (): EntityOwner => ({
@@ -46,7 +53,22 @@ interface CalculatorState {
   updateOwner: <K extends keyof EntityOwner>(entityId: string, ownerId: string, k: K, v: EntityOwner[K]) => void;
   setNotes: (s: string) => void;
   hydrateFromLead: (clientName: string, taxYears: TaxYear[]) => void;
+  loadLeadEntities: (leadEntities: LeadDataEntity[]) => void;
 }
+
+// Map a lead's stored entity (data.entities[]) onto a calculator entity card.
+// Only fields with a direct counterpart are carried over; the rest keep their
+// empty defaults for the user to fill in. Pure mapping — no calculation logic.
+const entityFromLead = (le: LeadDataEntity, i: number): Entity => ({
+  ...newEntity(i),
+  companyName: le.name ?? "",
+  state: le.state ?? "",
+  employeeCount: le.employeeCount ?? "",
+  wagesW2: le.w2Wages ?? "",
+  contractWages: le.contractResearch ?? "",
+  totalSupplies: le.supplies ?? "",
+  notes: le.notes ?? "",
+});
 
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
@@ -104,4 +126,9 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
     set((s) => ({
       client: { ...s.client, clientName, taxYears: taxYears.length ? taxYears : s.client.taxYears },
     })),
+  loadLeadEntities: (leadEntities) =>
+    set(() => {
+      const entities = leadEntities.map(entityFromLead);
+      return { entities, entityCountInput: Math.max(1, entities.length) };
+    }),
 }));
