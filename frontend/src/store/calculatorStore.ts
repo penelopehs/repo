@@ -77,6 +77,20 @@ const entityFromLead = (le: LeadDataEntity, i: number): Entity => ({
 export const entitiesFromLead = (leadEntities: LeadDataEntity[]): Entity[] =>
   leadEntities.map(entityFromLead);
 
+// The entity id belongs to the master list (lead.data.entities) and is not
+// duplicated inside a year's saved calculation. Strip it before persisting.
+export const stripEntityIds = (entities: Entity[]): Array<Omit<Entity, "id">> =>
+  entities.map((e) => {
+    const copy: Partial<Entity> = { ...e };
+    delete copy.id;
+    return copy as Omit<Entity, "id">;
+  });
+
+// Rebuild calculator entity cards from a year's saved (id-less) calculation,
+// assigning a fresh card id (ids aren't stored inside calculations).
+export const entitiesFromSaved = (saved: Array<Omit<Entity, "id">>): Entity[] =>
+  saved.map((e, i) => ({ ...e, id: newEntity(i).id }));
+
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
     clientName: "",

@@ -24,7 +24,12 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearButtons } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
-import { useCalculatorStore, entitiesFromLead } from "@/store/calculatorStore";
+import {
+  useCalculatorStore,
+  entitiesFromLead,
+  entitiesFromSaved,
+  stripEntityIds,
+} from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { calculationYears } from "@/utils/calculationContext";
@@ -185,7 +190,8 @@ export function CalculatorPage() {
     const existing: LeadData = current.data ?? { people: [], entities: [], calculations: {} };
     const data: LeadData = {
       ...existing,
-      calculations: { ...existing.calculations, [String(p.year)]: p.entities },
+      // Entity ids live on the master list, not inside the calculation.
+      calculations: { ...existing.calculations, [String(p.year)]: stripEntityIds(p.entities) },
     };
     void updateLead(String(p.leadId), { data }).catch(() => {});
   }, [getLead, updateLead]);
@@ -205,7 +211,7 @@ export function CalculatorPage() {
     const saved = lead.data?.calculations?.[String(selectedYear)];
     const next =
       Array.isArray(saved) && saved.length > 0
-        ? (saved as Entity[])
+        ? entitiesFromSaved(saved as Array<Omit<Entity, "id">>)
         : entitiesFromLead(lead.data?.entities ?? []);
     snapshot.current = { year: selectedYear, entities: next };
     setEntities(next);
