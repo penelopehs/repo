@@ -129,6 +129,6 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   loadLeadEntities: (leadEntities) =>
     set(() => {
       const entities = leadEntities.map(entityFromLead);
-      return { entities, entityCountInput: Math.max(1, entities.length) };
+      return { entities, entityCountInput: 1 };
     }),
 }));
