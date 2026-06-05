@@ -470,7 +470,7 @@ export function CalculatorPage() {
             <h3 className="mt-1 text-xl font-bold text-navy">
               {client.clientName || "Untitled Client"}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 flex flex-wrap items-center text-sm text-muted-foreground">
               <span className="font-medium text-navy">{yearsLabel}</span>
               <span className="mx-2 opacity-50">·</span>
               <span>
@@ -482,7 +482,7 @@ export function CalculatorPage() {
                   <Badge variant="secondary">{result.tier}</Badge>
                 </>
               )}
-            </p>
+            </div>
           </div>
           <div className="grid w-full gap-x-8 gap-y-4 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
             {[
