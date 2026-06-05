@@ -449,6 +449,7 @@ function PipelineTable(p: TableProps) {
               layout
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              onClick={() => p.onProfile(l)}
               className="border-b border-border last:border-0 hover:bg-accent/40 transition-colors cursor-pointer"
             >
               <td className="px-5 py-3">
@@ -568,7 +569,10 @@ function EntityCell({ names, count }: { names: string[]; count: number }) {
       {overflow > 0 && !expanded && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(true);
+          }}
           className="mt-0.5 text-xs font-medium text-cyan hover:underline"
         >
           +{overflow} more
@@ -577,7 +581,10 @@ function EntityCell({ names, count }: { names: string[]; count: number }) {
       {expanded && filtered.length > ENTITY_PREVIEW && (
         <button
           type="button"
-          onClick={() => setExpanded(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(false);
+          }}
           className="mt-0.5 text-xs font-medium text-muted-foreground hover:underline"
         >
           Show less
