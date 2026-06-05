@@ -84,6 +84,66 @@ export function MultiYearSelect({
   );
 }
 
+// Inline toggle buttons for tax years — one button per year, active styling
+// for selected years. Used where the selection should be visible at a glance
+// (e.g. the calculator's Client Information, driven by a lead's calculations).
+// `years` controls which years are offered (defaults to all); omit the
+// All/Clear handlers for single-select usage.
+export function YearButtons({
+  value,
+  years = ALL_TAX_YEARS,
+  onToggle,
+  onSelectAll,
+  onClear,
+  className,
+  emptyText = "—",
+}: {
+  value: TaxYear[];
+  years?: TaxYear[];
+  onToggle: (y: TaxYear) => void;
+  onSelectAll?: () => void;
+  onClear?: () => void;
+  className?: string;
+  emptyText?: string;
+}) {
+  if (years.length === 0) {
+    return <p className={cn("text-sm text-muted-foreground", className)}>{emptyText}</p>;
+  }
+  const allSelected = years.every((y) => value.includes(y));
+  return (
+    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+      {years.map((y) => {
+        const active = value.includes(y);
+        return (
+          <button
+            key={y}
+            type="button"
+            onClick={() => onToggle(y)}
+            aria-pressed={active}
+            className={cn(
+              "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+              active
+                ? "border-cyan bg-cyan/10 text-navy"
+                : "border-input text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {y}
+          </button>
+        );
+      })}
+      {(onSelectAll || onClear) && (
+        <button
+          type="button"
+          onClick={allSelected ? onClear : onSelectAll}
+          className="ml-1 rounded-md px-2 py-1.5 text-xs font-medium text-cyan hover:underline"
+        >
+          {allSelected ? "Clear all" : "All years"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function YearChips({ years, className }: { years: TaxYear[]; className?: string }) {
   if (years.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
   const isAll = years.length === ALL_TAX_YEARS.length;

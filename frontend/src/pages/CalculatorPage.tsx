@@ -21,12 +21,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/KpiCard";
-import { MultiYearSelect } from "@/components/MultiYearSelect";
+import { YearButtons } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
 import { useCalculatorStore } from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
+import { calculationYears } from "@/utils/calculationContext";
+import { ALL_TAX_YEARS, type TaxYear } from "@/types/crm";
 import {
   calculateSOW,
   calculateFederal,
@@ -43,9 +45,6 @@ export function CalculatorPage() {
   const {
     client,
     setClientField,
-    toggleTaxYear,
-    selectAllTaxYears,
-    clearTaxYears,
     entityCountInput,
     setEntityCountInput,
     entities,
@@ -57,12 +56,32 @@ export function CalculatorPage() {
   } = useCalculatorStore();
 
   // Lead context: when arriving from the pipeline as /?leadId=<id>, pull the
-  // lead's full name into the Client Information section.
+  // lead's full name, tax years, and entities into the calculator.
   const { leadId } = routeApi.useSearch();
   const leads = useLeadsStore((s) => s.leads);
   const getLead = useLeadsStore((s) => s.getLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
   const hydratedLeadId = useRef<number | null>(null);
+
+  const lead = useMemo(
+    () => (leadId != null ? getLead(String(leadId)) : undefined),
+    [leadId, leads, getLead],
+  );
+
+  // Tax years selectable in Client Information: a lead's calculation years when
+  // viewing a lead, otherwise all years for the standalone calculator.
+  const availableYears = useMemo(
+    () => (lead ? calculationYears(lead) : ALL_TAX_YEARS),
+    [lead],
+  );
+
+  // Single-select: clicking a year makes it the sole selection; clicking the
+  // already-selected year clears it.
+  const selectYear = (y: TaxYear) =>
+    setClientField(
+      "taxYears",
+      client.taxYears.length === 1 && client.taxYears[0] === y ? [] : [y],
+    );
 
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -123,22 +142,24 @@ export function CalculatorPage() {
 
   useEffect(() => {
     if (leadId == null) return;
-    const id = String(leadId);
-    const lead = getLead(id);
     if (!lead) {
       // Not in the store yet (e.g. deep link / page refresh) — fetch it; the
-      // resulting `leads` update re-runs this effect to hydrate the name.
-      void fetchLead(id).catch(() => {});
+      // resulting `leads` update re-runs this effect to hydrate.
+      void fetchLead(String(leadId)).catch(() => {});
       return;
     }
-    // Hydrate the client name and entities once per leadId so manual edits
-    // aren't clobbered by later `leads` store updates.
+    // Hydrate the client name, tax year, and entities once per leadId so manual
+    // edits aren't clobbered by later `leads` store updates. The tax year comes
+    // from the lead's calculation keys (lead.data.calculations); single-select
+    // defaults to the most recent of those years.
     if (hydratedLeadId.current === leadId) return;
     hydratedLeadId.current = leadId;
+    const years = calculationYears(lead);
     setClientField("clientName", lead.fullName);
+    setClientField("taxYears", years.slice(-1));
     const leadEntities = lead.data?.entities ?? [];
     if (leadEntities.length) loadLeadEntities(leadEntities);
-  }, [leadId, leads, getLead, fetchLead, setClientField, loadLeadEntities]);
+  }, [leadId, lead, fetchLead, setClientField, loadLeadEntities]);
 
   const yearsLabel =
     client.taxYears.length === 7
@@ -303,12 +324,13 @@ export function CalculatorPage() {
             />
           </div>
           <div>
-            <Label>Tax Year(s)</Label>
-            <MultiYearSelect
+            <Label>Tax Year</Label>
+            <YearButtons
               value={client.taxYears}
-              onToggle={toggleTaxYear}
-              onSelectAll={selectAllTaxYears}
-              onClear={clearTaxYears}
+              years={availableYears}
+              onToggle={selectYear}
+              className="mt-1.5"
+              emptyText="No tax years on file for this lead."
             />
           </div>
         </div>
