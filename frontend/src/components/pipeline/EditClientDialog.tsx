@@ -125,9 +125,12 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       const entities = (company ? [company, ...extraEntities] : extraEntities).map((name) => ({
         name,
       }));
-      const calculations: Record<string, Record<string, unknown>> = {};
+      // Each tax year keeps its own calculation (an entity array). Preserve any
+      // existing bucket; default new years to an empty array for the calculator
+      // to seed from the entity list on first open.
+      const calculations: Record<string, unknown> = {};
       for (const y of form.taxYears) {
-        calculations[String(y)] = base.calculations[String(y)] ?? {};
+        calculations[String(y)] = base.calculations[String(y)] ?? [];
       }
       const data = { ...base, entities, calculations };
 

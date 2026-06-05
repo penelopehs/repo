@@ -1,6 +1,6 @@
 // Calculator page — multi-year client setup, eligibility-aware entities, billing dashboard.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getRouteApi } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -24,11 +24,11 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearButtons } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
-import { useCalculatorStore } from "@/store/calculatorStore";
+import { useCalculatorStore, entitiesFromLead } from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { calculationYears } from "@/utils/calculationContext";
-import { ALL_TAX_YEARS, type TaxYear } from "@/types/crm";
+import { ALL_TAX_YEARS, type Entity, type LeadData, type TaxYear } from "@/types/crm";
 import {
   calculateSOW,
   calculateFederal,
@@ -50,7 +50,7 @@ export function CalculatorPage() {
     entities,
     generateEntities,
     addEntity,
-    loadLeadEntities,
+    setEntities,
     notes,
     setNotes,
   } = useCalculatorStore();
@@ -61,6 +61,7 @@ export function CalculatorPage() {
   const leads = useLeadsStore((s) => s.leads);
   const getLead = useLeadsStore((s) => s.getLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
+  const updateLead = useLeadsStore((s) => s.updateLead);
   const hydratedLeadId = useRef<number | null>(null);
 
   const lead = useMemo(
@@ -140,6 +141,8 @@ export function CalculatorPage() {
   }, [completeEntities, result]);
 
 
+  // Per-lead hydration: set the client name and default-select a tax year. Runs
+  // once per leadId so manual edits aren't clobbered by later `leads` updates.
   useEffect(() => {
     if (leadId == null) return;
     if (!lead) {
@@ -148,18 +151,82 @@ export function CalculatorPage() {
       void fetchLead(String(leadId)).catch(() => {});
       return;
     }
-    // Hydrate the client name, tax year, and entities once per leadId so manual
-    // edits aren't clobbered by later `leads` store updates. The tax year comes
-    // from the lead's calculation keys (lead.data.calculations); single-select
-    // defaults to the most recent of those years.
     if (hydratedLeadId.current === leadId) return;
     hydratedLeadId.current = leadId;
     const years = calculationYears(lead);
     setClientField("clientName", lead.fullName);
     setClientField("taxYears", years.slice(-1));
-    const leadEntities = lead.data?.entities ?? [];
-    if (leadEntities.length) loadLeadEntities(leadEntities);
-  }, [leadId, lead, fetchLead, setClientField, loadLeadEntities]);
+  }, [leadId, lead, fetchLead, setClientField]);
+
+  const selectedYear = client.taxYears[0];
+
+  // ── On-the-fly persistence ──────────────────────────────────────────────
+  // A year's entities are saved automatically (debounced) to
+  // lead.data.calculations.<year> — but only on real edits. Selecting a year
+  // just previews its data and must not trigger a write. We tell the two apart
+  // by reference: hydration records the loaded array; an edit produces a new
+  // array reference, which is what schedules a save.
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSave = useRef<{ leadId: number; year: TaxYear; entities: Entity[] } | null>(null);
+  // The array loaded for the current year and the year it belongs to. Saves
+  // target snapshot.year (not selectedYear, which changes a render earlier).
+  const snapshot = useRef<{ year: TaxYear; entities: Entity[] } | null>(null);
+
+  const flushSave = useCallback(() => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const p = pendingSave.current;
+    pendingSave.current = null;
+    if (!p) return;
+    const current = getLead(String(p.leadId));
+    if (!current) return;
+    const existing: LeadData = current.data ?? { people: [], entities: [], calculations: {} };
+    const data: LeadData = {
+      ...existing,
+      calculations: { ...existing.calculations, [String(p.year)]: p.entities },
+    };
+    void updateLead(String(p.leadId), { data }).catch(() => {});
+  }, [getLead, updateLead]);
+
+  // Per-year hydration: each tax year has its own entities list. Load the saved
+  // calculation for the selected year if present; otherwise seed entity cards
+  // from the lead's master entity list (data.entities). Keyed by leadId+year;
+  // switching years first flushes any pending edit for the year being left,
+  // then swaps the cards (recording the loaded array as the snapshot).
+  const hydratedEntitiesKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lead || selectedYear == null) return;
+    const key = `${lead.id}:${selectedYear}`;
+    if (hydratedEntitiesKey.current === key) return;
+    flushSave();
+    hydratedEntitiesKey.current = key;
+    const saved = lead.data?.calculations?.[String(selectedYear)];
+    const next =
+      Array.isArray(saved) && saved.length > 0
+        ? (saved as Entity[])
+        : entitiesFromLead(lead.data?.entities ?? []);
+    snapshot.current = { year: selectedYear, entities: next };
+    setEntities(next);
+  }, [lead, selectedYear, flushSave, setEntities]);
+
+  // Autosave: an edit replaces the entities array reference. A mere preview load
+  // leaves it equal to the snapshot, so it's skipped — no PATCH on year change.
+  useEffect(() => {
+    if (leadId == null) return;
+    const snap = snapshot.current;
+    if (!snap || entities === snap.entities) return;
+    pendingSave.current = { leadId, year: snap.year, entities };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flushSave, 800);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [entities, leadId, flushSave]);
+
+  // Flush any pending edit when leaving the page.
+  useEffect(() => () => flushSave(), [flushSave]);
 
   const yearsLabel =
     client.taxYears.length === 7

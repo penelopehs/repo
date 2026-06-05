@@ -54,6 +54,7 @@ interface CalculatorState {
   setNotes: (s: string) => void;
   hydrateFromLead: (clientName: string, taxYears: TaxYear[]) => void;
   loadLeadEntities: (leadEntities: LeadDataEntity[]) => void;
+  setEntities: (entities: Entity[]) => void;
 }
 
 // Map a lead's stored entity (data.entities[]) onto a calculator entity card.
@@ -69,6 +70,12 @@ const entityFromLead = (le: LeadDataEntity, i: number): Entity => ({
   totalSupplies: le.supplies ?? "",
   notes: le.notes ?? "",
 });
+
+// Build calculator entity cards from a lead's master entity list. Exported so
+// callers can hold the resulting array reference (e.g. to tell a freshly seeded
+// preview apart from a user edit).
+export const entitiesFromLead = (leadEntities: LeadDataEntity[]): Entity[] =>
+  leadEntities.map(entityFromLead);
 
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
@@ -129,6 +136,8 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   loadLeadEntities: (leadEntities) =>
     set(() => {
       const entities = leadEntities.map(entityFromLead);
-      return { entities, entityCountInput: 1 };
+      return { entities };
     }),
+  setEntities: (entities) =>
+    set({ entities }),
 }));

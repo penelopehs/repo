@@ -97,9 +97,12 @@ export interface LeadDataPerson {
  *  echoed by GET/POST/PATCH /leads. */
 export interface LeadData {
   people: LeadDataPerson[];
+  /** Master entity list (names) for the client; seeds each year's calculation. */
   entities: LeadDataEntity[];
-  /** Keyed by tax year (e.g. "2021"); the value shape is calculation-specific. */
-  calculations: Record<string, Record<string, unknown>>;
+  /** Keyed by tax year (e.g. "2021"). Each year holds its own calculation —
+   *  an array of the calculator's entity cards (Entity[]) once saved, or an
+   *  empty array before the calculator has been opened for that year. */
+  calculations: Record<string, Entity[] | unknown>;
   filingStatus?: FilingStatus;
 }
 
