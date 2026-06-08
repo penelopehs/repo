@@ -294,16 +294,17 @@ export function CalculatorPage() {
     }
     setDownloading(true);
     try {
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-        import("html2canvas-pro"),
+      // html-to-image renders the clone via an SVG <foreignObject>, so the
+      // browser paints it natively — modern CSS (color-mix, oklch, gradients
+      // that Tailwind v4 emits) is captured correctly, unlike html2canvas.
+      const [{ toCanvas }, { default: jsPDF }] = await Promise.all([
+        import("html-to-image"),
         import("jspdf"),
       ]);
 
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        useCORS: true,
+      const canvas = await toCanvas(node, {
+        pixelRatio: 2,
         backgroundColor: "#ffffff",
-        windowWidth: node.scrollWidth,
       });
 
       const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });

@@ -22,4 +22,12 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: false,
   },
+
+  // Serve the production build at localhost:5173 (not 127.0.0.1) so it matches
+  // the auth provider's registered redirect URI.
+  preview: {
+    host: "localhost",
+    port: 5173,
+    strictPort: true,
+  },
 });
