@@ -33,7 +33,7 @@ import {
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { calculationYears } from "@/utils/calculationContext";
-import { ALL_TAX_YEARS, type Entity, type LeadData, type TaxYear } from "@/types/crm";
+import { type Entity, type LeadData, type TaxYear } from "@/types/crm";
 import {
   calculateSOW,
   calculateFederal,
@@ -74,10 +74,10 @@ export function CalculatorPage() {
     [leadId, leads, getLead],
   );
 
-  // Tax years selectable in Client Information: a lead's calculation years when
-  // viewing a lead, otherwise all years for the standalone calculator.
+  // Tax years selectable in Client Information come from the loaded lead's
+  // calculation years. With no lead loaded, no years are shown.
   const availableYears = useMemo(
-    () => (lead ? calculationYears(lead) : ALL_TAX_YEARS),
+    () => (lead ? calculationYears(lead) : []),
     [lead],
   );
 
@@ -403,7 +403,7 @@ export function CalculatorPage() {
               years={availableYears}
               onToggle={selectYear}
               className="mt-1.5"
-              emptyText="No tax years on file for this lead."
+              emptyText="Load a lead to choose a tax year."
             />
           </div>
         </div>

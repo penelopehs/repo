@@ -94,7 +94,7 @@ export const entitiesFromSaved = (saved: Array<Omit<Entity, "id">>): Entity[] =>
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
     clientName: "",
-    taxYears: [2025 as TaxYear],
+    taxYears: [],
     filingStatus: "mfj" as FilingStatus,
   },
   entityCountInput: 1,
