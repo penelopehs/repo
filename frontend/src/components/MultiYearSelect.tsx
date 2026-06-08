@@ -92,6 +92,7 @@ export function MultiYearSelect({
 export function YearButtons({
   value,
   years = ALL_TAX_YEARS,
+  invalidYears = [],
   onToggle,
   onSelectAll,
   onClear,
@@ -100,6 +101,7 @@ export function YearButtons({
 }: {
   value: TaxYear[];
   years?: TaxYear[];
+  invalidYears?: TaxYear[];
   onToggle: (y: TaxYear) => void;
   onSelectAll?: () => void;
   onClear?: () => void;
@@ -114,6 +116,9 @@ export function YearButtons({
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
       {years.map((y) => {
         const active = value.includes(y);
+        // Years with an incomplete/non-billable calculation keep the same button
+        // styling but switch to the error color (selected or not).
+        const invalid = invalidYears.includes(y);
         return (
           <button
             key={y}
@@ -121,10 +126,14 @@ export function YearButtons({
             onClick={() => onToggle(y)}
             aria-pressed={active}
             className={cn(
-              "rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
-              active
-                ? "border-cyan bg-cyan/10 text-navy"
-                : "border-input text-muted-foreground hover:bg-accent",
+              "cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
+              invalid
+                ? active
+                  ? "border-destructive bg-destructive/10 text-destructive"
+                  : "border-destructive/50 text-destructive hover:bg-destructive/10"
+                : active
+                  ? "border-cyan bg-cyan/10 text-navy"
+                  : "border-input text-muted-foreground hover:bg-accent",
             )}
           >
             {y}

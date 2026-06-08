@@ -14,7 +14,6 @@ import {
   Send,
   Users,
 } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -24,10 +23,11 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearButtons } from "@/components/MultiYearSelect";
 import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
+import { PhaseDonutChart } from "@/components/calculator/PhaseDonutChart";
+import { BillingYearReport } from "@/components/calculator/BillingYearReport";
 import {
   useCalculatorStore,
-  entitiesFromLead,
-  entitiesFromSaved,
+  entitiesForYear,
   stripEntityIds,
 } from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
@@ -38,8 +38,11 @@ import {
   calculateSOW,
   calculateFederal,
   calculateState,
+  computeTotals,
   runEngagementCalculation,
   isEntityComplete,
+  type BillingTotals,
+  type EngagementCalculation,
 } from "@/utils/calculatorEngine";
 
 export { calculateSOW, calculateFederal, calculateState };
@@ -122,6 +125,9 @@ export function CalculatorPage() {
   const [generating, setGenerating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Per-year billing overviews rendered off-screen during a multi-year PDF
+  // export; null when not exporting.
+  const [printData, setPrintData] = useState<PrintItem[] | null>(null);
 
   const completeEntities = useMemo(
     () => entities.filter(isEntityComplete),
@@ -163,17 +169,10 @@ export function CalculatorPage() {
     return runEngagementCalculation(completeEntities);
   }, [completeEntities]);
 
-  const totals = useMemo(() => {
-    const totalSOW = completeEntities.reduce((sum, e) => sum + calculateSOW(e), 0);
-    // Federal Credit Estimate is the single source of truth.
-    // Federal Total mirrors it (with safe fallback when missing/null/undefined).
-    const federalCreditEstimate = result?.federal ?? 0;
-    const federal = federalCreditEstimate;
-    const stateTotal =
-      result?.stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0) ?? 0;
-    const finalBill = result?.billing?.finalBill ?? 0;
-    return { totalSOW, federalCreditEstimate, federal, stateTotal, finalBill };
-  }, [completeEntities, result]);
+  const totals = useMemo(
+    () => computeTotals(completeEntities, result),
+    [completeEntities, result],
+  );
 
 
   // Per-lead hydration: set the client name and default-select a tax year. Runs
@@ -197,6 +196,40 @@ export function CalculatorPage() {
   }, [leadId, lead, fetchLead, setClientField]);
 
   const selectedYear = client.taxYears[0];
+
+  // Per-year billing readiness. A year is exportable only when it produces a
+  // real bill (complete entities + a tier in range — i.e. result.billing). The
+  // currently selected year uses the live in-memory entities so the status
+  // reflects edits before autosave; other years use their saved calculation.
+  const yearStatuses = useMemo(() => {
+    if (!lead) return [] as { year: TaxYear; valid: boolean }[];
+    return calculationYears(lead).map((year) => {
+      const ents = year === selectedYear ? entities : entitiesForYear(lead, year);
+      const complete = ents.filter(isEntityComplete);
+      const res = complete.length ? runEngagementCalculation(complete) : null;
+      return { year, valid: !!res?.billing };
+    });
+  }, [lead, selectedYear, entities]);
+
+  const validYears = useMemo(
+    () => yearStatuses.filter((s) => s.valid).map((s) => s.year),
+    [yearStatuses],
+  );
+  const incompleteYears = useMemo(
+    () => yearStatuses.filter((s) => !s.valid).map((s) => s.year),
+    [yearStatuses],
+  );
+
+  // Jump to an incomplete year so the user can finish it: select it and scroll
+  // the entity inputs into view.
+  const goToYear = (y: TaxYear) => {
+    setClientField("taxYears", [y]);
+    setTimeout(() => {
+      document
+        .getElementById("entity-details")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  };
 
   // ── On-the-fly persistence ──────────────────────────────────────────────
   // A year's entities are saved automatically (debounced) to
@@ -241,11 +274,7 @@ export function CalculatorPage() {
     if (hydratedEntitiesKey.current === key) return;
     flushSave();
     hydratedEntitiesKey.current = key;
-    const saved = lead.data?.calculations?.[String(selectedYear)];
-    const next =
-      Array.isArray(saved) && saved.length > 0
-        ? entitiesFromSaved(saved as Array<Omit<Entity, "id">>)
-        : entitiesFromLead(lead.data?.entities ?? []);
+    const next = entitiesForYear(lead, selectedYear);
     snapshot.current = { year: selectedYear, entities: next };
     setEntities(next);
   }, [lead, selectedYear, flushSave, setEntities]);
@@ -287,12 +316,29 @@ export function CalculatorPage() {
   };
 
   const handleDownload = async () => {
-    const node = document.getElementById("billing-overview-summary");
-    if (!node) {
-      toast.error("Billing Overview Summary not found");
+    if (!lead) return;
+    // One page (or more, if tall) per tax year with a complete, billable
+    // calculation. Years with empty/incomplete inputs are excluded.
+    const items: PrintItem[] = validYears.map((year) => {
+      const yearEntities = year === selectedYear ? entities : entitiesForYear(lead, year);
+      const complete = yearEntities.filter(isEntityComplete);
+      const yearResult = complete.length ? runEngagementCalculation(complete) : null;
+      return {
+        year,
+        clientName: client.clientName,
+        entities: yearEntities,
+        result: yearResult,
+        totals: computeTotals(complete, yearResult),
+        notes,
+      };
+    });
+    if (!items.length) {
+      toast.error("No completed calculations to export");
       return;
     }
+
     setDownloading(true);
+    setPrintData(items);
     try {
       // html-to-image renders the clone via an SVG <foreignObject>, so the
       // browser paints it natively — modern CSS (color-mix, oklch, gradients
@@ -302,31 +348,33 @@ export function CalculatorPage() {
         import("jspdf"),
       ]);
 
-      const canvas = await toCanvas(node, {
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-      });
+      // Let React paint the off-screen reports and Recharts finish drawing.
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+      await new Promise((r) => setTimeout(r, 200));
 
       const pdf = new jsPDF({ orientation: "p", unit: "pt", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 24;
       const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const maxImgHeight = pageHeight - margin * 2;
 
-      const imgData = canvas.toDataURL("image/png");
-
-      if (imgHeight <= pageHeight - margin * 2) {
-        pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
-      } else {
-        // Slice the canvas into page-sized chunks to preserve pagination
+      let firstPage = true;
+      const addCanvas = (canvas: HTMLCanvasElement) => {
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        if (imgHeight <= maxImgHeight) {
+          if (!firstPage) pdf.addPage();
+          pdf.addImage(canvas.toDataURL("image/png"), "PNG", margin, margin, imgWidth, imgHeight);
+          firstPage = false;
+          return;
+        }
+        // Slice a tall year into page-sized chunks to preserve pagination.
         const pxPerPt = canvas.width / imgWidth;
-        const pageHeightPx = (pageHeight - margin * 2) * pxPerPt;
+        const pageHeightPx = maxImgHeight * pxPerPt;
         let renderedPx = 0;
         const pageCanvas = document.createElement("canvas");
         const ctx = pageCanvas.getContext("2d")!;
         pageCanvas.width = canvas.width;
-
         while (renderedPx < canvas.height) {
           const sliceHeight = Math.min(pageHeightPx, canvas.height - renderedPx);
           pageCanvas.height = sliceHeight;
@@ -337,12 +385,19 @@ export function CalculatorPage() {
             0, renderedPx, canvas.width, sliceHeight,
             0, 0, canvas.width, sliceHeight,
           );
-          const sliceData = pageCanvas.toDataURL("image/png");
           const sliceHeightPt = sliceHeight / pxPerPt;
-          if (renderedPx > 0) pdf.addPage();
-          pdf.addImage(sliceData, "PNG", margin, margin, imgWidth, sliceHeightPt);
+          if (!firstPage) pdf.addPage();
+          pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", margin, margin, imgWidth, sliceHeightPt);
+          firstPage = false;
           renderedPx += sliceHeight;
         }
+      };
+
+      for (const item of items) {
+        const node = document.getElementById(`print-year-${item.year}`);
+        if (!node) continue;
+        const canvas = await toCanvas(node, { pixelRatio: 2, backgroundColor: "#ffffff" });
+        addCanvas(canvas);
       }
 
       const safeName = (client.clientName || "billing-summary").replace(/[^a-z0-9-_]+/gi, "_");
@@ -351,6 +406,7 @@ export function CalculatorPage() {
     } catch {
       toast.error("Failed to generate PDF");
     } finally {
+      setPrintData(null);
       setDownloading(false);
     }
   };
@@ -457,6 +513,7 @@ export function CalculatorPage() {
             <YearButtons
               value={client.taxYears}
               years={availableYears}
+              invalidYears={incompleteYears}
               onToggle={selectYear}
               className="mt-1.5"
               emptyText="Load a lead to choose a tax year."
@@ -583,7 +640,12 @@ export function CalculatorPage() {
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2">
-            <BillingTable federalEstimate={totals.federalCreditEstimate} finalBill={totals.finalBill} />
+            <BillingTable
+              entities={entities}
+              taxYears={client.taxYears}
+              federalEstimate={totals.federalCreditEstimate}
+              finalBill={totals.finalBill}
+            />
           </div>
           {result?.phases && result.billing && (
             <PhaseDonutChart phases={result.phases} />
@@ -660,10 +722,28 @@ export function CalculatorPage() {
         </div>
       </Section>}
 
+      {lead && incompleteYears.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          <span className="font-medium text-destructive">
+            Incomplete calculations (excluded from PDF):
+          </span>
+          {incompleteYears.map((y) => (
+            <button
+              key={y}
+              type="button"
+              onClick={() => goToYear(y)}
+              className="cursor-pointer rounded-md border border-destructive/50 bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/20"
+            >
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
+
       {lead && <div className="flex flex-col-reverse items-stretch justify-end gap-3 sm:flex-row">
         <Button
           onClick={handleDownload}
-          disabled={downloading || !result?.billing}
+          disabled={downloading || validYears.length === 0}
           className="bg-orange text-orange-foreground shadow-elevated hover:bg-orange/90"
         >
           <FileDown className="mr-1.5 h-4 w-4" />
@@ -678,82 +758,34 @@ export function CalculatorPage() {
           {submitting ? "Submitting..." : "Submit Calculation"}
         </Button>
       </div>}
+
+      {/* Off-screen, laid-out billing overviews — one per tax year — captured
+          into the multi-page PDF. Kept on-DOM (not display:none) and given an
+          explicit width so html-to-image and Recharts render correctly. */}
+      {printData && (
+        <div
+          aria-hidden
+          style={{ position: "fixed", left: -99999, top: 0, width: 1100, background: "#ffffff", pointerEvents: "none" }}
+        >
+          {printData.map((item) => (
+            <div key={item.year} id={`print-year-${item.year}`} style={{ width: 1100, background: "#ffffff" }}>
+              <BillingYearReport {...item} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-const PHASE_META = [
-  { key: "phase1", label: "Phase 1", color: "#7dd3fc" },
-  { key: "phase2", label: "Phase 2", color: "#86efac" },
-  { key: "phase3", label: "Phase 3", color: "#c4b5fd" },
-  { key: "phase4", label: "Phase 4", color: "#94a3b8" },
-] as const;
-
-function PhaseDonutChart({ phases }: { phases: { phase1: number; phase2: number; phase3: number; phase4: number; total: number } }) {
-  const data = PHASE_META.map(({ key, label, color }) => ({
-    label,
-    color,
-    value: phases[key],
-    pct: phases.total > 0 ? (phases[key] / phases.total) * 100 : 0,
-  }));
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-5 lg:col-span-1">
-      <h3 className="mb-3 text-sm font-semibold text-cyan">Phase Breakdown</h3>
-
-      <div className="relative h-44">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius="58%"
-              outerRadius="82%"
-              dataKey="value"
-              paddingAngle={2}
-              strokeWidth={0}
-            >
-              {data.map((d) => (
-                <Cell key={d.label} fill={d.color} />
-              ))}
-            </Pie>
-            <Tooltip
-              formatter={(value: number, _name: string, props: { payload?: { label: string; pct: number } }) => [
-                `${formatCurrency(value)} (${props.payload?.pct.toFixed(1)}%)`,
-                props.payload?.label,
-              ]}
-              contentStyle={{ borderRadius: 8, fontSize: 12 }}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xs text-muted-foreground">Total</span>
-          <span className="text-sm font-bold text-navy tabular-nums">{formatCurrency(phases.total)}</span>
-        </div>
-      </div>
-
-      <div className="mt-3 space-y-2">
-        {data.map((d) => (
-          <div key={d.label} className="flex items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
-              <span className="font-medium text-navy">{d.label}</span>
-            </div>
-            <div className="flex items-center gap-3 tabular-nums">
-              <span className="text-xs text-muted-foreground">{d.pct.toFixed(1)}%</span>
-              <span className="font-semibold" style={{ color: d.color }}>{formatCurrency(d.value)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm font-semibold text-navy">
-        <span>Final Bill</span>
-        <span className="tabular-nums">{formatCurrency(phases.total)}</span>
-      </div>
-    </div>
-  );
+// One off-screen billing overview to render and screenshot for the PDF export.
+interface PrintItem {
+  year: TaxYear;
+  clientName: string;
+  entities: Entity[];
+  result: EngagementCalculation | null;
+  totals: BillingTotals;
+  notes: string;
 }
 
 function formatList(items: string[]): string {

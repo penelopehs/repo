@@ -3,8 +3,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useCalculatorStore } from "@/store/calculatorStore";
-import type { Entity } from "@/types/crm";
+import type { Entity, TaxYear } from "@/types/crm";
 import { formatCurrency } from "@/utils/format";
 import { YearChips } from "@/components/MultiYearSelect";
 import {
@@ -83,10 +82,17 @@ export function buildEntityRows(entities: Entity[]): BilledEntity[] {
   });
 }
 
-export function BillingTable({ federalEstimate, finalBill }: { federalEstimate: number; finalBill: number }) {
-  const entities = useCalculatorStore((s) => s.entities);
-  const taxYears = useCalculatorStore((s) => s.client.taxYears);
-
+export function BillingTable({
+  entities,
+  taxYears,
+  federalEstimate,
+  finalBill,
+}: {
+  entities: Entity[];
+  taxYears: TaxYear[];
+  federalEstimate: number;
+  finalBill: number;
+}) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("sow");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");

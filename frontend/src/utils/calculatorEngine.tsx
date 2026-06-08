@@ -247,6 +247,35 @@ export function runEngagementCalculation(entities: Entity[]): EngagementCalculat
   };
 }
 
+export interface BillingTotals {
+  totalSOW: number;
+  federalCreditEstimate: number;
+  federal: number;
+  stateTotal: number;
+  finalBill: number;
+}
+
+// Aggregate billing figures for the Overview KPIs / print report. Federal Credit
+// Estimate is the single source of truth; Federal Total mirrors it. Safe when
+// `result` is null (no complete entities) — everything falls back to 0.
+export function computeTotals(
+  completeEntities: Entity[],
+  result: EngagementCalculation | null,
+): BillingTotals {
+  const totalSOW = completeEntities.reduce((sum, e) => sum + calculateSOW(e), 0);
+  const federalCreditEstimate = result?.federal ?? 0;
+  const stateTotal =
+    result?.stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0) ?? 0;
+  const finalBill = result?.billing?.finalBill ?? 0;
+  return {
+    totalSOW,
+    federalCreditEstimate,
+    federal: federalCreditEstimate,
+    stateTotal,
+    finalBill,
+  };
+}
+
 export function isEntityComplete(e: Entity): boolean {
   const filingOk =
     !!e.filingStatus &&

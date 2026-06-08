@@ -6,6 +6,7 @@ import type {
   Entity,
   EntityOwner,
   FilingStatus,
+  Lead,
   LeadDataEntity,
   TaxYear,
 } from "@/types/crm";
@@ -90,6 +91,19 @@ export const stripEntityIds = (entities: Entity[]): Array<Omit<Entity, "id">> =>
 // assigning a fresh card id (ids aren't stored inside calculations).
 export const entitiesFromSaved = (saved: Array<Omit<Entity, "id">>): Entity[] =>
   saved.map((e, i) => ({ ...e, id: newEntity(i).id }));
+
+// Resolve the entity cards for a given tax year: a year's own saved calculation
+// when present, otherwise a seed from the lead's master entity list. Shared by
+// the calculator's per-year hydration and the multi-year PDF export.
+export const entitiesForYear = (
+  lead: Pick<Lead, "data">,
+  year: TaxYear,
+): Entity[] => {
+  const saved = lead.data?.calculations?.[String(year)];
+  return Array.isArray(saved) && saved.length > 0
+    ? entitiesFromSaved(saved as Array<Omit<Entity, "id">>)
+    : entitiesFromLead(lead.data?.entities ?? []);
+};
 
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
