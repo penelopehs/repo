@@ -72,6 +72,7 @@ export function ProfilePage({ id }: { id: string }) {
   const navigate = useNavigate();
   const [openCall, setOpenCall] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
+  const [editingCall, setEditingCall] = useState<FollowUpCall | null>(null);
   const [newNote, setNewNote] = useState("");
   const [editDraft, setEditDraft] = useState("");
   const [savingNote, setSavingNote] = useState(false);
@@ -918,7 +919,14 @@ export function ProfilePage({ id }: { id: string }) {
             id="section-calls"
             title="Follow-up Calls"
             action={
-              <Button size="sm" variant="outline" onClick={() => setOpenCall(true)}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditingCall(null);
+                  setOpenCall(true);
+                }}
+              >
                 <Plus className="mr-1 h-3 w-3" /> Add
               </Button>
             }
@@ -931,10 +939,12 @@ export function ProfilePage({ id }: { id: string }) {
                   .sort((a, b) => {
                     if ((a.completed ?? false) !== (b.completed ?? false))
                       return Number(a.completed ?? false) - Number(b.completed ?? false);
-                    return (
+                    const diff =
                       new Date(`${a.date}T${a.time}`).getTime() -
-                      new Date(`${b.date}T${b.time}`).getTime()
-                    );
+                      new Date(`${b.date}T${b.time}`).getTime();
+                    // Pending: soonest first (ascending). Completed: most recent
+                    // first (descending).
+                    return a.completed ? -diff : diff;
                   })
                   .map((c) => {
                     const isToday = c.date === new Date().toISOString().slice(0, 10);
@@ -965,15 +975,29 @@ export function ProfilePage({ id }: { id: string }) {
                               </span>
                             </p>
                           </div>
-                          <label className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-navy">
-                            <input
-                              type="checkbox"
-                              checked={!!c.completed}
-                              onChange={() => void updateCall(id, c.id, { completed: !c.completed })}
-                              className="h-3.5 w-3.5 rounded border-border text-green-600 focus:ring-green-500"
-                            />
-                            Complete
-                          </label>
+                          <div className="flex flex-col items-end gap-2">
+                            <label className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-navy">
+                              <input
+                                type="checkbox"
+                                checked={!!c.completed}
+                                onChange={() => void updateCall(id, c.id, { completed: !c.completed })}
+                                className="h-3.5 w-3.5 rounded border-border text-green-600 focus:ring-green-500"
+                              />
+                              Complete
+                            </label>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-navy"
+                              title="Edit call"
+                              onClick={() => {
+                                setEditingCall(c);
+                                setOpenCall(true);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </li>
                     );
@@ -993,7 +1017,15 @@ export function ProfilePage({ id }: { id: string }) {
         </div>
       </div>
 
-      <ScheduleCallDialog clientId={id} open={openCall} onOpenChange={setOpenCall} />
+      <ScheduleCallDialog
+        clientId={id}
+        call={editingCall}
+        open={openCall}
+        onOpenChange={(o) => {
+          setOpenCall(o);
+          if (!o) setEditingCall(null);
+        }}
+      />
       <EditClientDialog lead={lead} open={openEdit} onOpenChange={setOpenEdit} />
     </div>
   );
