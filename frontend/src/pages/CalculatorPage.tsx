@@ -409,7 +409,7 @@ export function CalculatorPage() {
         </div>
       </Section>
 
-      <Section icon={<Layers className="h-4 w-4 text-violet" />} title="Generate Entities">
+      {lead && <Section icon={<Layers className="h-4 w-4 text-violet" />} title="Generate Entities">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="w-full md:w-48">
             <Label>Number of Entities</Label>
@@ -430,9 +430,9 @@ export function CalculatorPage() {
             {generating ? "Generating..." : "Generate Entities"}
           </Button>
         </div>
-      </Section>
+      </Section>}
 
-      <Section
+      {lead && <Section
         id="entity-details"
         icon={<CalcIcon className="h-4 w-4 text-orange" />}
         title="Entity Details & Calculations"
@@ -458,9 +458,9 @@ export function CalculatorPage() {
             </AnimatePresence>
           </div>
         )}
-      </Section>
+      </Section>}
 
-      <Section id="billing-overview-summary" title="Billing Overview Summary" icon={<DollarSign className="h-4 w-4 text-green" />}>
+      {lead && <Section id="billing-overview-summary" title="Billing Overview Summary" icon={<DollarSign className="h-4 w-4 text-green" />}>
         {missingFields.length > 0 && (
           <div
             role="alert"
@@ -604,9 +604,9 @@ export function CalculatorPage() {
             className="w-full"
           />
         </div>
-      </Section>
+      </Section>}
 
-      <div className="flex flex-col-reverse items-stretch justify-end gap-3 sm:flex-row">
+      {lead && <div className="flex flex-col-reverse items-stretch justify-end gap-3 sm:flex-row">
         <Button
           onClick={handleDownload}
           disabled={downloading || !result?.billing}
@@ -623,7 +623,7 @@ export function CalculatorPage() {
           <Send className="mr-1.5 h-4 w-4" />
           {submitting ? "Submitting..." : "Submit Calculation"}
         </Button>
-      </div>
+      </div>}
     </div>
   );
 }
