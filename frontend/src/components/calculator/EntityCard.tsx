@@ -25,6 +25,7 @@ import { STATE_DATA, isEntityComplete } from "@/utils/calculatorEngine";
 interface Props {
   entity: Entity;
   index: number;
+  taxYear: number;
 }
 
 const FINANCIAL_FIELDS: { k: keyof Entity; label: string }[] = [
@@ -44,7 +45,7 @@ const ENTITY_FILING_OPTIONS = [
   "Other",
 ] as const;
 
-export function EntityCard({ entity, index }: Props) {
+export function EntityCard({ entity, index, taxYear }: Props) {
   const [open, setOpen] = useState(true);
   const update = useCalculatorStore((s) => s.updateEntity);
   const remove = useCalculatorStore((s) => s.removeEntity);
@@ -88,6 +89,9 @@ export function EntityCard({ entity, index }: Props) {
               {entity.state || "State not selected"}
               {stateEligible && " · State Credit Eligible"}
             </p>
+          </div>
+          <div className="ml-3 flex items-center gap-2 font-medium text-navy">
+            {taxYear}
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -451,11 +451,9 @@ export function CalculatorPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            <AnimatePresence>
               {entities.map((e, i) => (
-                <EntityCard key={e.id} entity={e} index={i} />
+                <EntityCard taxYear={client?.taxYears[0]} key={e.id} entity={e} index={i} />
               ))}
-            </AnimatePresence>
           </div>
         )}
       </Section>}
