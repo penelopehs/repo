@@ -149,7 +149,10 @@ export function CalculatorPage() {
   // Per-lead hydration: set the client name and default-select a tax year. Runs
   // once per leadId so manual edits aren't clobbered by later `leads` updates.
   useEffect(() => {
-    if (leadId == null) return;
+    if (leadId == null) {
+      setClientField("clientName", "");
+      return
+    };
     if (!lead) {
       // Not in the store yet (e.g. deep link / page refresh) — fetch it; the
       // resulting `leads` update re-runs this effect to hydrate.
