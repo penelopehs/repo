@@ -1,7 +1,7 @@
 // Calculator page — multi-year client setup, eligibility-aware entities, billing dashboard.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -32,8 +32,8 @@ import {
 } from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
-import { calculationYears } from "@/utils/calculationContext";
-import { type Entity, type LeadData, type TaxYear } from "@/types/crm";
+import { buildCalculationSearch, calculationYears } from "@/utils/calculationContext";
+import { type Entity, type Lead, type LeadData, type TaxYear } from "@/types/crm";
 import {
   calculateSOW,
   calculateFederal,
@@ -63,11 +63,41 @@ export function CalculatorPage() {
   // Lead context: when arriving from the pipeline as /?leadId=<id>, pull the
   // lead's full name, tax years, and entities into the calculator.
   const { leadId } = routeApi.useSearch();
+  const navigate = useNavigate();
   const leads = useLeadsStore((s) => s.leads);
   const getLead = useLeadsStore((s) => s.getLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
+  const fetchLeads = useLeadsStore((s) => s.fetchLeads);
   const updateLead = useLeadsStore((s) => s.updateLead);
   const hydratedLeadId = useRef<number | null>(null);
+
+  // Load the pipeline once so the Client Name field can suggest existing
+  // clients even when the calculator is opened directly (no prior list fetch).
+  useEffect(() => {
+    void fetchLeads();
+  }, [fetchLeads]);
+
+  // Client Name autocomplete: matching leads for the current input, shown while
+  // the field is focused. Selecting one navigates to /?leadId=<id>, which the
+  // hydration effects below pick up to load that client's years and entities.
+  const [nameFocused, setNameFocused] = useState(false);
+  const clientSuggestions = useMemo(() => {
+    const q = client.clientName.trim().toLowerCase();
+    if (!q) return [];
+    return leads
+      .filter(
+        (l) =>
+          String(l.id) !== String(leadId) &&
+          (l.fullName.toLowerCase().includes(q) ||
+            l.company?.toLowerCase().includes(q)),
+      )
+      .slice(0, 8);
+  }, [leads, client.clientName, leadId]);
+
+  const selectClient = (l: Lead) => {
+    setNameFocused(false);
+    navigate({ to: "/", search: buildCalculationSearch(l) as never });
+  };
 
   const lead = useMemo(
     () => (leadId != null ? getLead(String(leadId)) : undefined),
@@ -390,14 +420,36 @@ export function CalculatorPage() {
 
       <Section icon={<Building2 className="h-4 w-4 text-cyan" />} title="Client Information">
         <div className="grid gap-4 md:grid-cols-2">
-          <div>
+          <div className="relative">
             <Label>Client Name</Label>
             <Input
               value={client.clientName}
               onChange={(e) => setClientField("clientName", e.target.value)}
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => setTimeout(() => setNameFocused(false), 120)}
               placeholder="e.g. Helios Biotech LLC"
               maxLength={160}
+              autoComplete="off"
             />
+            {nameFocused && clientSuggestions.length > 0 && (
+              <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-elevated">
+                {clientSuggestions.map((l) => (
+                  <li key={l.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectClient(l)}
+                      className="flex w-full flex-col items-start rounded-md px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                    >
+                      <span className="font-medium text-navy">{l.fullName}</span>
+                      {l.company && (
+                        <span className="text-xs text-muted-foreground">{l.company}</span>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <Label>Tax Year</Label>
