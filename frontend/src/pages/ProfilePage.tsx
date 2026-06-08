@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Briefcase,
@@ -40,15 +41,17 @@ import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
+import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-import type { FollowUpCall, LeadDataPerson } from "@/types/crm";
+import type { FollowUpCall, LeadDataPerson, ProfileNote } from "@/types/crm";
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
 // array on every read (which would make useSyncExternalStore loop forever).
 const NO_CALLS: FollowUpCall[] = [];
+const NO_NOTES: ProfileNote[] = [];
 
 export function ProfilePage({ id }: { id: string }) {
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
@@ -61,11 +64,17 @@ export function ProfilePage({ id }: { id: string }) {
   const calls = useFollowUpCallsStore((s) => s.byLead[id] ?? NO_CALLS);
   const fetchCalls = useFollowUpCallsStore((s) => s.fetch);
   const updateCall = useFollowUpCallsStore((s) => s.update);
+  const intakeNotes = useIntakeNotesStore((s) => s.byLead[id] ?? NO_NOTES);
+  const fetchIntakeNotes = useIntakeNotesStore((s) => s.fetch);
+  const addIntakeNote = useIntakeNotesStore((s) => s.add);
+  const updateIntakeNote = useIntakeNotesStore((s) => s.update);
+  const removeIntakeNote = useIntakeNotesStore((s) => s.remove);
   const navigate = useNavigate();
   const [openCall, setOpenCall] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
-  const [isEditingIntakeNotes, setIsEditingIntakeNotes] = useState(false);
-  const [draftIntakeNote, setDraftIntakeNote] = useState("");
+  const [newNote, setNewNote] = useState("");
+  const [editDraft, setEditDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [contactForm, setContactForm] = useState({
@@ -97,6 +106,64 @@ export function ProfilePage({ id }: { id: string }) {
     };
   }, []);
 
+  // Flash the transient "Saved" indicator in the Intake Notes card header.
+  const flashNoteSaved = () => {
+    setNoteSaved(true);
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => setNoteSaved(false), 2500);
+  };
+
+  const handleAddNote = async () => {
+    const text = newNote.trim();
+    if (!text || savingNote) return;
+    setSavingNote(true);
+    try {
+      await addIntakeNote(id, text);
+      setNewNote("");
+      flashNoteSaved();
+    } catch {
+      toast.error("Failed to save note");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const startEditNote = (note: ProfileNote) => {
+    setEditingNoteId(note.id);
+    setEditDraft(note.text);
+  };
+
+  const cancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditDraft("");
+  };
+
+  const handleSaveEdit = async (noteId: string) => {
+    const text = editDraft.trim();
+    if (!text || savingNote) return;
+    setSavingNote(true);
+    try {
+      await updateIntakeNote(id, noteId, text);
+      cancelEditNote();
+      flashNoteSaved();
+    } catch {
+      toast.error("Failed to save note");
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!window.confirm("Delete this note?")) return;
+    try {
+      await removeIntakeNote(id, noteId);
+      if (editingNoteId === noteId) cancelEditNote();
+      flashNoteSaved();
+    } catch {
+      toast.error("Failed to delete note");
+    }
+  };
+
   const { engagements, entities: clientEntities } = byClient(id);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
@@ -110,6 +177,10 @@ export function ProfilePage({ id }: { id: string }) {
   useEffect(() => {
     void fetchCalls(id);
   }, [fetchCalls, id]);
+
+  useEffect(() => {
+    void fetchIntakeNotes(id);
+  }, [fetchIntakeNotes, id]);
 
   useEffect(() => {
     const now = new Date();
@@ -348,167 +419,115 @@ export function ProfilePage({ id }: { id: string }) {
             }
           >
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Add intake notes or comments for this client profile. These will be saved on the
-                profile and displayed as individual notes.
-              </p>
-              {isEditingIntakeNotes ? (
-                <>
-                  <Textarea
-                    value={draftIntakeNote}
-                    onChange={(event) => setDraftIntakeNote(event.target.value)}
-                    className="min-h-[140px]"
-                    rows={6}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      onClick={() => {
-                        if (!draftIntakeNote.trim()) return;
-                        if (editingNoteId) {
-                          // update existing note
-                          updateLead(id, {
-                            intakeNotes: (lead?.intakeNotes ?? []).map((n) =>
-                              n.id === editingNoteId ? { ...n, text: draftIntakeNote.trim() } : n,
-                            ),
-                          });
-                        } else {
-                          // add new note
-                          updateLead(id, {
-                            intakeNotes: [
-                              ...(lead?.intakeNotes ?? []),
-                              {
-                                id: `note_${Date.now()}`,
-                                text: draftIntakeNote.trim(),
-                                createdAt: new Date().toISOString(),
-                                author: lead?.rep,
-                              },
-                            ],
-                          });
-                        }
-                        // ensure localStorage updated immediately (fixes intermittent hydration overwrite)
-                        try {
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              "sales-leads",
-                              JSON.stringify(useLeadsStore.getState().leads),
-                            );
-                          }
-                        } catch (e) {
-                          console.warn("Failed to persist leads after save:", e);
-                        }
-                        // show transient saved indicator
-                        setNoteSaved(true);
-                        if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-                        saveTimerRef.current = window.setTimeout(() => setNoteSaved(false), 2500);
-                        setDraftIntakeNote("");
-                        setIsEditingIntakeNotes(false);
-                        setEditingNoteId(null);
-                      }}
-                      disabled={draftIntakeNote.trim().length === 0}
-                    >
-                      Save notes
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setDraftIntakeNote("");
-                        setIsEditingIntakeNotes(false);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {lead.intakeNotes && lead.intakeNotes.length > 0 ? (
-                    <div className="space-y-3">
-                      {lead.intakeNotes.map((note) => (
-                        <div
-                          key={note.id}
-                          className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-navy"
-                        >
-                          <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-                            <span className="font-semibold text-foreground">
-                              By {note.author ?? lead.rep}
-                            </span>
-                            <div className="flex items-center gap-3">
-                              <span>
-                                {formatDate(note.createdAt)}{" "}
-                                <span className="text-cyan">
-                                  {new Date(note.createdAt).toLocaleTimeString("en-US", {
-                                    hour: "numeric",
-                                    minute: "2-digit",
-                                  })}
-                                </span>
+              {/* Add a new note — always visible at the top. */}
+              <div className="space-y-2">
+                <Textarea
+                  value={newNote}
+                  onChange={(event) => setNewNote(event.target.value)}
+                  onKeyDown={(event) => {
+                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                      event.preventDefault();
+                      void handleAddNote();
+                    }
+                  }}
+                  placeholder="Add an intake note or comment…"
+                  className="min-h-[88px]"
+                  rows={3}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleAddNote}
+                    disabled={newNote.trim().length === 0 || savingNote}
+                  >
+                    <Plus className="mr-1.5 h-4 w-4" /> Add note
+                  </Button>
+                </div>
+              </div>
+
+              {/* Existing notes, newest first. */}
+              {intakeNotes.length > 0 ? (
+                <div className="space-y-3">
+                  {intakeNotes.map((note) => {
+                    const editing = editingNoteId === note.id;
+                    return (
+                      <div
+                        key={note.id}
+                        className="rounded-xl border border-border bg-muted/30 p-4 text-sm text-navy"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            By {note.author ?? lead.rep}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <span>
+                              {formatDate(note.createdAt)}{" "}
+                              <span className="text-cyan">
+                                {new Date(note.createdAt).toLocaleTimeString("en-US", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                })}
                               </span>
+                            </span>
+                            {!editing && (
                               <div className="flex items-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setIsEditingIntakeNotes(true);
-                                    setDraftIntakeNote(note.text);
-                                    setEditingNoteId(note.id);
-                                  }}
-                                >
-                                  Edit
+                                <Button size="sm" variant="outline" onClick={() => startEditNote(note)}>
+                                  <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-red-600"
-                                  onClick={() => {
-                                    if (!window.confirm("Delete this note?")) return;
-                                    updateLead(id, {
-                                      intakeNotes: (lead?.intakeNotes ?? []).filter(
-                                        (n) => n.id !== note.id,
-                                      ),
-                                    });
-                                    try {
-                                      if (typeof window !== "undefined") {
-                                        window.localStorage.setItem(
-                                          "sales-leads",
-                                          JSON.stringify(useLeadsStore.getState().leads),
-                                        );
-                                      }
-                                    } catch (e) {
-                                      console.warn("Failed to persist leads after delete:", e);
-                                    }
-                                    setNoteSaved(true);
-                                    if (saveTimerRef.current)
-                                      window.clearTimeout(saveTimerRef.current);
-                                    saveTimerRef.current = window.setTimeout(
-                                      () => setNoteSaved(false),
-                                      2500,
-                                    );
-                                    if (editingNoteId === note.id) {
-                                      setEditingNoteId(null);
-                                      setIsEditingIntakeNotes(false);
-                                      setDraftIntakeNote("");
-                                    }
-                                  }}
+                                  onClick={() => handleDeleteNote(note.id)}
                                 >
-                                  Delete
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {editing ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editDraft}
+                              onChange={(event) => setEditDraft(event.target.value)}
+                              onKeyDown={(event) => {
+                                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                                  event.preventDefault();
+                                  void handleSaveEdit(note.id);
+                                }
+                                if (event.key === "Escape") cancelEditNote();
+                              }}
+                              autoFocus
+                              className="min-h-[88px]"
+                              rows={3}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={cancelEditNote}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEdit(note.id)}
+                                disabled={editDraft.trim().length === 0 || savingNote}
+                              >
+                                Save
+                              </Button>
                             </div>
                           </div>
-                          <p>{note.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="min-h-[96px] rounded-xl border border-border bg-muted/30 p-4 text-sm text-navy">
-                      No intake notes yet.
-                    </div>
-                  )}
-                  <Button onClick={() => setIsEditingIntakeNotes(true)}>
-                    {lead.intakeNotes && lead.intakeNotes.length > 0
-                      ? "Add another note"
-                      : "Add note"}
-                  </Button>
-                </>
+                        ) : (
+                          <p className="whitespace-pre-wrap">{note.text}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No intake notes yet.</p>
               )}
             </div>
           </Card>

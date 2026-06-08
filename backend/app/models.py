@@ -263,6 +263,28 @@ class CrmIntakeQuestion(Base):
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
 
 
+class CrmIntakeNote(Base):
+    """Free-form intake notes captured against a lead. A lead can have many
+    notes (one-to-many); each carries its author and timestamps."""
+
+    __tablename__ = "crm_intake_notes"
+
+    idcrm_intake_note = Column(Integer, primary_key=True, autoincrement=True)
+    crm_leads_id = Column(
+        Integer,
+        ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    note = Column(Text, nullable=False)
+    created_by_iduser = Column(
+        Integer, ForeignKey("users.iduser"), nullable=True
+    )
+    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
+    updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
+
+    __table_args__ = (Index("idx_crm_intake_note_lead", "crm_leads_id"),)
+
+
 class CrmFollowUpCall(Base):
     __tablename__ = "crm_follow_up_calls"
 

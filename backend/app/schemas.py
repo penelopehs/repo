@@ -180,12 +180,22 @@ class IntakeQuestionRead(BaseModel):
     answer: Optional[str] = None
 
 
+class IntakeNoteRead(BaseModel):
+    id: int
+    note: str
+    created_by_iduser: Optional[int] = None
+    created_by_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
 class LeadDetail(LeadListItem):
     notes: Optional[str] = None
     updated_at: Optional[datetime] = None
     engagements: List[EngagementRead] = Field(default_factory=list)
     follow_up_calls: List[FollowUpCallRead] = Field(default_factory=list)
     intake_questions: List[IntakeQuestionRead] = Field(default_factory=list)
+    intake_notes: List[IntakeNoteRead] = Field(default_factory=list)
     # Free-form calculator state stored on the lead (crm_leads.data).
 
 
@@ -202,6 +212,16 @@ class FollowUpCallUpdate(BaseModel):
     scheduled_time: Optional[str] = None
     notes: Optional[str] = None
     completed: Optional[bool] = None
+
+
+# ── Intake notes ───────────────────────────────────────────────────────────────
+
+class IntakeNoteCreate(BaseModel):
+    note: str
+
+
+class IntakeNoteUpdate(BaseModel):
+    note: Optional[str] = None
 
 
 # ── Engagements ──────────────────────────────────────────────────────────────

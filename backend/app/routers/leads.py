@@ -423,6 +423,18 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         .all()
     ]
 
+    note_rows = (
+        db.query(models.CrmIntakeNote)
+        .filter(models.CrmIntakeNote.crm_leads_id == lead.crm_lead_id)
+        .order_by(
+            models.CrmIntakeNote.created_at.desc(),
+            models.CrmIntakeNote.idcrm_intake_note.desc(),
+        )
+        .all()
+    )
+    author_names = _user_name_map(db, [n.created_by_iduser for n in note_rows])
+    intake_notes = [_note_read(n, author_names) for n in note_rows]
+
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
         company=company,
@@ -446,6 +458,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         engagements=engagements,
         follow_up_calls=follow_up_calls,
         intake_questions=intake_questions,
+        intake_notes=intake_notes,
         data=lead.data,
         tax_years=_lead_tax_years(lead.data),
     )
@@ -588,6 +601,117 @@ def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
         scheduled_time=call.scheduled_time,
         notes=call.notes,
         completed=bool(call.completed),
+    )
+
+
+# ── Intake notes ───────────────────────────────────────────────────────────────
+# A lead can carry many free-form intake notes (one-to-many).
+
+@router.post(
+    "/leads/{lead_id}/intake-notes",
+    response_model=schemas.IntakeNoteRead,
+    status_code=201,
+)
+def create_intake_note(
+    lead_id: int,
+    body: schemas.IntakeNoteCreate,
+    db: Session = Depends(get_db),
+    claims: dict = Depends(verify_token),
+):
+    _get_lead(db, lead_id)
+    caller = _caller(db, claims)
+    note = models.CrmIntakeNote(
+        crm_leads_id=lead_id,
+        note=body.note,
+        created_by_iduser=caller.iduser,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return _note_read(note, _user_name_map(db, [note.created_by_iduser]))
+
+
+@router.get(
+    "/leads/{lead_id}/intake-notes",
+    response_model=List[schemas.IntakeNoteRead],
+)
+def list_intake_notes(lead_id: int, db: Session = Depends(get_db)):
+    _get_lead(db, lead_id)
+    notes = (
+        db.query(models.CrmIntakeNote)
+        .filter(models.CrmIntakeNote.crm_leads_id == lead_id)
+        .order_by(
+            models.CrmIntakeNote.created_at.desc(),
+            models.CrmIntakeNote.idcrm_intake_note.desc(),
+        )
+        .all()
+    )
+    names = _user_name_map(db, [n.created_by_iduser for n in notes])
+    return [_note_read(n, names) for n in notes]
+
+
+@router.patch(
+    "/leads/{lead_id}/intake-notes/{note_id}",
+    response_model=schemas.IntakeNoteRead,
+)
+def update_intake_note(
+    lead_id: int,
+    note_id: int,
+    body: schemas.IntakeNoteUpdate,
+    db: Session = Depends(get_db),
+):
+    note = _get_lead_note(db, lead_id, note_id)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(note, field, value)
+    db.commit()
+    db.refresh(note)
+    return _note_read(note, _user_name_map(db, [note.created_by_iduser]))
+
+
+@router.delete(
+    "/leads/{lead_id}/intake-notes/{note_id}", status_code=204
+)
+def delete_intake_note(lead_id: int, note_id: int, db: Session = Depends(get_db)):
+    note = _get_lead_note(db, lead_id, note_id)
+    db.delete(note)
+    db.commit()
+
+
+def _get_lead_note(db: Session, lead_id: int, note_id: int) -> models.CrmIntakeNote:
+    """An intake note that belongs to `lead_id`. 404 if it doesn't exist or is
+    attached to a different lead."""
+    note = (
+        db.query(models.CrmIntakeNote)
+        .filter(
+            models.CrmIntakeNote.idcrm_intake_note == note_id,
+            models.CrmIntakeNote.crm_leads_id == lead_id,
+        )
+        .first()
+    )
+    if not note:
+        raise HTTPException(status_code=404, detail="Intake note not found")
+    return note
+
+
+def _user_name_map(db: Session, user_ids) -> dict:
+    """Map iduser -> "First Last" for the given (possibly None/duplicated) ids."""
+    ids = {uid for uid in user_ids if uid}
+    if not ids:
+        return {}
+    return {
+        u.iduser: f"{u.first_name} {u.last_name}".strip()
+        for u in db.query(models.User).filter(models.User.iduser.in_(ids)).all()
+    }
+
+
+def _note_read(note: models.CrmIntakeNote, names: dict) -> schemas.IntakeNoteRead:
+    return schemas.IntakeNoteRead(
+        id=note.idcrm_intake_note,
+        note=note.note,
+        created_by_iduser=note.created_by_iduser,
+        created_by_name=names.get(note.created_by_iduser),
+        created_at=note.created_at,
+        updated_at=note.updated_at,
     )
 
 

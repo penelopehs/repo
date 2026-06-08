@@ -391,3 +391,62 @@ def test_follow_up_call_on_missing_lead_404(client):
         json={"scheduled_date": "2026-06-10"},
     )
     assert resp.status_code == 404
+
+
+def test_intake_note_crud(client):
+    lead = client.post("/leads", json={"first_name": "Notes", "last_name": "Lead"}).json()
+
+    # Create: many notes per lead, each stamped with the caller as author.
+    first = client.post(
+        f"/leads/{lead['id']}/intake-notes", json={"note": "Spoke with owner"}
+    )
+    assert first.status_code == 201
+    note = first.json()
+    assert note["note"] == "Spoke with owner"
+    assert note["created_by_name"] == "Test Caller"
+
+    second = client.post(
+        f"/leads/{lead['id']}/intake-notes", json={"note": "Sent intro email"}
+    )
+    assert second.status_code == 201
+
+    # Read: list for the lead (newest first), and surfaced on the lead detail.
+    listed = client.get(f"/leads/{lead['id']}/intake-notes")
+    assert listed.status_code == 200
+    assert [n["id"] for n in listed.json()] == [second.json()["id"], note["id"]]
+
+    detail = client.get(f"/leads/{lead['id']}").json()
+    assert len(detail["intake_notes"]) == 2
+
+    # Update: lead-scoped patch.
+    patched = client.patch(
+        f"/leads/{lead['id']}/intake-notes/{note['id']}", json={"note": "Owner called back"}
+    )
+    assert patched.status_code == 200
+    assert patched.json()["note"] == "Owner called back"
+
+    # Delete.
+    assert client.delete(f"/leads/{lead['id']}/intake-notes/{note['id']}").status_code == 204
+    assert [n["id"] for n in client.get(f"/leads/{lead['id']}/intake-notes").json()] == [
+        second.json()["id"]
+    ]
+
+    # 404 when the note isn't on this lead (unknown note, or wrong lead).
+    other = client.post("/leads", json={"first_name": "Other", "last_name": "Lead"}).json()
+    assert (
+        client.patch(
+            f"/leads/{other['id']}/intake-notes/{second.json()['id']}", json={"note": "x"}
+        ).status_code
+        == 404
+    )
+    assert (
+        client.patch(
+            f"/leads/{lead['id']}/intake-notes/999999", json={"note": "x"}
+        ).status_code
+        == 404
+    )
+
+
+def test_intake_note_on_missing_lead_404(client):
+    resp = client.post("/leads/999999/intake-notes", json={"note": "x"})
+    assert resp.status_code == 404
