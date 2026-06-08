@@ -114,6 +114,8 @@ export function CalculatorPage() {
     [lead],
   );
 
+  // console.log(availableYears)
+
   // Single-select: clicking a year makes it the sole selection; clicking the
   // already-selected year clears it.
   const selectYear = (y: TaxYear) =>
@@ -179,16 +181,22 @@ export function CalculatorPage() {
   // once per leadId so manual edits aren't clobbered by later `leads` updates.
   useEffect(() => {
     if (leadId == null) {
+      hydratedLeadId.current = null;
       setClientField("clientName", "");
-      return
-    };
+      setClientField("taxYears", []);
+      return;
+    }
+    // Already hydrated this lead — leave the user's selection alone.
+    if (hydratedLeadId.current === leadId) return;
     if (!lead) {
-      // Not in the store yet (e.g. deep link / page refresh) — fetch it; the
-      // resulting `leads` update re-runs this effect to hydrate.
+      // Switching to a lead that isn't loaded yet (deep link / page refresh, or
+      // another client picked from suggestions). Clear the previous client's
+      // selected years so they don't linger, then fetch it; the resulting
+      // `leads` update re-runs this effect to hydrate.
+      setClientField("taxYears", []);
       void fetchLead(String(leadId)).catch(() => {});
       return;
     }
-    if (hydratedLeadId.current === leadId) return;
     hydratedLeadId.current = leadId;
     const years = calculationYears(lead);
     setClientField("clientName", lead.fullName);
@@ -239,9 +247,18 @@ export function CalculatorPage() {
   // array reference, which is what schedules a save.
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSave = useRef<{ leadId: number; year: TaxYear; entities: Entity[] } | null>(null);
-  // The array loaded for the current year and the year it belongs to. Saves
-  // target snapshot.year (not selectedYear, which changes a render earlier).
-  const snapshot = useRef<{ year: TaxYear; entities: Entity[] } | null>(null);
+  // The array loaded for the current year and the lead+year it belongs to. Saves
+  // target the snapshot's lead/year (not the live leadId/selectedYear, which
+  // change a render earlier) so an in-flight edit can never land on the wrong
+  // client while switching.
+  const snapshot = useRef<{ leadId: number; year: TaxYear; entities: Entity[] } | null>(null);
+  // Saves are "armed" only once the live `entities` have caught up to the freshly
+  // loaded snapshot. Until then any difference is the preview lagging hydration,
+  // not a user edit — so it must not be persisted. A boolean state machine (not a
+  // consume-once flag) keeps this correct under StrictMode's double-invoked
+  // effects, where a single-use flag would be consumed by the first run and let
+  // the second run save stale entities onto the newly selected lead.
+  const savesArmed = useRef(false);
 
   const flushSave = useCallback(() => {
     if (saveTimer.current) {
@@ -275,7 +292,9 @@ export function CalculatorPage() {
     flushSave();
     hydratedEntitiesKey.current = key;
     const next = entitiesForYear(lead, selectedYear);
-    snapshot.current = { year: selectedYear, entities: next };
+    snapshot.current = { leadId: Number(lead.id), year: selectedYear, entities: next };
+    // Disarm until the live entities equal this baseline again.
+    savesArmed.current = false;
     setEntities(next);
   }, [lead, selectedYear, flushSave, setEntities]);
 
@@ -284,8 +303,20 @@ export function CalculatorPage() {
   useEffect(() => {
     if (leadId == null) return;
     const snap = snapshot.current;
-    if (!snap || entities === snap.entities) return;
-    pendingSave.current = { leadId, year: snap.year, entities };
+    // Only ever act on the lead currently in view. While switching clients the
+    // snapshot may still point at the previous one — never save across that gap.
+    if (!snap || snap.leadId !== leadId) return;
+    if (entities === snap.entities) {
+      // Live entities match the freshly loaded baseline: arm so the next real
+      // edit (and only that) persists. Idempotent, so StrictMode's double run
+      // and HMR are both safe.
+      savesArmed.current = true;
+      return;
+    }
+    // Disarmed means `entities` is the preview lagging a new baseline, not a user
+    // edit — don't persist (this is what was creating phantom years on switch).
+    if (!savesArmed.current) return;
+    pendingSave.current = { leadId: snap.leadId, year: snap.year, entities };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(flushSave, 800);
     return () => {
