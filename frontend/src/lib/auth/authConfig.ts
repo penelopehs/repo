@@ -34,8 +34,7 @@ export const msalConfig: Configuration = {
     postLogoutRedirectUri: redirectUri,
   },
   cache: {
-    // sessionStorage keeps tokens out of localStorage; cleared when tab closes.
-    cacheLocation: "sessionStorage",
+    cacheLocation: "localStorage",
   },
 };
 
