@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
@@ -304,13 +305,12 @@ export function AddLeadDialog() {
                 selected={form.phone}
                 onPick={(v) => set("phone", v)}
               >
-              <Input
+              <PhoneInput
                 value={form.phone}
-                onChange={(e) => set("phone", e.target.value)}
-                  onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
-                  onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
-                placeholder="(555) 123-4567"
-                  autoComplete="off"
+                onChange={(v) => set("phone", v)}
+                onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
+                onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
+                autoComplete="off"
               />
               </ContactPicker>
             </Field>
