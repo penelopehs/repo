@@ -112,6 +112,56 @@ def test_create_defaults_sales_rep_to_caller(client, db_session):
     assert body["salesperson_iduser"] == 1
 
 
+def test_manager_assignments_create_list_and_update(client, db_session):
+    coach = models.User(
+        azure_ad_user_id="coach-oid",
+        email="coach@test.local",
+        first_name="Casey",
+        last_name="Coach",
+    )
+    db_session.add(coach)
+    db_session.commit()
+
+    body = client.post(
+        "/leads",
+        json={
+            "first_name": "Managed",
+            "last_name": "Lead",
+            "sales_manager_iduser": 1,
+            "training_manager_iduser": coach.iduser,
+        },
+    ).json()
+    assert body["sales_manager_iduser"] == 1
+    assert body["sales_manager_name"] == "Test Caller"
+    assert body["training_manager_iduser"] == coach.iduser
+    assert body["training_manager_name"] == "Casey Coach"
+
+    # Both assignments surface on the list endpoint too.
+    row = client.get("/leads").json()[0]
+    assert row["sales_manager_name"] == "Test Caller"
+    assert row["training_manager_name"] == "Casey Coach"
+
+    # PATCH can reassign one and unassign the other.
+    updated = client.patch(
+        f"/leads/{body['id']}",
+        json={"sales_manager_iduser": coach.iduser, "training_manager_iduser": None},
+    ).json()
+    assert updated["sales_manager_iduser"] == coach.iduser
+    assert updated["sales_manager_name"] == "Casey Coach"
+    assert updated["training_manager_iduser"] is None
+    assert updated["training_manager_name"] is None
+
+
+def test_manager_assignments_default_to_none(client):
+    body = client.post(
+        "/leads", json={"first_name": "Plain", "last_name": "Lead"}
+    ).json()
+    assert body["sales_manager_iduser"] is None
+    assert body["sales_manager_name"] is None
+    assert body["training_manager_iduser"] is None
+    assert body["training_manager_name"] is None
+
+
 def test_create_stores_data_blob(client):
     payload = {"runs": [{"total_bill": 42.0}]}
     resp = client.post(

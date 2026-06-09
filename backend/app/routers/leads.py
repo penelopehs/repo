@@ -274,11 +274,15 @@ def list_leads(
         .group_by(models.Entity.clients_idclients)
         .all()
     ) if client_ids else {}
-    rep_ids = {o.salesperson_iduser for o in leads if o.salesperson_iduser}
-    reps = {
-        u.iduser: f"{u.first_name} {u.last_name}".strip()
-        for u in db.query(models.User).filter(models.User.iduser.in_(rep_ids)).all()
-    } if rep_ids else {}
+    # iduser -> name for every user referenced by a lead (rep + managers).
+    names = _user_name_map(
+        db,
+        [
+            uid
+            for o in leads
+            for uid in (o.salesperson_iduser, o.sales_manager_iduser, o.training_manager_iduser)
+        ],
+    )
 
     def _item(o: models.CrmLead) -> schemas.LeadListItem:
         client_id = client_id_by_lead.get(o.crm_lead_id)
@@ -293,7 +297,11 @@ def list_leads(
             pipeline_status=o.pipeline_status,
             lead_source=o.lead_source,
             salesperson_iduser=o.salesperson_iduser,
-            salesperson_name=reps.get(o.salesperson_iduser),
+            salesperson_name=names.get(o.salesperson_iduser),
+            sales_manager_iduser=o.sales_manager_iduser,
+            sales_manager_name=names.get(o.sales_manager_iduser),
+            training_manager_iduser=o.training_manager_iduser,
+            training_manager_name=names.get(o.training_manager_iduser),
             client_type="Returning" if client_id and counts.get(client_id, 1) > 1 else "New",
             latest_calc_date=_latest_calc_date(o.data),
             created_at=o.created_at,
@@ -345,6 +353,8 @@ def create_lead(
         pipeline_status=PipelineStatus.lead.value,
         lead_source=body.lead_source,
         salesperson_iduser=body.assigned_sales_rep or caller.iduser,
+        sales_manager_iduser=body.sales_manager_iduser,
+        training_manager_iduser=body.training_manager_iduser,
         notes=body.notes,
         data=data,
     )
@@ -364,10 +374,9 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)):
 def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     client_id = _lead_client_id(db, lead)
     company = _company_for(db, lead)
-    rep = (
-        db.query(models.User).filter(models.User.iduser == lead.salesperson_iduser).first()
-        if lead.salesperson_iduser
-        else None
+    names = _user_name_map(
+        db,
+        [lead.salesperson_iduser, lead.sales_manager_iduser, lead.training_manager_iduser],
     )
 
     # engagements (+ tax years)
@@ -446,7 +455,11 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         pipeline_status=lead.pipeline_status,
         lead_source=lead.lead_source,
         salesperson_iduser=lead.salesperson_iduser,
-        salesperson_name=f"{rep.first_name} {rep.last_name}".strip() if rep else None,
+        salesperson_name=names.get(lead.salesperson_iduser),
+        sales_manager_iduser=lead.sales_manager_iduser,
+        sales_manager_name=names.get(lead.sales_manager_iduser),
+        training_manager_iduser=lead.training_manager_iduser,
+        training_manager_name=names.get(lead.training_manager_iduser),
         client_type=_client_type(db, client_id),
         latest_calc_date=_latest_calc_date(lead.data),
         created_at=lead.created_at,

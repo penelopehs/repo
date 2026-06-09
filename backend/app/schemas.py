@@ -80,6 +80,9 @@ class LeadCreate(BaseModel):
     lead_source: Optional[str] = None
     # The assigned sales rep (users.iduser); defaults to the calling user.
     assigned_sales_rep: Optional[int] = None
+    # Optional assignments (users.iduser).
+    sales_manager_iduser: Optional[int] = None
+    training_manager_iduser: Optional[int] = None
     # Tax years — seeded as empty buckets under calculations.calculations
     # (e.g. [2022, 2023] -> {"2022": {}, "2023": {}}).
     tax_years: List[int] = Field(default_factory=list)
@@ -101,6 +104,9 @@ class LeadUpdate(BaseModel):
     lead_source: Optional[str] = None
     # The assigned sales rep (users.iduser).
     salesperson_iduser: Optional[int] = None
+    # Optional assignments (users.iduser). Pass null to unassign.
+    sales_manager_iduser: Optional[int] = None
+    training_manager_iduser: Optional[int] = None
     notes: Optional[str] = None
     # Status-transition timestamps are normally stamped automatically when
     # pipeline_status advances; exposed here for manual correction.
@@ -122,6 +128,10 @@ class LeadListItem(BaseModel):
     lead_source: Optional[str] = None
     salesperson_iduser: Optional[int] = None
     salesperson_name: Optional[str] = None
+    sales_manager_iduser: Optional[int] = None
+    sales_manager_name: Optional[str] = None
+    training_manager_iduser: Optional[int] = None
+    training_manager_name: Optional[str] = None
     client_type: str  # "New" | "Returning"
     latest_calc_date: Optional[float] = None
     created_at: datetime

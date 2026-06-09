@@ -58,14 +58,20 @@ const schema = z.object({
     "Other",
   ]),
   rep: z.string().trim().min(1, "Required"),
+  // Optional assignments — users.iduser as a string ("" = unassigned).
+  salesManager: z.string().optional(),
+  trainingManager: z.string().optional(),
 });
 
 type FormState = z.infer<typeof schema>;
 
 const initial: FormState = {
   firstName: "", lastName: "", company: "", email: "", phone: "",
-  source: "Website", rep: "",
+  source: "Website", rep: "", salesManager: "", trainingManager: "",
 };
+
+// Sentinel SelectItem value for "no assignment" (Radix forbids empty values).
+const UNASSIGNED = "unassigned";
 
 // Fields that drive the client-search dropdown.
 type SearchKey = "firstName" | "lastName" | "company";
@@ -185,7 +191,13 @@ export function AddLeadDialog() {
     }
     setSubmitting(true);
     try {
-      await addLead({ ...parsed.data, eprId, taxYears: years });
+      await addLead({
+        ...parsed.data,
+        eprId,
+        taxYears: years,
+        salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
+        trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
+      });
     toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
     });
@@ -349,6 +361,44 @@ export function AddLeadDialog() {
               onClear={() => setYears([])}
             />
           </Field>
+          
+          <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
+          <div className="text-gray-500 font-normal flex">
+            <div className="whitespace-nowrap">Optional Assignments</div>
+            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field optional label="Sales Manager">
+              <Select
+                value={form.salesManager || UNASSIGNED}
+                onValueChange={(v) => set("salesManager", v === UNASSIGNED ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field optional label="Training Manager">
+              <Select
+                value={form.trainingManager || UNASSIGNED}
+                onValueChange={(v) => set("trainingManager", v === UNASSIGNED ? "" : v)}
+              >
+                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
           <DialogFooter className="mt-2">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
               Cancel
@@ -402,10 +452,10 @@ function ContactPicker({
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({ optional = false, label, error, children }: { optional?: boolean; label: string; error?: string; children: React.ReactNode }) {
   return (
     <div>
-      <Label className="mb-1.5 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}{optional && (<span className="text-gray-500 ml-2 text-xs font-normal">optional</span>)}</Label>
       {children}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
