@@ -44,8 +44,9 @@ dist-ssr
 *.sln
 *.sw?
 
-# TanStack Router generated cache
+# TanStack Router generated files
 .tanstack
+src/routeTree.gen.ts
 
 # Local tooling
 *.local
