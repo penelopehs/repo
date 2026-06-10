@@ -13,7 +13,12 @@ interface ApiFollowUpCall {
   scheduled_date: string; // ISO date "YYYY-MM-DD"
   scheduled_time: string | null;
   notes: string | null;
+<<<<<<< HEAD
   call_type: string | null; // backend PipelineStatus value, e.g. "Intro Call"
+=======
+  call_type: string | null;
+  assigned_rep_name: string | null;
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
   completed: boolean;
 }
 
@@ -32,6 +37,8 @@ function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
     date: c.scheduled_date,
     time: c.scheduled_time ?? "",
     notes: c.notes ?? "",
+    callType: c.call_type,
+    assignedRepName: c.assigned_rep_name,
     completed: c.completed,
     callType: c.call_type ? CALL_TYPE_FROM_API[c.call_type] : undefined,
   };
@@ -41,9 +48,11 @@ export interface FollowUpCallCreateInput {
   date: string;
   time?: string;
   notes?: string;
+  callType?: string;
+  assignedRepName?: string;
 }
 
-export type FollowUpCallPatch = Partial<Pick<FollowUpCall, "date" | "time" | "notes" | "completed">>;
+export type FollowUpCallPatch = Partial<Pick<FollowUpCall, "date" | "time" | "notes" | "callType" | "assignedRepName" | "completed">>;
 
 export const followUpCallsApi = {
   async list(leadId: string): Promise<FollowUpCall[]> {
@@ -56,6 +65,8 @@ export const followUpCallsApi = {
       scheduled_date: input.date,
       scheduled_time: input.time || null,
       notes: input.notes || null,
+      call_type: input.callType || null,
+      assigned_rep_name: input.assignedRepName || null,
     });
     return mapCall(leadId, row);
   },
@@ -65,6 +76,8 @@ export const followUpCallsApi = {
     if (patch.date !== undefined) body.scheduled_date = patch.date;
     if (patch.time !== undefined) body.scheduled_time = patch.time || null;
     if (patch.notes !== undefined) body.notes = patch.notes;
+    if (patch.callType !== undefined) body.call_type = patch.callType || null;
+    if (patch.assignedRepName !== undefined) body.assigned_rep_name = patch.assignedRepName || null;
     if (patch.completed !== undefined) body.completed = patch.completed;
     const row = await api.patch<ApiFollowUpCall>(
       `/leads/${leadId}/follow-up-calls/${callId}`,

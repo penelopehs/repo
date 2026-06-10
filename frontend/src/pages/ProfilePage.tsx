@@ -19,9 +19,17 @@ import {
   Trash2,
   Calculator as CalcIcon,
   Loader2,
+<<<<<<< HEAD
   AlertTriangle,
   CheckCircle2,
   Circle,
+=======
+  Star,
+  Clock,
+  CheckCircle2,
+  Ban,
+  AlertTriangle,
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
 } from "lucide-react";
 import {
   BarChart,
@@ -38,6 +46,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { KpiCard } from "@/components/KpiCard";
 import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
@@ -48,7 +64,9 @@ import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
+import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
+<<<<<<< HEAD
 import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
 import { cn } from "@/lib/utils";
 import type { FollowUpCall, LeadDataPerson, ProfileNote } from "@/types/crm";
@@ -64,6 +82,9 @@ const CALL_STEPS = [
   { title: "Tax Prepare Call", noun: "tax preparer call" },
   { title: "Close Call", noun: "close call" },
 ] as const;
+=======
+import type { FollowUpCall, LeadDataPerson, ProfileNote, TaxYearRecord, TaxYearStatus } from "@/types/crm";
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
 // array on every read (which would make useSyncExternalStore loop forever).
@@ -381,15 +402,30 @@ export function ProfilePage({ id }: { id: string }) {
             <p className="text-sm text-muted-foreground">{lead.company}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} />
+<<<<<<< HEAD
               {needsCall && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                   <AlertTriangle className="h-3 w-3" /> No {activeStep.noun} scheduled
+=======
+              {!calls.some((c) => c.callType === "Intro Call") && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400">
+                  <AlertTriangle className="h-3 w-3" /> No intro call scheduled
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
                 </span>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* R&D Tax Credit History */}
+      <TaxHistoryPanel
+        lead={lead}
+        onUpdate={async (yearStatuses) => {
+          const base = lead.data ?? { people: [], entities: [], calculations: {} };
+          await updateLead(id, { data: { ...base, yearStatuses } });
+        }}
+      />
 
       {/* KPIs */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -522,7 +558,7 @@ export function ProfilePage({ id }: { id: string }) {
                 label="Client Since"
                 value={lead.engagedSince ? formatDate(lead.engagedSince) : formatDate(lead.addedAt)}
               />
-              <Info label="Phone" value={lead.phone} icon={<Phone className="h-3 w-3" />} />
+              <Info label="Phone" value={lead.phone ? formatPhone(lead.phone) : lead.phone} icon={<Phone className="h-3 w-3" />} />
               <Info label="Email" value={lead.email} icon={<Mail className="h-3 w-3" />} />
             </div>
             <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
@@ -1080,11 +1116,23 @@ export function ProfilePage({ id }: { id: string }) {
 
           {/* Engagements */}
           <Card title="Engagements" id="section-engagements">
-            {engagements.length === 0 ? (
+            {engagements.length === 0 && lead.taxYears.length === 0 ? (
               <p className="text-sm text-muted-foreground">No engagements yet.</p>
             ) : (
               <>
                 <ul className="mb-4 space-y-2">
+                  {/* Synthetic row from lead.taxYears when no backend engagements exist */}
+                  {engagements.length === 0 && lead.taxYears.length > 0 && (
+                    <li className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3 text-sm">
+                      <div>
+                        <p className="font-semibold text-navy">R&amp;D Tax Credit</p>
+                        <div className="mt-0.5">
+                          <StatusBadge status={lead.status} />
+                        </div>
+                      </div>
+                      <YearChips years={lead.taxYears} />
+                    </li>
+                  )}
                   {engagements.map((e) => (
                     <li
                       key={e.id}
@@ -1100,7 +1148,7 @@ export function ProfilePage({ id }: { id: string }) {
                     </li>
                   ))}
                 </ul>
-                <div className="rounded-lg border border-border bg-card p-3">
+                {engagements.length > 0 && <div className="rounded-lg border border-border bg-card p-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-cyan">
                     R&amp;D Tax Credit — {engagementYears.length ? engagementYears.join(", ") : "—"}
                   </p>
@@ -1139,11 +1187,155 @@ export function ProfilePage({ id }: { id: string }) {
                       {formatCurrency(grandTotal)}
                     </span>
                   </div>
-                </div>
+                </div>}
               </>
             )}
           </Card>
 
+<<<<<<< HEAD
+=======
+          {/* Follow-up Calls */}
+          <Card
+            id="section-calls"
+            title="Follow-up Calls"
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditingCall(null);
+                  setOpenCall(true);
+                }}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Add
+              </Button>
+            }
+          >
+            <ul className="space-y-2">
+              {/* Yellow reminder when no intro call has ever been booked */}
+              {!calls.some((c) => c.callType === "Intro Call") && (
+                <li className="rounded-lg border-l-4 border-l-amber-400 border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-700/50 dark:bg-amber-950/20">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-amber-800 dark:text-amber-300">
+                          No intro call scheduled
+                        </p>
+                        <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                          Reminder
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                        Lead added {formatDate(lead.addedAt)} — intro call not yet booked.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingCall(null); setOpenCall(true); }}
+                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-cyan hover:underline"
+                      >
+                        <Phone className="h-3 w-3" /> Schedule now →
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              )}
+
+              {calls.length === 0 && (
+                <li className="text-sm text-muted-foreground">No follow-ups scheduled.</li>
+              )}
+
+              {[...calls]
+                .sort((a, b) => {
+                  if ((a.completed ?? false) !== (b.completed ?? false))
+                    return Number(a.completed ?? false) - Number(b.completed ?? false);
+                  const diff =
+                    new Date(`${a.date}T${a.time}`).getTime() -
+                    new Date(`${b.date}T${b.time}`).getTime();
+                  return a.completed ? -diff : diff;
+                })
+                .map((c) => {
+                  const isToday = c.date === new Date().toISOString().slice(0, 10);
+                  const isUpcoming = !c.completed && new Date(`${c.date}T${c.time || "00:00"}`).getTime() >= Date.now();
+                  const isIntro = c.callType === "Intro Call";
+                  return (
+                    <li
+                      key={c.id}
+                      className={cn(
+                        "rounded-lg border-l-4 border p-3 text-sm transition-colors",
+                        c.completed
+                          ? "border-l-green-400 border-green-100 bg-green-50/50 dark:border-green-800/40 dark:bg-green-950/10"
+                          : isIntro
+                            ? "border-l-cyan border-cyan/20 bg-cyan/5"
+                            : isToday
+                              ? "border-l-cyan/50 border-cyan/20 bg-cyan/5"
+                              : "border-l-border border-border",
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-navy">
+                              {c.callType || "Follow-up Call"}
+                            </p>
+                            {isUpcoming && (
+                              <span className="rounded-full bg-cyan/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan">
+                                Upcoming
+                              </span>
+                            )}
+                            {c.completed && (
+                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700 dark:bg-green-900/40 dark:text-green-400">
+                                Completed
+                              </span>
+                            )}
+                            {isToday && !c.completed && (
+                              <span className="rounded-full bg-cyan px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                Today
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {formatDate(c.date)}
+                            {c.time && ` · ${formatTime(c.time)}`}
+                            {c.assignedRepName && ` · ${c.assignedRepName}`}
+                          </p>
+                          {c.notes && (
+                            <p className="mt-1 text-xs text-muted-foreground italic">{c.notes}</p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <Button
+                            size="sm"
+                            variant={c.completed ? "outline" : "outline"}
+                            className={cn(
+                              "h-7 rounded-full px-3 text-xs",
+                              c.completed
+                                ? "border-green-300 text-green-700 hover:bg-green-50"
+                                : "border-border text-muted-foreground hover:text-navy",
+                            )}
+                            onClick={() => void updateCall(id, c.id, { completed: !c.completed })}
+                          >
+                            {c.completed ? "Completed ✓" : "Mark complete"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-navy"
+                            title="Edit call"
+                            onClick={() => {
+                              setEditingCall(c);
+                              setOpenCall(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+            </ul>
+          </Card>
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
 
           {/* Quick action */}
           <Button
@@ -1159,6 +1351,11 @@ export function ProfilePage({ id }: { id: string }) {
       <ScheduleCallDialog
         clientId={id}
         call={editingCall}
+        defaultCallType={
+          !editingCall && !calls.some((c) => c.callType === "Intro Call")
+            ? "Intro Call"
+            : undefined
+        }
         open={openCall}
         onOpenChange={(o) => {
           setOpenCall(o);
@@ -1208,6 +1405,265 @@ function Info({ label, value, icon }: { label: string; value: string; icon?: Rea
         {value}
       </p>
     </div>
+  );
+}
+
+// ─── R&D Tax Credit History ───────────────────────────────────────────────────
+
+const YEAR_STATUS_META: Record<
+  TaxYearStatus,
+  { label: string; cardCls: string; icon: React.ReactNode }
+> = {
+  current: {
+    label: "Current year",
+    cardCls: "bg-navy/8 border-navy/30 text-navy",
+    icon: <Star className="h-3.5 w-3.5" />,
+  },
+  current_engaged: {
+    label: "Current year",
+    cardCls: "bg-green/10 border-green/50 text-green ring-1 ring-green/30",
+    icon: <Star className="h-3.5 w-3.5" />,
+  },
+  engaged: {
+    label: "Engaged",
+    cardCls: "bg-green/10 border-green/50 text-green",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+  },
+  eligible_not_engaged: {
+    label: "Eligible — not engaged",
+    cardCls: "bg-card border-border text-muted-foreground",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
+  not_eligible: {
+    label: "Not eligible",
+    cardCls: "bg-muted/40 border-border text-muted-foreground opacity-60",
+    icon: <Ban className="h-3.5 w-3.5" />,
+  },
+};
+
+function TaxHistoryPanel({
+  lead,
+  onUpdate,
+}: {
+  lead: import("@/types/crm").Lead;
+  onUpdate: (yearStatuses: Record<string, TaxYearRecord>) => Promise<void>;
+}) {
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const saved = lead.data?.yearStatuses ?? {};
+
+  const [activeYear, setActiveYear] = useState<number | null>(null);
+  const [notEligibleYear, setNotEligibleYear] = useState<number | null>(null);
+  const [reasonDraft, setReasonDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  function effectiveRecord(year: number): TaxYearRecord {
+    if (saved[year]) return saved[year];
+    if (year === currentYear) {
+      const isEngaged = lead.taxYears.includes(year as import("@/types/crm").TaxYear);
+      return { status: isEngaged ? "current_engaged" : "current" };
+    }
+    // Any year listed in the client's Engagement Years is Engaged
+    if (lead.taxYears.includes(year as import("@/types/crm").TaxYear))
+      return { status: "engaged" };
+    return { status: "eligible_not_engaged" };
+  }
+
+  const records = years.map((y) => ({ year: y, record: effectiveRecord(y) }));
+  const engagedCount = records.filter((r) => r.record.status === "engaged" || r.record.status === "current_engaged").length;
+  const openCount = records.filter((r) => r.record.status === "eligible_not_engaged").length;
+  const notEligibleCount = records.filter((r) => r.record.status === "not_eligible").length;
+
+  const applyStatus = async (year: number, status: TaxYearStatus, reason?: string) => {
+    setSaving(true);
+    const record: TaxYearRecord = { status };
+    if (status === "not_eligible" && reason) {
+      record.notEligibleReason = reason;
+      record.notEligibleBy = lead.rep;
+      record.notEligibleAt = new Date().toISOString();
+    }
+    try {
+      await onUpdate({ ...saved, [year]: record });
+      setActiveYear(null);
+    } catch {
+      toast.error("Failed to save year status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-2xl border border-border bg-card shadow-card"
+    >
+      <header className="flex items-center justify-between border-b border-border px-5 py-3">
+        <h2 className="text-sm font-semibold text-navy">R&amp;D Tax Credit History</h2>
+      </header>
+      <div className="p-5">
+        {/* Summary KPIs */}
+        <div className="mb-5 grid grid-cols-3 gap-3">
+          {[
+            { label: "Years Engaged", value: engagedCount, cls: "text-green" },
+            { label: "Open Opportunities", value: openCount, cls: "text-orange" },
+            { label: "Not Eligible", value: notEligibleCount, cls: "text-muted-foreground" },
+          ].map(({ label, value, cls }) => (
+            <div
+              key={label}
+              className="rounded-xl border border-border bg-muted/20 px-4 py-3 text-center"
+            >
+              <p className={`text-2xl font-bold tabular-nums ${cls}`}>{value}</p>
+              <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Year cards */}
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {records.map(({ year, record }) => {
+            const meta = YEAR_STATUS_META[record.status];
+            return (
+              <button
+                key={year}
+                type="button"
+                title={
+                  record.status === "not_eligible" && record.notEligibleReason
+                    ? `Reason: ${record.notEligibleReason}\nBy: ${record.notEligibleBy} · ${record.notEligibleAt ? new Date(record.notEligibleAt).toLocaleString() : ""}`
+                    : undefined
+                }
+                onClick={() => setActiveYear(activeYear === year ? null : year)}
+                className={cn(
+                  "flex flex-col items-center rounded-xl border px-2 py-3 text-center transition-all hover:scale-[1.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan",
+                  meta.cardCls,
+                  activeYear === year && "ring-2 ring-cyan",
+                )}
+              >
+                {record.status === "current_engaged" ? (
+                  <>
+                    <span className="mb-1 flex items-center gap-1">
+                      <Star className="h-3.5 w-3.5" />
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="text-lg font-bold leading-none">{year}</span>
+                    <span className="mt-1.5 text-[10px] leading-tight">Current year</span>
+                    <span className="mt-0.5 text-[10px] leading-tight font-semibold">Engaged</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="mb-1">{meta.icon}</span>
+                    <span className="text-lg font-bold leading-none">{year}</span>
+                    <span className="mt-1.5 text-[10px] leading-tight">{meta.label}</span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Inline status picker */}
+        {activeYear !== null && (
+          <div className="mt-3 rounded-xl border border-border bg-muted/20 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Set status for {activeYear}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {activeYear === currentYear && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={saving}
+                  onClick={() => applyStatus(activeYear, "current")}
+                >
+                  <Star className="mr-1.5 h-3.5 w-3.5" /> Current Year
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                className="border-green/50 text-green hover:bg-green/10"
+                onClick={() => applyStatus(activeYear, "engaged")}
+              >
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Engaged
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                onClick={() => applyStatus(activeYear, "eligible_not_engaged")}
+              >
+                <Clock className="mr-1.5 h-3.5 w-3.5" /> Eligible – Not Engaged
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={saving}
+                className="text-muted-foreground"
+                onClick={() => {
+                  setNotEligibleYear(activeYear);
+                  setReasonDraft("");
+                }}
+              >
+                <Ban className="mr-1.5 h-3.5 w-3.5" /> Not Eligible…
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-3">
+          {(Object.entries(YEAR_STATUS_META) as [TaxYearStatus, (typeof YEAR_STATUS_META)[TaxYearStatus]][])
+            .filter(([status]) => status !== "current_engaged")
+            .map(([status, { label, icon }]) => (
+              <div key={status} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {icon}
+                {label}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* Not Eligible dialog */}
+      <Dialog
+        open={notEligibleYear !== null}
+        onOpenChange={(open) => { if (!open) setNotEligibleYear(null); }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark {notEligibleYear} as Not Eligible</DialogTitle>
+            <DialogDescription>
+              Provide a reason below. Your name, date, and time will be automatically recorded.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={reasonDraft}
+            onChange={(e) => setReasonDraft(e.target.value)}
+            placeholder="e.g. Client did not perform qualifying R&D activities this year…"
+            className="min-h-[88px]"
+            rows={3}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotEligibleYear(null)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!reasonDraft.trim() || saving}
+              onClick={async () => {
+                if (notEligibleYear !== null) {
+                  await applyStatus(notEligibleYear, "not_eligible", reasonDraft.trim());
+                  setNotEligibleYear(null);
+                }
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </motion.section>
   );
 }
 

@@ -7,8 +7,8 @@ aggregate, follow-up calls, engagements (+ yearly billing) and saved calculation
 into a focused surface — no per-model CRUD.
 """
 
-from datetime import date, datetime
-from typing import List, Optional
+from datetime import date, datetime, date as date_type
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -284,8 +284,37 @@ def list_leads(
         ],
     )
 
+    # Batch-fetch the next upcoming (non-completed, future) call per lead.
+    lead_ids = [o.crm_lead_id for o in leads]
+    today = date.today()
+    next_call_by_lead: Dict[int, models.CrmFollowUpCall] = {}
+    if lead_ids:
+        upcoming = (
+            db.query(models.CrmFollowUpCall)
+            .filter(
+                models.CrmFollowUpCall.crm_leads_id.in_(lead_ids),
+                models.CrmFollowUpCall.completed == False,
+                models.CrmFollowUpCall.scheduled_date >= today,
+            )
+            .order_by(
+                models.CrmFollowUpCall.crm_leads_id,
+                models.CrmFollowUpCall.scheduled_date,
+                models.CrmFollowUpCall.scheduled_time,
+            )
+            .all()
+        )
+        for c in upcoming:
+            if c.crm_leads_id not in next_call_by_lead:
+                next_call_by_lead[c.crm_leads_id] = c
+
     def _item(o: models.CrmLead) -> schemas.LeadListItem:
         client_id = client_id_by_lead.get(o.crm_lead_id)
+        nc = next_call_by_lead.get(o.crm_lead_id)
+        next_call = schemas.NextCallInfo(
+            date=nc.scheduled_date,
+            time=nc.scheduled_time,
+            call_type=nc.call_type,
+        ) if nc else None
         return schemas.LeadListItem(
             id=o.crm_lead_id,
             company=_company_for(db, o),
@@ -311,6 +340,7 @@ def list_leads(
             tax_years=_lead_tax_years(o.data),
             data=o.data,
             notes=o.notes,
+            next_call=next_call,
         )
 
     return [_item(o) for o in leads]
@@ -573,7 +603,12 @@ def create_follow_up_call(
         scheduled_date=body.scheduled_date,
         scheduled_time=body.scheduled_time,
         notes=body.notes,
+<<<<<<< HEAD
         call_type=lead.pipeline_status,
+=======
+        call_type=body.call_type,
+        assigned_rep_name=body.assigned_rep_name,
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
         completed=False,
     )
     db.add(call)
@@ -641,6 +676,10 @@ def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
         scheduled_time=call.scheduled_time,
         notes=call.notes,
         call_type=call.call_type,
+<<<<<<< HEAD
+=======
+        assigned_rep_name=call.assigned_rep_name,
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
         completed=bool(call.completed),
     )
 

@@ -141,6 +141,7 @@ class LeadListItem(BaseModel):
     tax_years: List[int] = Field(default_factory=list)
     data: Any = None
     notes: Optional[str] = None
+    next_call: Optional[NextCallInfo] = None
 
 
 
@@ -176,13 +177,24 @@ class EngagementRead(BaseModel):
     tax_years: List[int] = Field(default_factory=list)
 
 
+class NextCallInfo(BaseModel):
+    date: date
+    time: Optional[str] = None
+    call_type: Optional[str] = None
+
+
 class FollowUpCallRead(BaseModel):
     id: int
     scheduled_date: date
     scheduled_time: Optional[str] = None
     notes: Optional[str] = None
+<<<<<<< HEAD
     # Pipeline stage this call works; copied from the lead at creation.
     call_type: Optional[PipelineStatus] = None
+=======
+    call_type: Optional[str] = None
+    assigned_rep_name: Optional[str] = None
+>>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
     completed: bool
 
 
@@ -217,12 +229,16 @@ class FollowUpCallCreate(BaseModel):
     scheduled_date: date
     scheduled_time: Optional[str] = None
     notes: Optional[str] = None
+    call_type: Optional[str] = None
+    assigned_rep_name: Optional[str] = None
 
 
 class FollowUpCallUpdate(BaseModel):
     scheduled_date: Optional[date] = None
     scheduled_time: Optional[str] = None
     notes: Optional[str] = None
+    call_type: Optional[str] = None
+    assigned_rep_name: Optional[str] = None
     completed: Optional[bool] = None
 
 

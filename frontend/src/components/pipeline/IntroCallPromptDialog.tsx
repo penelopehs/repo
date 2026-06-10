@@ -1,4 +1,5 @@
-// Schedule / edit follow-up call modal — includes call type and assigned rep.
+// Shown immediately after a lead is created — prompts the rep to schedule an
+// intro call. Skipping leaves a yellow reminder on the client profile.
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -25,59 +26,59 @@ import {
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
-import type { FollowUpCall } from "@/types/crm";
+import type { Lead } from "@/types/crm";
 
 const CALL_TYPES = ["Intro Call", "Follow-up Call", "Check-in", "Discovery Call", "Other"];
 
 interface Props {
-  clientId: string;
-  /** When provided, the dialog edits this call instead of creating a new one. */
-  call?: FollowUpCall | null;
-  /** Default call type for new calls (e.g. "Intro Call"). */
-  defaultCallType?: string;
+  lead: Lead;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }
 
-export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOpenChange }: Props) {
+export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
   const add = useFollowUpCallsStore((s) => s.add);
-  const update = useFollowUpCallsStore((s) => s.update);
   const me = useUsersStore((s) => s.me);
   const users = useUsersStore((s) => s.users);
   const ensureUsers = useUsersStore((s) => s.ensureLoaded);
-  const isEditing = !!call;
 
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const defaultDate = tomorrow.toISOString().slice(0, 10);
+
+  const [callType, setCallType] = useState("Intro Call");
+  const [assignedRep, setAssignedRep] = useState("");
+  const [date, setDate] = useState(defaultDate);
   const [time, setTime] = useState("10:00");
   const [notes, setNotes] = useState("");
-  const [callType, setCallType] = useState(defaultCallType ?? "Follow-up Call");
-  const [assignedRep, setAssignedRep] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { void ensureUsers(); }, [ensureUsers]);
 
   useEffect(() => {
     if (!open) return;
-    setDate(call?.date || new Date().toISOString().slice(0, 10));
-    setTime((call?.time || "10:00").slice(0, 5));
-    setNotes(call?.notes || "");
-    setCallType(call?.callType || defaultCallType || "Follow-up Call");
-    setAssignedRep(call?.assignedRepName || (me ? (userFullName(me) || me.email) : ""));
-  }, [open, call, defaultCallType, me]);
+    setCallType("Intro Call");
+    setDate(defaultDate);
+    setTime("10:00");
+    setNotes("");
+    if (me) setAssignedRep(userFullName(me) || me.email);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, me]);
 
-  const submit = async () => {
+  const schedule = async () => {
     setSaving(true);
     try {
-      if (call) {
-        await update(clientId, call.id, { date, time, notes, callType, assignedRepName: assignedRep });
-        toast.success("Call updated", { description: `${date} at ${time}` });
-      } else {
-        await add(clientId, { date, time, notes, callType, assignedRepName: assignedRep });
-        toast.success("Call scheduled", { description: `${date} at ${time}` });
-      }
+      await add(lead.id, {
+        date,
+        time,
+        notes,
+        callType,
+        assignedRepName: assignedRep,
+      });
+      toast.success("Intro call scheduled", { description: `${date} at ${time}` });
       onOpenChange(false);
     } catch (e) {
-      toast.error(isEditing ? "Couldn't update call" : "Couldn't schedule call", {
+      toast.error("Couldn't schedule call", {
         description: e instanceof Error ? e.message : undefined,
       });
     } finally {
@@ -85,19 +86,38 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
     }
   };
 
+  const skip = () => onOpenChange(false);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-navy flex items-center gap-2">
-            <Phone className="h-4 w-4" /> {isEditing ? "Edit Call" : "Schedule Call"}
-          </DialogTitle>
+          <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-cyan/10 text-cyan ring-1 ring-cyan/20">
+            <Phone className="h-5 w-5" />
+          </div>
+          <DialogTitle className="text-navy text-xl">Schedule an intro call?</DialogTitle>
           <DialogDescription>
-            {isEditing
-              ? "Update this follow-up call's details."
-              : "Add a follow-up call to this client."}
+            You just added a new lead. Would you like to schedule an introductory call now to kick
+            off the engagement?
           </DialogDescription>
         </DialogHeader>
+
+        {/* Lead chip */}
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm font-medium text-navy">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-navy text-white text-xs font-bold">
+            {lead.fullName
+              .split(" ")
+              .map((s) => s[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()}
+          </span>
+          <span>
+            {lead.fullName}
+            {lead.company ? ` — ${lead.company}` : ""}
+          </span>
+        </div>
+
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -130,6 +150,7 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
               </Select>
             </div>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="mb-1.5 block">Date</Label>
@@ -140,33 +161,36 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
               <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
           </div>
+
           <div>
-            <Label className="mb-1.5 block">Notes</Label>
+            <Label className="mb-1.5 block">
+              Notes <span className="text-muted-foreground font-normal">optional</span>
+            </Label>
             <Textarea
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Agenda, prep notes..."
+              placeholder="e.g. Discuss R&D eligibility for 2024–2026…"
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={skip} disabled={saving}>
+            Skip for now
           </Button>
-          <Button
-            onClick={submit}
-            disabled={saving}
-            className="bg-orange text-white hover:bg-orange/90"
-          >
-            {saving
-              ? isEditing
-                ? "Saving…"
-                : "Scheduling…"
-              : isEditing
-                ? "Save Changes"
-                : "Schedule Call"}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={skip} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={schedule}
+              disabled={saving || !date}
+              className="bg-cyan text-white hover:bg-cyan/90"
+            >
+              {saving ? "Scheduling…" : "Schedule call"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

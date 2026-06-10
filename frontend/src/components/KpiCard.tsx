@@ -57,6 +57,7 @@ export function KpiCard({
       transition={{ duration: 0.4, ease: "easeOut" }}
       className={cn(
         "group relative overflow-hidden rounded-xl border border-border bg-card shadow-card transition-shadow hover:shadow-hover",
+        mini && "h-full",
         padding,
       )}
     >
