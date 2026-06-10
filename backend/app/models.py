@@ -297,6 +297,8 @@ class CrmFollowUpCall(Base):
     scheduled_date = Column(Date, nullable=False)
     scheduled_time = Column(String(20), nullable=True)
     notes = Column(Text, nullable=True)
+    call_type = Column(String(100), nullable=True)
+    assigned_rep_name = Column(String(255), nullable=True)
     completed = Column(Boolean, nullable=False, server_default=text("0"))
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)

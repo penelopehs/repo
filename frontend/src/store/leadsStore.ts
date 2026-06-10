@@ -15,7 +15,7 @@ interface LeadsState {
   error: string | null;
   fetchLeads: () => Promise<void>;
   fetchLead: (id: string) => Promise<void>;
-  addLead: (l: LeadCreateInput) => Promise<void>;
+  addLead: (l: LeadCreateInput) => Promise<Lead>;
   updateLead: (id: string, patch: Partial<Lead>) => Promise<void>;
   deleteLead: (id: string) => Promise<void>;
   setStatus: (id: string, status: LeadStatus) => Promise<void>;
@@ -56,6 +56,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   addLead: async (l) => {
     const created = await leadsApi.create(l);
     set((s) => ({ leads: [created, ...s.leads] }));
+    return created;
   },
 
   updateLead: async (id, patch) => {
