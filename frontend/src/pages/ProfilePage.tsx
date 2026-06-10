@@ -184,6 +184,14 @@ export function ProfilePage({ id }: { id: string }) {
     }
   };
 
+  // Toggle a follow-up call's completed state, then refresh the lead — completing
+  // a call can advance the lead's pipeline status on the backend, and the Call
+  // Progress / status badge are driven off the lead, not the call.
+  const handleToggleCallComplete = async (call: FollowUpCall) => {
+    await updateCall(id, call.id, { completed: !call.completed });
+    await fetchLead(id);
+  };
+
   const { engagements, entities: clientEntities } = byClient(id);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
@@ -1024,7 +1032,7 @@ export function ProfilePage({ id }: { id: string }) {
                               <input
                                 type="checkbox"
                                 checked={!!c.completed}
-                                onChange={() => void updateCall(id, c.id, { completed: !c.completed })}
+                                onChange={() => void handleToggleCallComplete(c)}
                                 className="h-3.5 w-3.5 rounded border-border text-green-600 focus:ring-green-500"
                               />
                               Complete
