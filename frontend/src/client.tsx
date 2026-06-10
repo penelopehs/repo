@@ -16,6 +16,11 @@ async function bootstrap() {
   const redirectResult = await msalInstance.handleRedirectPromise();
   if (redirectResult?.account) {
     msalInstance.setActiveAccount(redirectResult.account);
+    // Fresh login — send to pipeline instead of landing on the root/calculator.
+    if (window.location.pathname === "/") {
+      window.location.replace("/pipeline");
+      return;
+    }
   } else {
     // No redirect — restore cached account if one exists.
     const accounts = msalInstance.getAllAccounts();

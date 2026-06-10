@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, Trash2, Building2, DollarSign, BadgeCheck, AlertCircle, Users, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -233,19 +234,13 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   </div>
                   <div>
                     <Label>Employee Count</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={entity.employeeCount === "" ? "" : entity.employeeCount}
-                      onChange={(e) =>
-                        update(
-                          entity.id,
-                          "employeeCount",
-                          e.target.value === "" ? "" : Number(e.target.value),
-                        )
+                    <MoneyInput
+                        value={entity.employeeCount === "" ? "" : entity.employeeCount}
+                        onChange={(e) =>
+                        update(entity.id, "employeeCount", e === "" ? "" : Number(e))
                       }
-                      placeholder="0"
-                    />
+                        placeholder="0"
+                      />
                   </div>
                 </div>
               </div>
@@ -263,18 +258,9 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                           $
                         </span>
-                        <Input
-                          type="number"
-                          min={0}
-                          className="pl-7"
+                        <MoneyInput
                           value={entity[k] as number | ""}
-                          onChange={(e) =>
-                            update(
-                              entity.id,
-                              k,
-                              (e.target.value === "" ? "" : Number(e.target.value)) as never,
-                            )
-                          }
+                          onChange={(v) => update(entity.id, k, v as never)}
                           placeholder="0"
                         />
                       </div>

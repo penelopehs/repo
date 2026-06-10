@@ -131,6 +131,11 @@ export interface Lead {
   rep: SalesRep;
   /** Backend user id of the assigned salesperson, if any. */
   repId?: number | null;
+  /** Optional assignments — backend user id + display name, if assigned. */
+  salesManagerId?: number | null;
+  salesManagerName?: string;
+  trainingManagerId?: number | null;
+  trainingManagerName?: string;
   status: LeadStatus;
   clientType?: ClientType;
   /** Legacy: count of years engaged (kept for backwards compat). */

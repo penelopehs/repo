@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,8 @@ import {
 import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
+import { useUsersStore } from "@/store/usersStore";
+import { userFullName } from "@/services/users";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 
 const SOURCES: LeadSource[] = [
@@ -65,7 +68,13 @@ const schema = z.object({
   taxYears: z.array(z.number().int()).optional(),
   entityNames: z.string().max(2000).optional(),
   notes: z.string().max(2000).optional(),
+  // Optional assignments — users.iduser as a string ("" = unassigned).
+  salesManager: z.string().optional(),
+  trainingManager: z.string().optional(),
 });
+
+// Sentinel SelectItem value for "no assignment" (Radix forbids empty values).
+const UNASSIGNED = "unassigned";
 
 interface Props {
   lead: Lead;
@@ -79,6 +88,10 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   const open = openProp ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
   const update = useLeadsStore((s) => s.updateLead);
+  const users = useUsersStore((s) => s.users);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
+
+  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
 
   const buildForm = () => ({
     firstName: lead.firstName,
@@ -92,6 +105,8 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     taxYears: lead.taxYears ?? [],
     entityNames: (lead.entityNames ?? []).join(",\n"),
     notes: lead.notes ?? "",
+    salesManager: lead.salesManagerId != null ? String(lead.salesManagerId) : "",
+    trainingManager: lead.trainingManagerId != null ? String(lead.trainingManagerId) : "",
   });
 
   const [form, setForm] = useState(buildForm);
@@ -142,6 +157,8 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         source: parsed.data.source,
         status: parsed.data.status,
         notes: parsed.data.notes,
+        salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
+        trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
         data,
     });
       toast.success("Client updated", {
@@ -195,9 +212,9 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               />
             </Item>
             <Item label="Phone">
-              <Input
+              <PhoneInput
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(v) => setForm({ ...form, phone: v })}
               />
             </Item>
             <Item label="Lead Source">
@@ -281,6 +298,57 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </Item>
+
+          <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
+          <div className="text-gray-500 font-normal flex">
+            <div className="whitespace-nowrap">Optional Assignments</div>
+            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Item optional label="Sales Manager">
+              <Select
+                value={form.salesManager || UNASSIGNED}
+                onValueChange={(v) =>
+                  setForm({ ...form, salesManager: v === UNASSIGNED ? "" : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>
+                      {userFullName(u) || u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Item>
+
+            <Item optional label="Training Manager">
+              <Select
+                value={form.trainingManager || UNASSIGNED}
+                onValueChange={(v) =>
+                  setForm({ ...form, trainingManager: v === UNASSIGNED ? "" : v })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Unassigned" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>
+                      {userFullName(u) || u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Item>
+          </div>
+
           <DialogFooter>
             <Button disabled={submitting} type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -295,10 +363,10 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   );
 }
 
-function Item({ label, children }: { label: string; children: React.ReactNode }) {
+function Item({ optional = false, label, children }: { optional?: boolean; label: string; children: React.ReactNode }) {
   return (
     <div>
-      <Label className="mb-1.5 block">{label}</Label>
+      <Label className="mb-1.5 block">{label}{optional && (<span className="text-gray-500 ml-2 text-xs font-normal">optional</span>)}</Label>
       {children}
     </div>
   );

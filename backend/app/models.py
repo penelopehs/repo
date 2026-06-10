@@ -234,6 +234,13 @@ class CrmLead(Base):
     salesperson_iduser = Column(
         Integer, ForeignKey("users.iduser"), nullable=True
     )
+    # Optional assignments (extra staff attached to the lead).
+    sales_manager_iduser = Column(
+        Integer, ForeignKey("users.iduser"), nullable=True
+    )
+    training_manager_iduser = Column(
+        Integer, ForeignKey("users.iduser"), nullable=True
+    )
     first_name = Column(String(255), nullable=False)
     last_name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=True)

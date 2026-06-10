@@ -33,6 +33,10 @@ interface ApiLeadListItem {
   lead_source: string | null;
   salesperson_iduser: number | null;
   salesperson_name: string | null;
+  sales_manager_iduser: number | null;
+  sales_manager_name: string | null;
+  training_manager_iduser: number | null;
+  training_manager_name: string | null;
   client_type: string; // "New" | "Returning"
   /** Unix epoch seconds (Python datetime.timestamp()), null if no calculation. */
   latest_calc_date: number | null;
@@ -118,6 +122,10 @@ function mapListItem(i: ApiLeadListItem): Lead {
     source: (i.lead_source ?? "Other") as LeadSource,
     rep: i.salesperson_name ?? "Unassigned",
     repId: i.salesperson_iduser ?? null,
+    salesManagerId: i.sales_manager_iduser ?? null,
+    salesManagerName: i.sales_manager_name ?? undefined,
+    trainingManagerId: i.training_manager_iduser ?? null,
+    trainingManagerName: i.training_manager_name ?? undefined,
     status: STATUS_FROM_API[i.pipeline_status] ?? "new",
     clientType: toClientType(i.client_type),
     engagementYears: taxYears.length,
@@ -153,6 +161,9 @@ export interface LeadCreateInput {
   /** epr id (identity_people_roles) of a picked existing client, if any. */
   eprId?: number | null;
   taxYears?: TaxYear[];
+  /** Optional assignments (users.iduser). */
+  salesManagerId?: number | null;
+  trainingManagerId?: number | null;
 }
 
 // ── Public API ──────────────────────────────────────────────────────────────────
@@ -201,6 +212,8 @@ export const leadsApi = {
       epr_id: input.eprId ?? null,
       rep: input.rep,
       tax_years: input.taxYears ?? [],
+      sales_manager_iduser: input.salesManagerId ?? null,
+      training_manager_iduser: input.trainingManagerId ?? null,
     });
     return mapListItem(item);
   },
@@ -217,6 +230,8 @@ export const leadsApi = {
     if (patch.source !== undefined) body.lead_source = patch.source;
     if (patch.status !== undefined) body.pipeline_status = STATUS_TO_API[patch.status];
     if (patch.repId !== undefined) body.salesperson_iduser = patch.repId;
+    if (patch.salesManagerId !== undefined) body.sales_manager_iduser = patch.salesManagerId;
+    if (patch.trainingManagerId !== undefined) body.training_manager_iduser = patch.trainingManagerId;
     if (patch.notes !== undefined) body.notes = patch.notes;
     if (patch.data !== undefined) body.data = patch.data;
 
