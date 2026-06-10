@@ -416,6 +416,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
             scheduled_date=c.scheduled_date,
             scheduled_time=c.scheduled_time,
             notes=c.notes,
+            call_type=c.call_type,
             completed=bool(c.completed),
         )
         for c in db.query(models.CrmFollowUpCall)
@@ -543,12 +544,20 @@ def delete_lead(lead_id: int, db: Session = Depends(get_db)):
 def create_follow_up_call(
     lead_id: int, body: schemas.FollowUpCallCreate, db: Session = Depends(get_db)
 ):
-    _get_lead(db, lead_id)
+    lead = _get_lead(db, lead_id)
+    # The call's type is the lead's current pipeline stage. A brand-new lead has
+    # no stage yet, so scheduling its first call advances it into "Intro Call".
+    if lead.pipeline_status == PipelineStatus.new_lead.value:
+        lead.pipeline_status = PipelineStatus.intro_call.value
+        call_type = PipelineStatus.intro_call.value
+    else:
+        call_type = lead.pipeline_status
     call = models.CrmFollowUpCall(
         crm_leads_id=lead_id,
         scheduled_date=body.scheduled_date,
         scheduled_time=body.scheduled_time,
         notes=body.notes,
+        call_type=call_type,
         completed=False,
     )
     db.add(call)
@@ -583,8 +592,21 @@ def update_follow_up_call(
     db: Session = Depends(get_db),
 ):
     call = _get_lead_call(db, lead_id, call_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    was_completed = bool(call.completed)
+    for field, value in data.items():
         setattr(call, field, value)
+    # Finishing a call advances the lead one pipeline stage (capped at Closed).
+    if data.get("completed") and not was_completed:
+        lead = _get_lead(db, lead_id)
+        lead.pipeline_status = models.next_pipeline_status(lead.pipeline_status)
+        # Reaching the terminal "Closed" stage starts the engagement clock,
+        # mirroring update_lead.
+        if (
+            lead.pipeline_status == PipelineStatus.closed.value
+            and lead.engagement_started_at is None
+        ):
+            lead.engagement_started_at = datetime.utcnow()
     db.commit()
     db.refresh(call)
     return _call_read(call)
@@ -612,6 +634,7 @@ def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
         scheduled_date=call.scheduled_date,
         scheduled_time=call.scheduled_time,
         notes=call.notes,
+        call_type=call.call_type,
         completed=bool(call.completed),
     )
 

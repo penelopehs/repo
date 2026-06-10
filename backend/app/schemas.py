@@ -181,6 +181,8 @@ class FollowUpCallRead(BaseModel):
     scheduled_date: date
     scheduled_time: Optional[str] = None
     notes: Optional[str] = None
+    # Pipeline stage this call works; copied from the lead at creation.
+    call_type: Optional[PipelineStatus] = None
     completed: bool
 
 

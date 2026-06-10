@@ -50,6 +50,22 @@ PIPELINE_ENUM = Enum(
     values_callable=lambda x: [e.value for e in x],
 )
 
+# A follow-up call's type mirrors the pipeline stage it works (PipelineStatus
+# beyond the initial "New Lead" — i.e. PipelineStatus[1:]).
+CALL_TYPE_ENUM = Enum(
+    *[s.value for s in PipelineStatus][1:],
+    name="crm_follow_up_calls_call_type",
+)
+
+
+def next_pipeline_status(current) -> str:
+    """The pipeline status one step after `current`, capped at the terminal
+    stage (Closed). Accepts and returns the stored string value."""
+    order = [s.value for s in PipelineStatus]
+    cur = current.value if isinstance(current, PipelineStatus) else current
+    idx = order.index(cur)
+    return order[idx + 1] if idx < len(order) - 1 else cur
+
 _CREATED = text("CURRENT_TIMESTAMP")
 _UPDATED = text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 
@@ -301,6 +317,7 @@ class CrmFollowUpCall(Base):
     scheduled_date = Column(Date, nullable=False)
     scheduled_time = Column(String(20), nullable=True)
     notes = Column(Text, nullable=True)
+    call_type = Column(CALL_TYPE_ENUM, nullable=True)
     completed = Column(Boolean, nullable=False, server_default=text("0"))
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)

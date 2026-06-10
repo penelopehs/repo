@@ -406,18 +406,22 @@ def test_follow_up_call_crud(client):
     assert created.status_code == 201
     call = created.json()
     assert call["completed"] is False
+    # A new lead's first call stamps "Intro Call" and advances the lead there.
+    assert call["call_type"] == "Intro Call"
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Intro Call"
 
     # Read: list for the lead.
     listed = client.get(f"/leads/{lead['id']}/follow-up-calls")
     assert listed.status_code == 200
     assert [c["id"] for c in listed.json()] == [call["id"]]
 
-    # Update: lead-scoped patch.
+    # Update: lead-scoped patch. Finishing the call advances the lead +1 stage.
     patched = client.patch(
         f"/leads/{lead['id']}/follow-up-calls/{call['id']}", json={"completed": True}
     )
     assert patched.status_code == 200
     assert patched.json()["completed"] is True
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Feasibility Call"
 
     # 404 when the call isn't on this lead (unknown call, or wrong lead).
     other = client.post("/leads", json={"first_name": "Other", "last_name": "Lead"}).json()
