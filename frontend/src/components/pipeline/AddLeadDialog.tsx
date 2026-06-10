@@ -23,13 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {Check, Loader2, Plus } from "lucide-react";
-import type { LeadSource, SalesRep, TaxYear } from "@/types/crm";
+import type { Lead, LeadSource, SalesRep, TaxYear } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import { clientsApi, type ClientContactRow } from "@/services/clients";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { ALL_TAX_YEARS } from "@/types/crm";
+import { IntroCallPromptDialog } from "@/components/pipeline/IntroCallPromptDialog";
 
 const SOURCES: LeadSource[] = [
   "Referral",
@@ -71,6 +72,7 @@ type SearchKey = "firstName" | "lastName" | "company";
 
 export function AddLeadDialog() {
   const [open, setOpen] = useState(false);
+  const [introPromptLead, setIntroPromptLead] = useState<Lead | null>(null);
   const [form, setForm] = useState<FormState>(initial);
   const [years, setYears] = useState<TaxYear[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
@@ -184,14 +186,15 @@ export function AddLeadDialog() {
     }
     setSubmitting(true);
     try {
-      await addLead({ ...parsed.data, eprId, taxYears: years });
-    toast.success("Lead added", {
+      const newLead = await addLead({ ...parsed.data, eprId, taxYears: years });
+      toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
-    });
-    setForm(initial);
-    setYears([]);
-    setErrors({});
-    setOpen(false);
+      });
+      setForm(initial);
+      setYears([]);
+      setErrors({});
+      setOpen(false);
+      setIntroPromptLead(newLead);
     } catch (err) {
       toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
     } finally {
@@ -200,6 +203,14 @@ export function AddLeadDialog() {
   };
 
   return (
+    <>
+    {introPromptLead && (
+      <IntroCallPromptDialog
+        lead={introPromptLead}
+        open={!!introPromptLead}
+        onOpenChange={(o) => { if (!o) setIntroPromptLead(null); }}
+      />
+    )}
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated">
@@ -360,6 +371,7 @@ export function AddLeadDialog() {
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 

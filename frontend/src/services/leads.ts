@@ -14,6 +14,7 @@ import type {
   LeadData,
   LeadSource,
   LeadStatus,
+  NextCallInfo,
   SalesRep,
   TaxYear,
 } from "@/types/crm";
@@ -43,6 +44,7 @@ interface ApiLeadListItem {
   // Per-lead aggregate (people, entities, calculations-by-year). Matches LeadData.
   data: LeadData | null;
   notes: string | null;
+  next_call: { date: string; time: string | null; call_type: string | null } | null;
 }
 
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
@@ -132,6 +134,9 @@ function mapListItem(i: ApiLeadListItem): Lead {
         : "—",
     addedAt: i.created_at,
     notes: i.notes ?? undefined,
+    nextCall: i.next_call
+      ? ({ date: i.next_call.date, time: i.next_call.time ?? undefined, callType: i.next_call.call_type } as NextCallInfo)
+      : null,
   };
 }
 

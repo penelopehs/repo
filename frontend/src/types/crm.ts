@@ -93,6 +93,17 @@ export interface LeadDataPerson {
   mobilePhone: string;
 }
 
+export type TaxYearStatus = "current" | "current_engaged" | "engaged" | "eligible_not_engaged" | "not_eligible";
+
+export interface TaxYearRecord {
+  status: TaxYearStatus;
+  notEligibleReason?: string;
+  /** Name of the rep who marked not-eligible */
+  notEligibleBy?: string;
+  /** ISO timestamp of when not-eligible was set */
+  notEligibleAt?: string;
+}
+
 /** Raw per-lead aggregate stored in the backend `crm_leads.data` column and
  *  echoed by GET/POST/PATCH /leads. */
 export interface LeadData {
@@ -104,6 +115,8 @@ export interface LeadData {
    *  empty array before the calculator has been opened for that year. */
   calculations: Record<string, Entity[] | unknown>;
   filingStatus?: FilingStatus;
+  /** Per-year R&D eligibility status overrides. Keyed by year as a string. */
+  yearStatuses?: Record<string, TaxYearRecord>;
 }
 
 export interface Lead {
@@ -136,6 +149,7 @@ export interface Lead {
   notes?: string;
   intakeNotes?: ProfileNote[];
   intake?: IntakeAnswers;
+  nextCall?: NextCallInfo | null;
 }
 
 export interface ProfileNote {
@@ -199,7 +213,15 @@ export interface FollowUpCall {
   date: string;
   time: string;
   notes: string;
+  callType?: string | null;
+  assignedRepName?: string | null;
   completed?: boolean;
+}
+
+export interface NextCallInfo {
+  date: string;
+  time?: string | null;
+  callType?: string | null;
 }
 
 // Documents
