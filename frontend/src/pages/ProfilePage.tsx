@@ -72,6 +72,7 @@ const NO_NOTES: ProfileNote[] = [];
 
 export function ProfilePage({ id }: { id: string }) {
   const me = useUsersStore((s) => s.me);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
@@ -192,6 +193,10 @@ export function ProfilePage({ id }: { id: string }) {
       void fetchLead(id).finally(() => setLeadLoading(false));
     }
   }, [id, lead, fetchLead]);
+
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
 
   useEffect(() => {
     void fetchCalls(id);
@@ -706,8 +711,8 @@ export function ProfilePage({ id }: { id: string }) {
 
         {/* Right sidebar */}
         <div className="space-y-6">
-          {/* Sales Rep */}
-          {me?.id === lead.lead.salesperson_iduser  && <Card title="Assigned Sales Representative">
+          {/* Sales Rep — hidden when the signed-in user is this lead's own rep. */}
+          {me?.iduser !== lead.repId && <Card title="Assigned Sales Representative">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 text-cyan text-sm font-bold ring-1 ring-cyan/25">
                 {lead.rep
