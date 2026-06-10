@@ -241,7 +241,6 @@ export interface FollowUpCall {
   date: string;
   time: string;
   notes: string;
-  callType?: string | null;
   assignedRepName?: string | null;
   completed?: boolean;
   /** Pipeline stage this call works (mirrors the lead's status at creation). */

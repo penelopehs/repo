@@ -19,17 +19,12 @@ import {
   Trash2,
   Calculator as CalcIcon,
   Loader2,
-<<<<<<< HEAD
+  Star,
+  Clock,
+  Ban,
   AlertTriangle,
   CheckCircle2,
   Circle,
-=======
-  Star,
-  Clock,
-  CheckCircle2,
-  Ban,
-  AlertTriangle,
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
 } from "lucide-react";
 import {
   BarChart,
@@ -66,10 +61,14 @@ import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-<<<<<<< HEAD
 import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
-import { cn } from "@/lib/utils";
-import type { FollowUpCall, LeadDataPerson, ProfileNote } from "@/types/crm";
+import type {
+  FollowUpCall,
+  LeadDataPerson,
+  ProfileNote,
+  TaxYearRecord,
+  TaxYearStatus,
+} from "@/types/crm";
 import { useUsersStore } from "@/store/usersStore";
 
 // The four scheduled calls a lead works through after "New Lead". Their order
@@ -82,9 +81,6 @@ const CALL_STEPS = [
   { title: "Tax Prepare Call", noun: "tax preparer call" },
   { title: "Close Call", noun: "close call" },
 ] as const;
-=======
-import type { FollowUpCall, LeadDataPerson, ProfileNote, TaxYearRecord, TaxYearStatus } from "@/types/crm";
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
 // array on every read (which would make useSyncExternalStore loop forever).
@@ -402,15 +398,9 @@ export function ProfilePage({ id }: { id: string }) {
             <p className="text-sm text-muted-foreground">{lead.company}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} />
-<<<<<<< HEAD
               {needsCall && (
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
                   <AlertTriangle className="h-3 w-3" /> No {activeStep.noun} scheduled
-=======
-              {!calls.some((c) => c.callType === "Intro Call") && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400">
-                  <AlertTriangle className="h-3 w-3" /> No intro call scheduled
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
                 </span>
               )}
             </div>
@@ -1076,6 +1066,11 @@ export function ProfilePage({ id }: { id: string }) {
                             {c.notes && (
                               <p className="mt-1 text-xs text-muted-foreground">{c.notes}</p>
                             )}
+                            {c.assignedRepName && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Rep: {c.assignedRepName}
+                              </p>
+                            )}
                             <p className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">
                               Status:{" "}
                               <span className={c.completed ? "text-green-600" : "text-amber-600"}>
@@ -1192,151 +1187,6 @@ export function ProfilePage({ id }: { id: string }) {
             )}
           </Card>
 
-<<<<<<< HEAD
-=======
-          {/* Follow-up Calls */}
-          <Card
-            id="section-calls"
-            title="Follow-up Calls"
-            action={
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setEditingCall(null);
-                  setOpenCall(true);
-                }}
-              >
-                <Plus className="mr-1 h-3 w-3" /> Add
-              </Button>
-            }
-          >
-            <ul className="space-y-2">
-              {/* Yellow reminder when no intro call has ever been booked */}
-              {!calls.some((c) => c.callType === "Intro Call") && (
-                <li className="rounded-lg border-l-4 border-l-amber-400 border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-700/50 dark:bg-amber-950/20">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-amber-800 dark:text-amber-300">
-                          No intro call scheduled
-                        </p>
-                        <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                          Reminder
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                        Lead added {formatDate(lead.addedAt)} — intro call not yet booked.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => { setEditingCall(null); setOpenCall(true); }}
-                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-cyan hover:underline"
-                      >
-                        <Phone className="h-3 w-3" /> Schedule now →
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              )}
-
-              {calls.length === 0 && (
-                <li className="text-sm text-muted-foreground">No follow-ups scheduled.</li>
-              )}
-
-              {[...calls]
-                .sort((a, b) => {
-                  if ((a.completed ?? false) !== (b.completed ?? false))
-                    return Number(a.completed ?? false) - Number(b.completed ?? false);
-                  const diff =
-                    new Date(`${a.date}T${a.time}`).getTime() -
-                    new Date(`${b.date}T${b.time}`).getTime();
-                  return a.completed ? -diff : diff;
-                })
-                .map((c) => {
-                  const isToday = c.date === new Date().toISOString().slice(0, 10);
-                  const isUpcoming = !c.completed && new Date(`${c.date}T${c.time || "00:00"}`).getTime() >= Date.now();
-                  const isIntro = c.callType === "Intro Call";
-                  return (
-                    <li
-                      key={c.id}
-                      className={cn(
-                        "rounded-lg border-l-4 border p-3 text-sm transition-colors",
-                        c.completed
-                          ? "border-l-green-400 border-green-100 bg-green-50/50 dark:border-green-800/40 dark:bg-green-950/10"
-                          : isIntro
-                            ? "border-l-cyan border-cyan/20 bg-cyan/5"
-                            : isToday
-                              ? "border-l-cyan/50 border-cyan/20 bg-cyan/5"
-                              : "border-l-border border-border",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-navy">
-                              {c.callType || "Follow-up Call"}
-                            </p>
-                            {isUpcoming && (
-                              <span className="rounded-full bg-cyan/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan">
-                                Upcoming
-                              </span>
-                            )}
-                            {c.completed && (
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700 dark:bg-green-900/40 dark:text-green-400">
-                                Completed
-                              </span>
-                            )}
-                            {isToday && !c.completed && (
-                              <span className="rounded-full bg-cyan px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                Today
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatDate(c.date)}
-                            {c.time && ` · ${formatTime(c.time)}`}
-                            {c.assignedRepName && ` · ${c.assignedRepName}`}
-                          </p>
-                          {c.notes && (
-                            <p className="mt-1 text-xs text-muted-foreground italic">{c.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-2">
-                          <Button
-                            size="sm"
-                            variant={c.completed ? "outline" : "outline"}
-                            className={cn(
-                              "h-7 rounded-full px-3 text-xs",
-                              c.completed
-                                ? "border-green-300 text-green-700 hover:bg-green-50"
-                                : "border-border text-muted-foreground hover:text-navy",
-                            )}
-                            onClick={() => void updateCall(id, c.id, { completed: !c.completed })}
-                          >
-                            {c.completed ? "Completed ✓" : "Mark complete"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-navy"
-                            title="Edit call"
-                            onClick={() => {
-                              setEditingCall(c);
-                              setOpenCall(true);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-          </Card>
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
-
           {/* Quick action */}
           <Button
             variant="outline"
@@ -1352,7 +1202,7 @@ export function ProfilePage({ id }: { id: string }) {
         clientId={id}
         call={editingCall}
         defaultCallType={
-          !editingCall && !calls.some((c) => c.callType === "Intro Call")
+          !editingCall && !calls.some((c) => c.callType === "intro_call")
             ? "Intro Call"
             : undefined
         }

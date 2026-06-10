@@ -603,12 +603,8 @@ def create_follow_up_call(
         scheduled_date=body.scheduled_date,
         scheduled_time=body.scheduled_time,
         notes=body.notes,
-<<<<<<< HEAD
         call_type=lead.pipeline_status,
-=======
-        call_type=body.call_type,
         assigned_rep_name=body.assigned_rep_name,
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
         completed=False,
     )
     db.add(call)
@@ -676,10 +672,7 @@ def _call_read(call: models.CrmFollowUpCall) -> schemas.FollowUpCallRead:
         scheduled_time=call.scheduled_time,
         notes=call.notes,
         call_type=call.call_type,
-<<<<<<< HEAD
-=======
         assigned_rep_name=call.assigned_rep_name,
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
         completed=bool(call.completed),
     )
 

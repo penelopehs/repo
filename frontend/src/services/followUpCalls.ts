@@ -13,12 +13,8 @@ interface ApiFollowUpCall {
   scheduled_date: string; // ISO date "YYYY-MM-DD"
   scheduled_time: string | null;
   notes: string | null;
-<<<<<<< HEAD
   call_type: string | null; // backend PipelineStatus value, e.g. "Intro Call"
-=======
-  call_type: string | null;
   assigned_rep_name: string | null;
->>>>>>> 5b07dab088847c23de15d2fb8b499c1cf2d8a35d
   completed: boolean;
 }
 
@@ -37,7 +33,6 @@ function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
     date: c.scheduled_date,
     time: c.scheduled_time ?? "",
     notes: c.notes ?? "",
-    callType: c.call_type,
     assignedRepName: c.assigned_rep_name,
     completed: c.completed,
     callType: c.call_type ? CALL_TYPE_FROM_API[c.call_type] : undefined,
@@ -52,7 +47,11 @@ export interface FollowUpCallCreateInput {
   assignedRepName?: string;
 }
 
-export type FollowUpCallPatch = Partial<Pick<FollowUpCall, "date" | "time" | "notes" | "callType" | "assignedRepName" | "completed">>;
+// callType is decoupled from the read model's LeadStatus: the dialog sends a
+// free-text call type (e.g. "Intro Call") that the backend maps onto its enum.
+export type FollowUpCallPatch = Partial<
+  Pick<FollowUpCall, "date" | "time" | "notes" | "assignedRepName" | "completed">
+> & { callType?: string };
 
 export const followUpCallsApi = {
   async list(leadId: string): Promise<FollowUpCall[]> {
