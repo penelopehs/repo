@@ -228,6 +228,8 @@ export interface FollowUpCall {
   time: string;
   notes: string;
   completed?: boolean;
+  /** Pipeline stage this call works (mirrors the lead's status at creation). */
+  callType?: LeadStatus;
 }
 
 // Documents

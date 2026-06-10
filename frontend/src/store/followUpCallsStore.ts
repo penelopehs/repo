@@ -8,6 +8,7 @@ import {
   type FollowUpCallCreateInput,
   type FollowUpCallPatch,
 } from "@/services/followUpCalls";
+import { useLeadsStore } from "@/store/leadsStore";
 
 interface FollowUpCallsState {
   byLead: Record<string, FollowUpCall[]>;
@@ -41,6 +42,9 @@ export const useFollowUpCallsStore = create<FollowUpCallsState>((set) => ({
     set((s) => ({
       byLead: { ...s.byLead, [leadId]: [created, ...(s.byLead[leadId] ?? [])] },
     }));
+    // Scheduling a call can advance the lead's pipeline stage on the backend;
+    // refresh the lead so the status badge and Call Progress stay in sync.
+    await useLeadsStore.getState().fetchLead(leadId);
   },
 
   update: async (leadId, callId, patch) => {
@@ -51,5 +55,7 @@ export const useFollowUpCallsStore = create<FollowUpCallsState>((set) => ({
         [leadId]: (s.byLead[leadId] ?? []).map((c) => (c.id === callId ? updated : c)),
       },
     }));
+    // Editing/completing a call may affect lead-derived UI; keep the lead fresh.
+    await useLeadsStore.getState().fetchLead(leadId);
   },
 }));

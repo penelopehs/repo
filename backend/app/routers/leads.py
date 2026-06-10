@@ -545,19 +545,35 @@ def create_follow_up_call(
     lead_id: int, body: schemas.FollowUpCallCreate, db: Session = Depends(get_db)
 ):
     lead = _get_lead(db, lead_id)
-    # The call's type is the lead's current pipeline stage. A brand-new lead has
-    # no stage yet, so scheduling its first call advances it into "Intro Call".
-    if lead.pipeline_status == PipelineStatus.new_lead.value:
-        lead.pipeline_status = PipelineStatus.intro_call.value
-        call_type = PipelineStatus.intro_call.value
-    else:
-        call_type = lead.pipeline_status
+    # Scheduling a call advances the lead one pipeline stage, but only once the
+    # previous call has been completed. A brand-new lead has no prior call, so
+    # its first call is always allowed to advance (New Lead -> Intro Call). This
+    # keeps a lead from skipping ahead while an earlier call is still open.
+    latest = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead_id)
+        .order_by(
+            models.CrmFollowUpCall.scheduled_date.desc(),
+            models.CrmFollowUpCall.idcrm_follow_up_call.desc(),
+        )
+        .first()
+    )
+    if latest is None or latest.completed:
+        lead.pipeline_status = models.next_pipeline_status(lead.pipeline_status)
+        # Reaching the terminal "Closed" stage starts the engagement clock,
+        # mirroring update_lead.
+        if (
+            lead.pipeline_status == PipelineStatus.closed.value
+            and lead.engagement_started_at is None
+        ):
+            lead.engagement_started_at = datetime.utcnow()
+    # The call's type mirrors the lead's (possibly just-advanced) pipeline stage.
     call = models.CrmFollowUpCall(
         crm_leads_id=lead_id,
         scheduled_date=body.scheduled_date,
         scheduled_time=body.scheduled_time,
         notes=body.notes,
-        call_type=call_type,
+        call_type=lead.pipeline_status,
         completed=False,
     )
     db.add(call)
@@ -593,20 +609,10 @@ def update_follow_up_call(
 ):
     call = _get_lead_call(db, lead_id, call_id)
     data = body.model_dump(exclude_unset=True)
-    was_completed = bool(call.completed)
     for field, value in data.items():
         setattr(call, field, value)
-    # Finishing a call advances the lead one pipeline stage (capped at Closed).
-    if data.get("completed") and not was_completed:
-        lead = _get_lead(db, lead_id)
-        lead.pipeline_status = models.next_pipeline_status(lead.pipeline_status)
-        # Reaching the terminal "Closed" stage starts the engagement clock,
-        # mirroring update_lead.
-        if (
-            lead.pipeline_status == PipelineStatus.closed.value
-            and lead.engagement_started_at is None
-        ):
-            lead.engagement_started_at = datetime.utcnow()
+    # Completing a call no longer advances the lead; the pipeline now advances
+    # when the *next* call is scheduled (see create_follow_up_call).
     db.commit()
     db.refresh(call)
     return _call_read(call)

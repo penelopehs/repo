@@ -49,7 +49,7 @@ import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-import { pipelineStageIndex } from "@/types/crm";
+import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
 import { cn } from "@/lib/utils";
 import type { FollowUpCall, LeadDataPerson, ProfileNote } from "@/types/crm";
 import { useUsersStore } from "@/store/usersStore";
@@ -184,12 +184,11 @@ export function ProfilePage({ id }: { id: string }) {
     }
   };
 
-  // Toggle a follow-up call's completed state, then refresh the lead — completing
-  // a call can advance the lead's pipeline status on the backend, and the Call
-  // Progress / status badge are driven off the lead, not the call.
+  // Toggle a follow-up call's completed state. The store refreshes the lead
+  // afterwards, so the Call Progress / status badge (driven off the lead) and
+  // the call's own completed flag stay in sync.
   const handleToggleCallComplete = async (call: FollowUpCall) => {
     await updateCall(id, call.id, { completed: !call.completed });
-    await fetchLead(id);
   };
 
   const { engagements, entities: clientEntities } = byClient(id);
@@ -279,9 +278,14 @@ export function ProfilePage({ id }: { id: string }) {
   // People & Contacts live on the lead's `data.people[]` and persist via PATCH /leads/{id}.
   const people = lead.data?.people ?? [];
 
-  // Call Progress: the lead's pipeline stage index (0 = New Lead) equals the
-  // number of completed calls, so it points at the call currently in progress.
+  // Call Progress: the lead advances one pipeline stage each time a call is
+  // *scheduled*, so stageIndex is the number of scheduled calls (0 = New Lead).
   const stageIndex = pipelineStageIndex(lead.status);
+  // The call working the lead's current stage (undefined for a brand-new lead).
+  // While it's still open the next step can't be scheduled yet, so the pipeline
+  // is "in progress" on this call rather than on the next step.
+  const currentCall = calls.find((c) => c.callType === lead.status);
+  const currentOpen = !!currentCall && !currentCall.completed;
   const activeStep = stageIndex < CALL_STEPS.length ? CALL_STEPS[stageIndex] : null;
   // Warn when the in-progress call has no upcoming follow-up scheduled yet.
   const needsCall = !!activeStep && upcomingCalls === 0;
@@ -443,27 +447,43 @@ export function ProfilePage({ id }: { id: string }) {
           <Card title="Call Progress">
             <ol className="space-y-2">
               {CALL_STEPS.map((step, i) => {
+                // Each scheduled call advances the stage, so steps below
+                // stageIndex already have a call — completed or merely scheduled.
+                // Look up this stage's call to tell the two apart (a
+                // scheduled-but-open call reads as "Scheduled", not "Completed").
+                // The step at stageIndex only becomes "active" once the current
+                // call is completed; while it's still open, the next step stays
+                // pending so just one step shows as in progress.
+                const stepStatus = PIPELINE_STAGES[i + 1]?.value;
+                const stepCall = calls.find((c) => c.callType === stepStatus);
                 const state =
-                  stageIndex > i ? "done" : stageIndex === i ? "active" : "pending";
+                  stepCall && !stepCall.completed
+                    ? "scheduled"
+                    : i < stageIndex
+                      ? "done"
+                      : i === stageIndex && !currentOpen
+                        ? "active"
+                        : "pending";
                 const sub =
                   state === "done"
                     ? "Completed"
-                    : state === "active"
-                      ? nextCall
-                        ? `Scheduled for ${formatDate(nextCall.date)}`
-                        : "Not yet scheduled"
-                      : i === CALL_STEPS.length - 1
-                        ? "Pending prior steps"
-                        : `Pending ${CALL_STEPS[i - 1].noun}`;
+                    : state === "scheduled"
+                      ? `Scheduled for ${formatDate(stepCall!.date)}`
+                      : state === "active"
+                        ? nextCall
+                          ? `Scheduled for ${formatDate(nextCall.date)}`
+                          : "Not yet scheduled"
+                        : i === CALL_STEPS.length - 1
+                          ? "Pending prior steps"
+                          : `Pending ${CALL_STEPS[i - 1].noun}`;
                 const Icon = state === "done" ? CheckCircle2 : Circle;
+                const highlighted = state === "active" || state === "scheduled";
                 return (
                   <li
                     key={step.title}
                     className={cn(
                       "flex items-start gap-3 rounded-xl border p-4 transition-colors",
-                      state === "active"
-                        ? "border-cyan/50 bg-cyan/5"
-                        : "border-border",
+                      highlighted ? "border-cyan/50 bg-cyan/5" : "border-border",
                       state === "pending" && "opacity-60",
                     )}
                   >
@@ -472,7 +492,7 @@ export function ProfilePage({ id }: { id: string }) {
                         "mt-0.5 h-4 w-4 shrink-0",
                         state === "done"
                           ? "text-green-600"
-                          : state === "active"
+                          : highlighted
                             ? "text-cyan"
                             : "text-muted-foreground",
                       )}

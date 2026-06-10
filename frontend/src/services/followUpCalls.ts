@@ -6,15 +6,24 @@
 //   PATCH /leads/{lead_id}/follow-up-calls/{call_id}
 
 import { api } from "@/services/api";
-import type { FollowUpCall } from "@/types/crm";
+import type { FollowUpCall, LeadStatus } from "@/types/crm";
 
 interface ApiFollowUpCall {
   id: number;
   scheduled_date: string; // ISO date "YYYY-MM-DD"
   scheduled_time: string | null;
   notes: string | null;
+  call_type: string | null; // backend PipelineStatus value, e.g. "Intro Call"
   completed: boolean;
 }
+
+// Backend Title Case PipelineStatus value → frontend snake_case LeadStatus.
+const CALL_TYPE_FROM_API: Record<string, LeadStatus> = {
+  "Intro Call": "intro_call",
+  "Feasibility Call": "feasibility_call",
+  "Tax Preparer Coordination": "tax_preparer_coordination",
+  Closed: "closed",
+};
 
 function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
   return {
@@ -24,6 +33,7 @@ function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
     time: c.scheduled_time ?? "",
     notes: c.notes ?? "",
     completed: c.completed,
+    callType: c.call_type ? CALL_TYPE_FROM_API[c.call_type] : undefined,
   };
 }
 
