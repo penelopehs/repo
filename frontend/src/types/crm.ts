@@ -49,7 +49,30 @@ export interface Entity {
 }
 
 // Leads / Pipeline
-export type LeadStatus = "new" | "calculation_sent" | "sow_signed" | "active_engagement" | "lost";
+//
+// Pipeline stages mirror the backend `PipelineStatus` enum (models.py). They are
+// ordered: a lead advances New Lead → Intro Call → Feasibility Call → Tax
+// Preparer Coordination → Closed. The numeric index of `status` in
+// PIPELINE_STAGES is the lead's progress through the pipeline.
+export type LeadStatus =
+  | "new_lead"
+  | "intro_call"
+  | "feasibility_call"
+  | "tax_preparer_coordination"
+  | "closed";
+
+/** Ordered pipeline stages with display labels (index = pipeline progress). */
+export const PIPELINE_STAGES: { value: LeadStatus; label: string }[] = [
+  { value: "new_lead", label: "New Lead" },
+  { value: "intro_call", label: "Intro Call" },
+  { value: "feasibility_call", label: "Feasibility Call" },
+  { value: "tax_preparer_coordination", label: "Tax Preparer Coordination" },
+  { value: "closed", label: "Closed" },
+];
+
+/** Progress index of a status within the pipeline (0 = New Lead). */
+export const pipelineStageIndex = (status: LeadStatus): number =>
+  Math.max(0, PIPELINE_STAGES.findIndex((s) => s.value === status));
 
 export type LeadSource =
   | "Referral"

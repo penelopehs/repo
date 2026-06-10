@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
@@ -41,13 +41,7 @@ const SOURCES: LeadSource[] = [
   "Partner",
   "Other",
 ];
-const STATUSES: { value: LeadStatus; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "calculation_sent", label: "Calculation Sent" },
-  { value: "sow_signed", label: "SOW Signed" },
-  { value: "active_engagement", label: "Active Engagement" },
-  { value: "lost", label: "Lost" },
-];
+const STATUSES: { value: LeadStatus; label: string }[] = PIPELINE_STAGES;
 
 const schema = z.object({
   firstName: z.string().trim().min(1).max(60),
@@ -64,7 +58,13 @@ const schema = z.object({
     "Partner",
     "Other",
   ]),
-  status: z.enum(["new", "calculation_sent", "sow_signed", "active_engagement", "lost"]),
+  status: z.enum([
+    "new_lead",
+    "intro_call",
+    "feasibility_call",
+    "tax_preparer_coordination",
+    "closed",
+  ]),
   taxYears: z.array(z.number().int()).optional(),
   entityNames: z.string().max(2000).optional(),
   notes: z.string().max(2000).optional(),

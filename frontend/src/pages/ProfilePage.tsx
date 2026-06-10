@@ -19,6 +19,9 @@ import {
   Trash2,
   Calculator as CalcIcon,
   Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import {
   BarChart,
@@ -46,7 +49,21 @@ import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatTime } from "@/utils/format";
 import { buildCalculationSearch } from "@/utils/calculationContext";
+import { pipelineStageIndex } from "@/types/crm";
+import { cn } from "@/lib/utils";
 import type { FollowUpCall, LeadDataPerson, ProfileNote } from "@/types/crm";
+import { useUsersStore } from "@/store/usersStore";
+
+// The four scheduled calls a lead works through after "New Lead". Their order
+// mirrors the pipeline stages (intro_call → feasibility_call →
+// tax_preparer_coordination → closed); a lead's stage index says how many of
+// these calls are done.
+const CALL_STEPS = [
+  { title: "Intro Call", noun: "intro call" },
+  { title: "Feasibility Call", noun: "feasibility call" },
+  { title: "Tax Prepare Call", noun: "tax preparer call" },
+  { title: "Close Call", noun: "close call" },
+] as const;
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
 // array on every read (which would make useSyncExternalStore loop forever).
@@ -54,6 +71,7 @@ const NO_CALLS: FollowUpCall[] = [];
 const NO_NOTES: ProfileNote[] = [];
 
 export function ProfilePage({ id }: { id: string }) {
+  const me = useUsersStore((s) => s.me);
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
@@ -215,6 +233,17 @@ export function ProfilePage({ id }: { id: string }) {
     (c) => new Date(`${c.date}T${c.time}`).getTime() >= Date.now(),
   ).length;
 
+  // Soonest pending future call — drives the "active" Call Progress step.
+  const nextCall = useMemo(() => {
+    const future = calls
+      .filter((c) => !c.completed && new Date(`${c.date}T${c.time}`).getTime() >= Date.now())
+      .sort(
+        (a, b) =>
+          new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime(),
+      );
+    return future[0] ?? null;
+  }, [calls]);
+
   if (!lead) {
     if (leadLoading) {
       return (
@@ -236,6 +265,13 @@ export function ProfilePage({ id }: { id: string }) {
 
   // People & Contacts live on the lead's `data.people[]` and persist via PATCH /leads/{id}.
   const people = lead.data?.people ?? [];
+
+  // Call Progress: the lead's pipeline stage index (0 = New Lead) equals the
+  // number of completed calls, so it points at the call currently in progress.
+  const stageIndex = pipelineStageIndex(lead.status);
+  const activeStep = stageIndex < CALL_STEPS.length ? CALL_STEPS[stageIndex] : null;
+  // Warn when the in-progress call has no upcoming follow-up scheduled yet.
+  const needsCall = !!activeStep && upcomingCalls === 0;
 
   const resetContactForm = () => {
     setContactForm({
@@ -326,8 +362,13 @@ export function ProfilePage({ id }: { id: string }) {
             <p className="text-xs font-semibold uppercase tracking-widest text-cyan">Client</p>
             <h1 className="text-2xl font-bold text-navy">{lead.fullName}</h1>
             <p className="text-sm text-muted-foreground">{lead.company}</p>
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} />
+              {needsCall && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                  <AlertTriangle className="h-3 w-3" /> No {activeStep.noun} scheduled
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -385,6 +426,61 @@ export function ProfilePage({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Left column */}
         <div className="space-y-6">
+          {/* Call Progress */}
+          <Card title="Call Progress">
+            <ol className="space-y-2">
+              {CALL_STEPS.map((step, i) => {
+                const state =
+                  stageIndex > i ? "done" : stageIndex === i ? "active" : "pending";
+                const sub =
+                  state === "done"
+                    ? "Completed"
+                    : state === "active"
+                      ? nextCall
+                        ? `Scheduled for ${formatDate(nextCall.date)}`
+                        : "Not yet scheduled"
+                      : i === CALL_STEPS.length - 1
+                        ? "Pending prior steps"
+                        : `Pending ${CALL_STEPS[i - 1].noun}`;
+                const Icon = state === "done" ? CheckCircle2 : Circle;
+                return (
+                  <li
+                    key={step.title}
+                    className={cn(
+                      "flex items-start gap-3 rounded-xl border p-4 transition-colors",
+                      state === "active"
+                        ? "border-cyan/50 bg-cyan/5"
+                        : "border-border",
+                      state === "pending" && "opacity-60",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "mt-0.5 h-4 w-4 shrink-0",
+                        state === "done"
+                          ? "text-green-600"
+                          : state === "active"
+                            ? "text-cyan"
+                            : "text-muted-foreground",
+                      )}
+                    />
+                    <div>
+                      <p
+                        className={cn(
+                          "text-sm font-semibold",
+                          state === "pending" ? "text-muted-foreground" : "text-navy",
+                        )}
+                      >
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{sub}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </Card>
+
           {/* General Info */}
           <Card title="General Information">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -611,7 +707,7 @@ export function ProfilePage({ id }: { id: string }) {
         {/* Right sidebar */}
         <div className="space-y-6">
           {/* Sales Rep */}
-          <Card title="Assigned Sales Representative">
+          {me?.id === lead.lead.salesperson_iduser  && <Card title="Assigned Sales Representative">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 text-cyan text-sm font-bold ring-1 ring-cyan/25">
                 {lead.rep
@@ -625,7 +721,7 @@ export function ProfilePage({ id }: { id: string }) {
                 <p className="text-xs text-muted-foreground">Senior Sales Representative</p>
               </div>
             </div>
-          </Card>
+          </Card>}
 
           {/* People & Contacts */}
           <Card
@@ -848,72 +944,7 @@ export function ProfilePage({ id }: { id: string }) {
             </ul>
           </Card>
 
-          {/* Engagements */}
-          <Card title="Engagements" id="section-engagements">
-            {engagements.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No engagements yet.</p>
-            ) : (
-              <>
-                <ul className="mb-4 space-y-2">
-                  {engagements.map((e) => (
-                    <li
-                      key={e.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3 text-sm"
-                    >
-                      <div>
-                        <p className="font-semibold text-navy">{e.type}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {e.phase} · {e.status}
-                        </p>
-                      </div>
-                      <YearChips years={e.years} />
-                    </li>
-                  ))}
-                </ul>
-                <div className="rounded-lg border border-border bg-card p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-cyan">
-                    R&amp;D Tax Credit — {engagementYears.length ? engagementYears.join(", ") : "—"}
-                  </p>
-                  <div className="mt-2 h-44">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={chartData}
-                        layout="vertical"
-                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.012 230)" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                          fontSize={11}
-                          stroke="oklch(0.50 0.03 245)"
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="year"
-                          fontSize={11}
-                          stroke="oklch(0.50 0.03 245)"
-                          width={42}
-                        />
-                        <RTooltip
-                          formatter={(v: number) => formatCurrency(v)}
-                          cursor={{ fill: "oklch(0.94 0.02 220 / 0.5)" }}
-                        />
-                        <Bar dataKey="amount" fill="var(--orange)" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Total engagement value</span>
-                    <span className="font-bold text-navy tabular-nums">
-                      {formatCurrency(grandTotal)}
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </Card>
-
+          
           {/* Follow-up Calls */}
           <Card
             id="section-calls"
@@ -927,10 +958,18 @@ export function ProfilePage({ id }: { id: string }) {
                   setOpenCall(true);
                 }}
               >
-                <Plus className="mr-1 h-3 w-3" /> Add
+                <Plus className="mr-1 h-3 w-3" /> Schedule
               </Button>
             }
           >
+            {needsCall && (
+              <Alert className="mb-4 border-amber-300 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800">
+                  Schedule {activeStep.noun} to advance this lead.
+                </AlertDescription>
+              </Alert>
+            )}
             {calls.length === 0 ? (
               <p className="text-sm text-muted-foreground">No follow-ups scheduled.</p>
             ) : (
@@ -1005,6 +1044,73 @@ export function ProfilePage({ id }: { id: string }) {
               </ul>
             )}
           </Card>
+
+          {/* Engagements */}
+          <Card title="Engagements" id="section-engagements">
+            {engagements.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No engagements yet.</p>
+            ) : (
+              <>
+                <ul className="mb-4 space-y-2">
+                  {engagements.map((e) => (
+                    <li
+                      key={e.id}
+                      className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3 text-sm"
+                    >
+                      <div>
+                        <p className="font-semibold text-navy">{e.type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {e.phase} · {e.status}
+                        </p>
+                      </div>
+                      <YearChips years={e.years} />
+                    </li>
+                  ))}
+                </ul>
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-cyan">
+                    R&amp;D Tax Credit — {engagementYears.length ? engagementYears.join(", ") : "—"}
+                  </p>
+                  <div className="mt-2 h-44">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartData}
+                        layout="vertical"
+                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.012 230)" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                          fontSize={11}
+                          stroke="oklch(0.50 0.03 245)"
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="year"
+                          fontSize={11}
+                          stroke="oklch(0.50 0.03 245)"
+                          width={42}
+                        />
+                        <RTooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          cursor={{ fill: "oklch(0.94 0.02 220 / 0.5)" }}
+                        />
+                        <Bar dataKey="amount" fill="var(--orange)" radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total engagement value</span>
+                    <span className="font-bold text-navy tabular-nums">
+                      {formatCurrency(grandTotal)}
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </Card>
+
 
           {/* Quick action */}
           <Button

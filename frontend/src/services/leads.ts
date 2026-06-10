@@ -52,18 +52,19 @@ interface ApiLeadListItem {
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
 
 const STATUS_FROM_API: Record<string, LeadStatus> = {
-  Lead: "new",
-  "Calculation Sent": "calculation_sent",
-  "SOW Signed": "sow_signed",
-  "Active Engagement": "active_engagement",
+  "New Lead": "new_lead",
+  "Intro Call": "intro_call",
+  "Feasibility Call": "feasibility_call",
+  "Tax Preparer Coordination": "tax_preparer_coordination",
+  Closed: "closed",
 };
 
 const STATUS_TO_API: Record<LeadStatus, string> = {
-  new: "Lead",
-  calculation_sent: "Calculation Sent",
-  sow_signed: "SOW Signed",
-  active_engagement: "Active Engagement",
-  lost: "Lost", // no backend enum value yet — sent as-is for the future update.
+  new_lead: "New Lead",
+  intro_call: "Intro Call",
+  feasibility_call: "Feasibility Call",
+  tax_preparer_coordination: "Tax Preparer Coordination",
+  closed: "Closed",
 };
 
 const TAX_YEARS = new Set<number>(ALL_TAX_YEARS);
@@ -124,7 +125,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
     salesManagerName: i.sales_manager_name ?? undefined,
     trainingManagerId: i.training_manager_iduser ?? null,
     trainingManagerName: i.training_manager_name ?? undefined,
-    status: STATUS_FROM_API[i.pipeline_status] ?? "new",
+    status: STATUS_FROM_API[i.pipeline_status] ?? "new_lead",
     clientType: toClientType(i.client_type),
     engagementYears: taxYears.length,
     taxYears,

@@ -245,7 +245,7 @@ def list_leads(
     db: Session = Depends(get_db),
     status: Optional[str] = Query(
         None,
-        description="Comma-separated pipeline statuses, e.g. 'Lead,Calculation Sent' "
+        description="Comma-separated pipeline statuses, e.g. 'New Lead,Intro Call' "
         "for the New Leads table.",
     ),
 ):
@@ -350,7 +350,7 @@ def create_lead(
         last_name=body.last_name,
         email=body.email,
         phone=body.phone,
-        pipeline_status=PipelineStatus.lead.value,
+        pipeline_status=PipelineStatus.new_lead.value,
         lead_source=body.lead_source,
         salesperson_iduser=body.assigned_sales_rep or caller.iduser,
         sales_manager_iduser=body.sales_manager_iduser,
@@ -512,9 +512,8 @@ def update_lead(
     if isinstance(new_status, PipelineStatus):
         new_status = new_status.value
         data["pipeline_status"] = new_status
-    if new_status == PipelineStatus.sow_signed.value and lead.sow_signed_at is None:
-        lead.sow_signed_at = datetime.utcnow()
-    if new_status == PipelineStatus.active_engagement.value and lead.engagement_started_at is None:
+    # Closing a lead (terminal "won" stage) starts the engagement clock.
+    if new_status == PipelineStatus.closed.value and lead.engagement_started_at is None:
         lead.engagement_started_at = datetime.utcnow()
 
     for field, value in data.items():
@@ -822,9 +821,9 @@ def save_calculations(
 ):
     lead = _get_lead(db, lead_id)
     lead.data = body.data
-    # Mirror the old saveCalculation behaviour: a fresh Lead becomes Calculation Sent.
-    if lead.pipeline_status == PipelineStatus.lead.value:
-        lead.pipeline_status = PipelineStatus.calculation_sent.value
+    # Saving a calculation advances a brand-new lead into the Intro Call stage.
+    if lead.pipeline_status == PipelineStatus.new_lead.value:
+        lead.pipeline_status = PipelineStatus.intro_call.value
     db.commit()
     db.refresh(lead)
     return _build_detail(db, lead)
