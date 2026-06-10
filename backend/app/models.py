@@ -38,20 +38,17 @@ from app.database import Base
 class PipelineStatus(str, enum.Enum):
     """Sales-pipeline status carried by a crm_lead (extra_db.md)."""
 
-    lead = "Lead"
-    calculation_sent = "Calculation Sent"
-    sow_signed = "SOW Signed"
-    active_engagement = "Active Engagement"
-
+    new_lead = "New Lead"
+    intro_call = "Intro Call"
+    feasibility_call = "Feasibility Call"
+    tax_preparer_coordination = "Tax Preparer Coordination"
+    closed = "Closed"
 
 PIPELINE_ENUM = Enum(
     *[s.value for s in PipelineStatus],
     name="crm_leads_pipeline_status",
     values_callable=lambda x: [e.value for e in x],
 )
-
-# Statuses that keep a lead in the "New Leads" list (pre-signature).
-LEAD_STATUSES = (PipelineStatus.lead.value, PipelineStatus.calculation_sent.value)
 
 _CREATED = text("CURRENT_TIMESTAMP")
 _UPDATED = text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
@@ -228,7 +225,7 @@ class CrmLead(Base):
         nullable=True,
     )
     pipeline_status = Column(
-        PIPELINE_ENUM, nullable=False, server_default=PipelineStatus.lead.value
+        PIPELINE_ENUM, nullable=False, server_default=PipelineStatus.new_lead.value
     )
     lead_source = Column(String(100), nullable=True)
     salesperson_iduser = Column(

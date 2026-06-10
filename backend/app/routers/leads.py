@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import verify_token
 from app.database import get_db
-from app.models import LEAD_STATUSES, PipelineStatus
+from app.models import PipelineStatus
 
 router = APIRouter(tags=["leads"], dependencies=[Depends(verify_token)])
 
