@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
+import type { Lead, LeadDataEntity, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
 import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
@@ -119,7 +119,9 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     email: lead.email,
     phone: lead.phone,
     source: lead.source,
-    rep: lead.rep,
+    // Track the assigned rep by users.iduser (as a string) so it can be changed
+    // and round-tripped through the update endpoint (repId → salesperson_iduser).
+    rep: lead.repId != null ? String(lead.repId) : "",
     status: lead.status,
     taxYears: lead.taxYears ?? [],
     entityNames: (lead.entityNames ?? []).join(",\n"),
@@ -156,9 +158,26 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         .map((s) => s.trim())
           .filter(Boolean)
         .filter((n) => n !== company);
-      const entities = (company ? [company, ...extraEntities] : extraEntities).map((name) => ({
-        name,
-      }));
+      const names = company ? [company, ...extraEntities] : extraEntities;
+      // Rebuild the entity list, preserving each entity's stable id (and thus
+      // its people links) by matching on name. New names get a fresh id.
+      const byName = new Map((base.entities ?? []).map((e) => [e.name, e] as const));
+      const usedIds = new Set((base.entities ?? []).map((e) => e.id));
+      const newEntityId = () => {
+        let id = `e_${Date.now().toString(36)}`;
+        for (let n = 2; usedIds.has(id); n++) id = `e_${Date.now().toString(36)}_${n}`;
+        usedIds.add(id);
+        return id;
+      };
+      const entities: LeadDataEntity[] = names.map((name) => {
+        const existing = byName.get(name);
+        return existing ? { ...existing, name } : { id: newEntityId(), name };
+      });
+      // Drop people-links for entities that were removed in this edit.
+      const keptIds = new Set(entities.map((e) => e.id));
+      const entityPeople = Object.fromEntries(
+        Object.entries(base.entityPeople ?? {}).filter(([entityId]) => keptIds.has(entityId)),
+      );
       // Each tax year keeps its own calculation (an entity array). Preserve any
       // existing bucket; default new years to an empty array for the calculator
       // to seed from the entity list on first open.
@@ -166,7 +185,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       for (const y of form.taxYears) {
         calculations[String(y)] = base.calculations[String(y)] ?? [];
       }
-      const data = { ...base, entities, calculations };
+      const data = { ...base, entities, calculations, entityPeople };
 
       await update(lead.id, {
         firstName: parsed.data.firstName,
@@ -176,6 +195,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         source: parsed.data.source,
         status: parsed.data.status,
         notes: parsed.data.notes,
+        repId: form.rep ? Number(form.rep) : null,
         salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
         trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
         data,
@@ -254,14 +274,20 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              <Select value={form.rep || "Unassigned"}>
+              <Select
+                value={form.rep || UNASSIGNED}
+                onValueChange={(v) => setForm({ ...form, rep: v === UNASSIGNED ? "" : v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={form.rep || "Unassigned"}>
-                    {form.rep || "Unassigned"}
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>
+                      {userFullName(u) || u.email}
                     </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Item>

@@ -98,9 +98,10 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
         models.CrmLead.crm_lead_id == body["id"]
     ).first()
     assert lead.data == {
-        "entities": [{"name": "Pike Diagnostics"}],
+        "entities": [{"id": "e_pike-diagnostics", "name": "Pike Diagnostics"}],
         "calculations": {"2025": {}, "2026": {}},
         "people": [],
+        "entityPeople": {},
     }
 
 
@@ -212,7 +213,7 @@ def test_get_detail_404(client):
 
 
 def test_detail_returns_data_blob(client, db_session):
-    _, _, epr_id = make_assignment(db_session)
+    client_id, entity_id, epr_id = make_assignment(db_session)
     lead = client.post(
         "/leads",
         json={
@@ -224,11 +225,31 @@ def test_detail_returns_data_blob(client, db_session):
         },
     ).json()
 
-    body = client.get(f"/leads/{lead['id']}").json()
-    assert body["data"] == {
-        "entities": [{"name": "Detail Co"}],
-        "calculations": {"2024": {}},
-        "people": [],
+    data = client.get(f"/leads/{lead['id']}").json()["data"]
+    # Tax-year buckets come from the seed; the entity/people graph is pulled
+    # from the EPR's client (replacing the seed "Detail Co" company name).
+    assert data["calculations"] == {"2024": {}}
+    assert data["entities"] == [
+        {
+            "id": f"e_db_{entity_id}",
+            "entityId": entity_id,
+            "name": "Acme Health, PC",
+            "ein": f"99-{client_id:07d}",
+            "state": "CA",
+            "city": "",
+        }
+    ]
+    assert len(data["people"]) == 1
+    person = data["people"][0]
+    assert person["personId"] == int(person["id"])
+    # The entity↔people link is seeded keyed by entity id → [person id].
+    assert data["entityPeople"] == {f"e_db_{entity_id}": [person["id"]]}
+    # Emails/phones are one-to-many lists (this seed person has none).
+    assert {k: person[k] for k in (
+        "firstName", "lastName", "title", "firm", "role", "emails", "phones",
+    )} == {
+        "firstName": "Dana", "lastName": "Reed", "title": "", "firm": "",
+        "role": "Owner", "emails": [], "phones": [],
     }
 
 

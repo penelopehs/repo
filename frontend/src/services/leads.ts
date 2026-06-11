@@ -12,10 +12,11 @@ import type {
   ClientType,
   Lead,
   LeadData,
+  LeadDataEntity,
+  LeadDataPerson,
   LeadSource,
   LeadStatus,
   NextCallInfo,
-  SalesRep,
   TaxYear,
 } from "@/types/crm";
 
@@ -81,17 +82,79 @@ const toClientType = (v: string | null | undefined): ClientType =>
 
 const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : "");
 
+// A url-safe slug used to derive a stable entity id from its name when the
+// stored entity predates ids. Deterministic across loads, so an unsaved entity
+// keeps the same id until associations are persisted (which fixes the id).
+const entitySlug = (name: string): string =>
+  name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "entity";
+
+// Ensure every entity carries a stable `id` (LeadDataEntity.id). Existing ids
+// are kept; missing ones are derived deterministically (db id or name slug) and
+// de-duplicated so two same-named entities don't collide.
+function withEntityIds(entities: LeadDataEntity[]): LeadDataEntity[] {
+  const used = new Set(entities.map((e) => e.id).filter(Boolean));
+  const uniquify = (base: string): string => {
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}_${n}`;
+    used.add(id);
+    return id;
+  };
+  return entities.map((e) =>
+    e.id ? e : { ...e, id: uniquify(e.entityId != null ? `e_db_${e.entityId}` : `e_${entitySlug(e.name)}`) },
+  );
+}
+
+// Coerce the persisted entityPeople blob into a clean Record<string, string[]>.
+function normalizeEntityPeople(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(value)) out[key] = value.filter((v): v is string => typeof v === "string");
+  }
+  return out;
+}
+
+// Bring a stored person up to the current shape: emails/phones are now arrays.
+// Older records carried workEmail/email/workPhone/mobilePhone scalars — fold any
+// of those into the arrays so existing leads keep their contact info.
+function normalizePerson(raw: unknown): LeadDataPerson {
+  const p = (raw ?? {}) as Record<string, unknown>;
+  const list = (...vals: unknown[]): string[] => {
+    const out: string[] = [];
+    for (const v of vals) {
+      if (Array.isArray(v)) {
+        for (const x of v) if (typeof x === "string" && x.trim() && !out.includes(x)) out.push(x);
+      } else if (typeof v === "string" && v.trim() && !out.includes(v)) {
+        out.push(v);
+      }
+    }
+    return out;
+  };
+  return {
+    id: String(p.id ?? `person_${Math.random().toString(36).slice(2)}`),
+    ...(typeof p.personId === "number" && { personId: p.personId }),
+    firstName: String(p.firstName ?? ""),
+    lastName: String(p.lastName ?? ""),
+    ...(typeof p.title === "string" && { title: p.title }),
+    ...(typeof p.firm === "string" && { firm: p.firm }),
+    role: String(p.role ?? ""),
+    emails: list(p.emails, p.workEmail, p.email),
+    phones: list(p.phones, p.workPhone, p.mobilePhone),
+  };
+}
+
 // The backend `data` column is free-form JSON and can be null or (when cleared)
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
 function normalizeData(data: LeadData | null | undefined): LeadData {
   if (!data || Array.isArray(data)) {
-    return { people: [], entities: [], calculations: {} };
+    return { people: [], entities: [], calculations: {}, entityPeople: {} };
   }
   return {
-    people: Array.isArray(data.people) ? data.people : [],
-    entities: Array.isArray(data.entities) ? data.entities : [],
+    people: Array.isArray(data.people) ? data.people.map((p) => normalizePerson(p)) : [],
+    entities: withEntityIds(Array.isArray(data.entities) ? data.entities : []),
     calculations:
       data.calculations && typeof data.calculations === "object" ? data.calculations : {},
+    entityPeople: normalizeEntityPeople(data.entityPeople),
     // Preserve the persisted filing status so the calculator can rehydrate it
     // instead of always falling back to the default.
     ...(data.filingStatus && { filingStatus: data.filingStatus }),
@@ -159,7 +222,8 @@ export interface LeadCreateInput {
   email: string;
   phone: string;
   source: LeadSource;
-  rep: SalesRep;
+  /** The assigned sales rep (users.iduser); null lets the backend default it. */
+  repId: number | null;
   /** epr id (identity_people_roles) of a picked existing client, if any. */
   eprId?: number | null;
   taxYears?: TaxYear[];
@@ -212,7 +276,7 @@ export const leadsApi = {
       full_name: `${input.firstName} ${input.lastName}`.trim(),
       // epr_id of the selected existing client (null for a brand-new person).
       epr_id: input.eprId ?? null,
-      rep: input.rep,
+      assigned_sales_rep: input.repId,
       tax_years: input.taxYears ?? [],
       sales_manager_iduser: input.salesManagerId ?? null,
       training_manager_iduser: input.trainingManagerId ?? null,

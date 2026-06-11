@@ -61,9 +61,12 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
     setDate(defaultDate);
     setTime("10:00");
     setNotes("");
-    if (me) setAssignedRep(userFullName(me) || me.email);
+    // Default to the rep assigned to the lead; fall back to the signed-in user
+    // only when the lead has no rep yet.
+    if (lead.rep && lead.rep !== "Unassigned") setAssignedRep(lead.rep);
+    else if (me) setAssignedRep(userFullName(me) || me.email);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, me]);
+  }, [open, me, lead]);
 
   const schedule = async () => {
     setSaving(true);
@@ -120,19 +123,6 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
 
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="mb-1.5 block">Call type</Label>
-              <Select value={callType} onValueChange={setCallType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CALL_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div>
               <Label className="mb-1.5 block">Assigned rep</Label>
               <Select value={assignedRep} onValueChange={setAssignedRep}>
