@@ -43,35 +43,54 @@ const SOURCES: LeadSource[] = [
 ];
 const STATUSES: { value: LeadStatus; label: string }[] = PIPELINE_STAGES;
 
-const schema = z.object({
-  firstName: z.string().trim().min(1).max(60),
-  lastName: z.string().trim().min(1).max(60),
-  company: z.string().trim().min(1).max(160),
-  email: z.string().trim().email().max(255),
-  phone: z.string().trim().min(7).max(40),
-  source: z.enum([
-    "Referral",
-    "Website",
-    "Cold Call",
-    "Conference",
-    "LinkedIn",
-    "Partner",
-    "Other",
-  ]),
-  status: z.enum([
-    "new_lead",
-    "intro_call",
-    "feasibility_call",
-    "tax_preparer_coordination",
-    "closed",
-  ]),
-  taxYears: z.array(z.number().int()).optional(),
-  entityNames: z.string().max(2000).optional(),
-  notes: z.string().max(2000).optional(),
-  // Optional assignments — users.iduser as a string ("" = unassigned).
-  salesManager: z.string().optional(),
-  trainingManager: z.string().optional(),
-});
+const schema = z
+  .object({
+    firstName: z.string().trim().min(1).max(60),
+    lastName: z.string().trim().min(1).max(60),
+    company: z.string().trim().min(1).max(160),
+    // Email and phone are each optional on their own, but at least one is
+    // required — enforced in the superRefine below.
+    email: z.string().trim().max(255),
+    phone: z.string().trim().max(40),
+    source: z.enum([
+      "Referral",
+      "Website",
+      "Cold Call",
+      "Conference",
+      "LinkedIn",
+      "Partner",
+      "Other",
+    ]),
+    status: z.enum([
+      "new_lead",
+      "intro_call",
+      "feasibility_call",
+      "tax_preparer_coordination",
+      "closed",
+    ]),
+    taxYears: z.array(z.number().int()).optional(),
+    entityNames: z.string().max(2000).optional(),
+    notes: z.string().max(2000).optional(),
+    // Optional assignments — users.iduser as a string ("" = unassigned).
+    salesManager: z.string().optional(),
+    trainingManager: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = data.email.length > 0;
+    const hasPhone = data.phone.length > 0;
+    if (!hasEmail && !hasPhone) {
+      const message = "Email or phone required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message });
+      return;
+    }
+    if (hasEmail && !z.string().email().safeParse(data.email).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Invalid email" });
+    }
+    if (hasPhone && data.phone.length < 7) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Invalid phone" });
+    }
+  });
 
 // Sentinel SelectItem value for "no assignment" (Radix forbids empty values).
 const UNASSIGNED = "unassigned";
@@ -122,7 +141,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     e.preventDefault();
     const parsed = schema.safeParse(form);
     if (!parsed.success) {
-      toast.error("Please check the form for errors.");
+      toast.error(parsed.error.issues[0]?.message ?? "Please check the form for errors.");
       return;
     }
     setSubmitting(true);

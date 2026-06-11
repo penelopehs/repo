@@ -43,26 +43,45 @@ const SOURCES: LeadSource[] = [
   "Other",
 ];
 
-const schema = z.object({
-  firstName: z.string().trim().min(1, "Required").max(60),
-  lastName: z.string().trim().min(1, "Required").max(60),
-  company: z.string().trim().min(1, "Required").max(160),
-  email: z.string().trim().email("Invalid email").max(255),
-  phone: z.string().trim().min(7, "Invalid phone").max(40),
-  source: z.enum([
-    "Referral",
-    "Website",
-    "Cold Call",
-    "Conference",
-    "LinkedIn",
-    "Partner",
-    "Other",
-  ]),
-  rep: z.string().trim().min(1, "Required"),
-  // Optional assignments — users.iduser as a string ("" = unassigned).
-  salesManager: z.string().optional(),
-  trainingManager: z.string().optional(),
-});
+const schema = z
+  .object({
+    firstName: z.string().trim().min(1, "Required").max(60),
+    lastName: z.string().trim().min(1, "Required").max(60),
+    company: z.string().trim().min(1, "Required").max(160),
+    // Email and phone are each optional on their own, but at least one is
+    // required — enforced in the superRefine below.
+    email: z.string().trim().max(255),
+    phone: z.string().trim().max(40),
+    source: z.enum([
+      "Referral",
+      "Website",
+      "Cold Call",
+      "Conference",
+      "LinkedIn",
+      "Partner",
+      "Other",
+    ]),
+    rep: z.string().trim().min(1, "Required"),
+    // Optional assignments — users.iduser as a string ("" = unassigned).
+    salesManager: z.string().optional(),
+    trainingManager: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = data.email.length > 0;
+    const hasPhone = data.phone.length > 0;
+    if (!hasEmail && !hasPhone) {
+      const message = "Email or phone required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message });
+      return;
+    }
+    if (hasEmail && !z.string().email().safeParse(data.email).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Invalid email" });
+    }
+    if (hasPhone && data.phone.length < 7) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Invalid phone" });
+    }
+  });
 
 type FormState = z.infer<typeof schema>;
 
