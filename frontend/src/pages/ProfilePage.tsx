@@ -37,6 +37,12 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -208,7 +214,7 @@ export function ProfilePage({ id }: { id: string }) {
     await updateCall(id, call.id, { completed: !call.completed });
   };
 
-  const { engagements, entities: clientEntities } = byClient(id);
+  const { engagements } = byClient(id);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
   useEffect(() => {
@@ -327,6 +333,29 @@ export function ProfilePage({ id }: { id: string }) {
     await updateLead(id, { data: { ...base, people: next } });
   };
 
+  // Entity ⇄ people links (lead.data.entityPeople), keyed by entity id.
+  const entityPeople = lead.data?.entityPeople ?? {};
+
+  const toggleEntityPerson = async (entityId: string, personId: string) => {
+    const current = entityPeople[entityId] ?? [];
+    const nextForEntity = current.includes(personId)
+      ? current.filter((p) => p !== personId)
+      : [...current, personId];
+    const next = { ...entityPeople };
+    if (nextForEntity.length === 0) delete next[entityId];
+    else next[entityId] = nextForEntity;
+    const base = lead.data ?? { people: [], entities: [], calculations: {} };
+    try {
+      await updateLead(id, { data: { ...base, entityPeople: next } });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update associated contacts.");
+    }
+  };
+
+  // Reverse lookup: entities a given person is linked to (derived, not stored).
+  const entitiesForPerson = (personId: string) =>
+    (lead.data?.entities ?? []).filter((e) => (entityPeople[e.id] ?? []).includes(personId));
+
   const flashSaved = () => {
     setContactSaved(true);
     window.setTimeout(() => setContactSaved(false), 2500);
@@ -423,7 +452,7 @@ export function ProfilePage({ id }: { id: string }) {
           [
             {
               label: "Total Entities",
-              value: clientEntities.length,
+              value: lead.data?.entities?.length ?? 0,
               icon: Layers,
               accent: "navy",
               target: "section-entities",
@@ -692,20 +721,7 @@ export function ProfilePage({ id }: { id: string }) {
           <Card title="Entities" id="section-entities">
             <div className="overflow-x-auto">
               {(() => {
-                const leadEntityNames = (lead.entityNames ?? []).filter(Boolean);
-                const mergedEntities = [
-                  ...clientEntities,
-                  ...leadEntityNames
-                    .filter((name) => !clientEntities.some((e) => e.name === name))
-                    .map((name, i) => ({
-                      id: `lead-${i}`,
-                      clientId: id,
-                      name,
-                      ein: "",
-                      contacts: [],
-                    })),
-                ];
-                const pocContacts = people.filter((c) => c.role === "Point of Contact");
+                const entities = lead.data?.entities ?? [];
                 return (
                   <table className="w-full text-sm">
                     <thead>
@@ -716,7 +732,7 @@ export function ProfilePage({ id }: { id: string }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {mergedEntities.length === 0 ? (
+                      {entities.length === 0 ? (
                         <tr>
                           <td
                             colSpan={3}
@@ -726,18 +742,18 @@ export function ProfilePage({ id }: { id: string }) {
                           </td>
                         </tr>
                       ) : (
-                        mergedEntities.map((e) => (
-                          <tr key={e.id} className="border-b border-border last:border-0">
-                            <td className="px-4 py-3 font-medium text-navy">{e.name}</td>
-                            <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                              {e.ein || "—"}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex flex-wrap gap-1.5">
-                                {pocContacts.length === 0 ? (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                ) : (
-                                  pocContacts.map((c) => (
+                        entities.map((e) => {
+                          const linkedIds = entityPeople[e.id] ?? [];
+                          const linked = people.filter((p) => linkedIds.includes(p.id));
+                          return (
+                            <tr key={e.id} className="border-b border-border last:border-0">
+                              <td className="px-4 py-3 font-medium text-navy">{e.name}</td>
+                              <td className="px-4 py-3 tabular-nums text-muted-foreground whitespace-nowrap">
+                                {e.ein || "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {linked.map((c) => (
                                     <Badge
                                       key={c.id}
                                       variant="outline"
@@ -745,15 +761,15 @@ export function ProfilePage({ id }: { id: string }) {
                                     >
                                       {c.firstName} {c.lastName}
                                       <span className="ml-1 text-[10px] text-muted-foreground">
-                                        (Point of Contact)
+                                        ({c.role})
                                       </span>
                                     </Badge>
-                                  ))
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
@@ -976,6 +992,20 @@ export function ProfilePage({ id }: { id: string }) {
                         </p>
                       )}
                     </div>
+                    {(() => {
+                      const linkedEntities = entitiesForPerson(c.id);
+                      if (linkedEntities.length === 0) return null;
+                      return (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                          <Layers className="h-3 w-3 text-muted-foreground" />
+                          {linkedEntities.map((e) => (
+                            <Badge key={e.id} variant="outline" className="border-navy/20 text-navy">
+                              {e.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     <div className="mt-3 flex justify-end">
                       <Button
                         size="sm"
@@ -1216,6 +1246,7 @@ export function ProfilePage({ id }: { id: string }) {
     </div>
   );
 }
+
 
 function Card({
   title,

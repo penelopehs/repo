@@ -12,6 +12,7 @@ import type {
   ClientType,
   Lead,
   LeadData,
+  LeadDataEntity,
   LeadSource,
   LeadStatus,
   NextCallInfo,
@@ -80,17 +81,50 @@ const toClientType = (v: string | null | undefined): ClientType =>
 
 const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : "");
 
+// A url-safe slug used to derive a stable entity id from its name when the
+// stored entity predates ids. Deterministic across loads, so an unsaved entity
+// keeps the same id until associations are persisted (which fixes the id).
+const entitySlug = (name: string): string =>
+  name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "entity";
+
+// Ensure every entity carries a stable `id` (LeadDataEntity.id). Existing ids
+// are kept; missing ones are derived deterministically (db id or name slug) and
+// de-duplicated so two same-named entities don't collide.
+function withEntityIds(entities: LeadDataEntity[]): LeadDataEntity[] {
+  const used = new Set(entities.map((e) => e.id).filter(Boolean));
+  const uniquify = (base: string): string => {
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}_${n}`;
+    used.add(id);
+    return id;
+  };
+  return entities.map((e) =>
+    e.id ? e : { ...e, id: uniquify(e.entityId != null ? `e_db_${e.entityId}` : `e_${entitySlug(e.name)}`) },
+  );
+}
+
+// Coerce the persisted entityPeople blob into a clean Record<string, string[]>.
+function normalizeEntityPeople(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, string[]> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(value)) out[key] = value.filter((v): v is string => typeof v === "string");
+  }
+  return out;
+}
+
 // The backend `data` column is free-form JSON and can be null or (when cleared)
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
 function normalizeData(data: LeadData | null | undefined): LeadData {
   if (!data || Array.isArray(data)) {
-    return { people: [], entities: [], calculations: {} };
+    return { people: [], entities: [], calculations: {}, entityPeople: {} };
   }
   return {
     people: Array.isArray(data.people) ? data.people : [],
-    entities: Array.isArray(data.entities) ? data.entities : [],
+    entities: withEntityIds(Array.isArray(data.entities) ? data.entities : []),
     calculations:
       data.calculations && typeof data.calculations === "object" ? data.calculations : {},
+    entityPeople: normalizeEntityPeople(data.entityPeople),
     // Preserve the persisted filing status so the calculator can rehydrate it
     // instead of always falling back to the default.
     ...(data.filingStatus && { filingStatus: data.filingStatus }),

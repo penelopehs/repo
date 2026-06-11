@@ -7,8 +7,9 @@ aggregate, follow-up calls, engagements (+ yearly billing) and saved calculation
 into a focused surface — no per-model CRUD.
 """
 
+import re
 from datetime import date, datetime, date as date_type
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -138,13 +139,159 @@ def _entities_count(data) -> int:
     return 0
 
 
+def _entity_slug(name: Optional[str]) -> str:
+    """URL-safe slug used to derive a stable entity id from its name. Mirrors the
+    frontend's scheme (services/leads.ts) so ids agree on both sides."""
+    s = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
+    return s or "entity"
+
+
+def _entity_dict(e: models.Entity) -> dict:
+    """An entity shaped for the lead's `data.entities[]` (frontend
+    LeadDataEntity). This is the master reference list; each tax year keeps its
+    own working copy under `data.calculations`. `id` is the stable key used by
+    `data.entityPeople` to link people to this entity."""
+    return {
+        "id": f"e_db_{e.entity_id}",
+        "entityId": e.entity_id,
+        "name": e.entity_name,
+        "ein": e.ein or "",
+        "state": e.state or "",
+        "city": e.city or "",
+    }
+
+
+def _contact_pairs(rows, val_fn) -> Dict[int, Tuple[str, str]]:
+    """person_id -> (primary, secondary) contact value. The primary is the
+    `is_primary` row (else first seen); the secondary is the next distinct
+    value, used to fill the frontend's work/alt (or work/mobile) slots."""
+    buckets: Dict[int, list] = {}
+    for r in rows:
+        buckets.setdefault(r.people_idperson, []).append(
+            (bool(getattr(r, "is_primary", False)), val_fn(r))
+        )
+    out: Dict[int, Tuple[str, str]] = {}
+    for pid, items in buckets.items():
+        # Stable sort floats the primary to the front, keeping first-seen order
+        # for the rest; then de-dupe to the first two distinct values.
+        vals: list = []
+        for _, v in sorted(items, key=lambda t: not t[0]):
+            if v and v not in vals:
+                vals.append(v)
+        out[pid] = (vals[0] if vals else "", vals[1] if len(vals) > 1 else "")
+    return out
+
+
+def _related_graph(
+    db: Session, person_id: int
+) -> Tuple[List[dict], List[dict], Dict[str, List[str]]]:
+    """Seeded from a person, return (entities, people, entity_people) for
+    `crm_leads.data`: every entity that person is attached to, plus everyone who
+    shares those entities (with role + contacts), and the entity→people links
+    keyed by entity id. Shapes match the frontend LeadDataEntity /
+    LeadDataPerson types and LeadData.entityPeople.
+
+    The core is the four-table join
+    ``entity_people_roles → entities → people → people_roles``, widened from a
+    single person to everyone on that person's entities so co-contacts come
+    along. Emails/phones are one-to-many, so they stay separate batched lookups
+    (joining them in would multiply rows)."""
+    # Entities the seed person is attached to — the scope for the main join.
+    seed_entities = (
+        db.query(models.EntityPeopleRole.entities_entity_id)
+        .filter(models.EntityPeopleRole.people_idperson == person_id)
+        .distinct()
+        .scalar_subquery()
+    )
+
+    rows = (
+        db.query(
+            models.Entity,
+            models.Person,
+            models.PeopleRole.role_name,
+        )
+        .select_from(models.EntityPeopleRole)
+        .join(
+            models.Entity,
+            models.Entity.entity_id == models.EntityPeopleRole.entities_entity_id,
+        )
+        .join(
+            models.Person,
+            models.Person.idperson == models.EntityPeopleRole.people_idperson,
+        )
+        .join(
+            models.PeopleRole,
+            models.PeopleRole.idroles == models.EntityPeopleRole.roles_idroles,
+        )
+        .filter(models.EntityPeopleRole.entities_entity_id.in_(seed_entities))
+        .all()
+    )
+    if not rows:
+        return [], [], {}
+
+    # De-dupe entities by id and people by id (a person can recur across several
+    # entity/role rows); first role seen wins. The same loop records the
+    # entity→people links (entityPeople), keyed by the entity's stable id.
+    entities: Dict[int, dict] = {}
+    persons: Dict[int, models.Person] = {}
+    role_by_person: Dict[int, str] = {}
+    entity_people: Dict[str, List[str]] = {}
+    for entity, person, role_name in rows:
+        ent = entities.setdefault(entity.entity_id, _entity_dict(entity))
+        persons.setdefault(person.idperson, person)
+        role_by_person.setdefault(person.idperson, role_name or "")
+        bucket = entity_people.setdefault(ent["id"], [])
+        pid = str(person.idperson)
+        if pid not in bucket:
+            bucket.append(pid)
+
+    person_ids = set(persons)
+    emails = _contact_pairs(
+        db.query(models.PeopleEmail)
+        .filter(models.PeopleEmail.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.email,
+    )
+    phones = _contact_pairs(
+        db.query(models.PeoplePhone)
+        .filter(models.PeoplePhone.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.phone,
+    )
+
+    people = []
+    for p in persons.values():
+        work_email, alt_email = emails.get(p.idperson, ("", ""))
+        work_phone, mobile_phone = phones.get(p.idperson, ("", ""))
+        people.append(
+            {
+                "id": str(p.idperson),
+                "personId": p.idperson,
+                "firstName": p.first_name,
+                "lastName": p.last_name,
+                "title": p.title or "",
+                "firm": p.firm or "",
+                "role": role_by_person.get(p.idperson, ""),
+                "workEmail": work_email,
+                "email": alt_email,
+                "workPhone": work_phone,
+                "mobilePhone": mobile_phone,
+            }
+        )
+    return list(entities.values()), people, entity_people
+
+
 def _initial_data(company: Optional[str], tax_years) -> dict:
     """Seed the lead's data JSON: one entity (the provided company / entity
-    name), an empty bucket per tax year, and an empty people list."""
+    name) with a stable id, an empty bucket per tax year, an empty people list,
+    and an empty entity→people map for the frontend to fill in."""
     return {
-        "entities": [{"name": company}] if company else [],
+        "entities": (
+            [{"id": f"e_{_entity_slug(company)}", "name": company}] if company else []
+        ),
         "calculations": {str(year): {} for year in (tax_years or [])},
         "people": [],
+        "entityPeople": {},
     }
 
 
@@ -373,6 +520,20 @@ def create_lead(
         if body.data is not None
         else _initial_data(body.company, body.tax_years)
     )
+
+    # Seed the related entities/people graph from the linked EPR's person, so
+    # the lead opens with the full client roster (master entity list + contacts)
+    # rather than just the seed company. Each tax year copies data.entities into
+    # its own calculation later.
+    if body.epr_id is not None and isinstance(data, dict):
+        entities, people, entity_people = _related_graph(db, epr.people_idperson)
+        if entities:
+            data["entities"] = entities
+        if people:
+            data["people"] = people
+        # Seed the entity↔people links so the lead opens with the client roster
+        # already wired up (keyed by entity id; see LeadData.entityPeople).
+        data["entityPeople"] = entity_people
 
     lead = models.CrmLead(
         epr_id=body.epr_id,
