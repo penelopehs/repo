@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  ArrowRight,
   Briefcase,
   Mail,
   Phone,
@@ -13,8 +14,6 @@ import {
   Users,
   Layers,
   CalendarClock,
-  BadgeCheck,
-  X,
   Pencil,
   Trash2,
   Calculator as CalcIcon,
@@ -25,6 +24,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Circle,
+  Info as InfoIcon,
 } from "lucide-react";
 import {
   BarChart,
@@ -58,7 +58,7 @@ import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
-import { formatCurrency, formatDate, formatTime } from "@/utils/format";
+import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
 import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
@@ -399,7 +399,7 @@ export function ProfilePage({ id }: { id: string }) {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} />
               {needsCall && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan/30 bg-cyan/[0.07] px-2.5 py-1 text-xs font-medium text-cyan">
                   <AlertTriangle className="h-3 w-3" /> No {activeStep.noun} scheduled
                 </span>
               )}
@@ -523,7 +523,7 @@ export function ProfilePage({ id }: { id: string }) {
                             : "text-muted-foreground",
                       )}
                     />
-                    <div>
+                    <div className="flex-1">
                       <p
                         className={cn(
                           "text-sm font-semibold",
@@ -533,6 +533,30 @@ export function ProfilePage({ id }: { id: string }) {
                         {step.title}
                       </p>
                       <p className="text-xs text-muted-foreground">{sub}</p>
+                      {/* Feasibility Call action button */}
+                      {i === 1 && state !== "done" && (
+                        <div className="mt-2.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={state === "pending"}
+                            className={cn(
+                              "gap-1.5",
+                              state === "scheduled" || state === "active"
+                                ? "border-cyan/50 text-cyan hover:bg-cyan/10"
+                                : "opacity-50",
+                            )}
+                            onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                          >
+                            Go to Feasibility Call <ArrowRight className="h-3.5 w-3.5" />
+                          </Button>
+                          {state === "pending" && (
+                            <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+                              <InfoIcon className="h-3 w-3 shrink-0" /> Schedule the Feasibility Call to enable
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </li>
                 );
@@ -546,7 +570,7 @@ export function ProfilePage({ id }: { id: string }) {
               <Info label="Lead Source" value={lead.source} />
               <Info
                 label="Client Since"
-                value={lead.engagedSince ? formatDate(lead.engagedSince) : formatDate(lead.addedAt)}
+                value={lead.engagedSince ? formatDate(lead.engagedSince) : formatLocalDate(lead.addedAt)}
               />
               <Info label="Phone" value={lead.phone ? formatPhone(lead.phone) : lead.phone} icon={<Phone className="h-3 w-3" />} />
               <Info label="Email" value={lead.email} icon={<Mail className="h-3 w-3" />} />
@@ -616,9 +640,13 @@ export function ProfilePage({ id }: { id: string }) {
                           </span>
                           <div className="flex items-center gap-3">
                             <span>
-                              {formatDate(note.createdAt)}{" "}
+                              {new Date(note.createdAt).toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}{" "}
                               <span className="text-cyan">
-                                {new Date(note.createdAt).toLocaleTimeString("en-US", {
+                                {new Date(note.createdAt).toLocaleTimeString(undefined, {
                                   hour: "numeric",
                                   minute: "2-digit",
                                 })}
@@ -1022,9 +1050,9 @@ export function ProfilePage({ id }: { id: string }) {
             }
           >
             {needsCall && (
-              <Alert className="mb-4 border-amber-300 bg-amber-50">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
+              <Alert className="mb-4 border-2 border-cyan/70 bg-cyan/[0.07]">
+                <AlertTriangle className="h-4 w-4 text-cyan" />
+                <AlertDescription className="text-cyan">
                   Schedule {activeStep.noun} to advance this lead.
                 </AlertDescription>
               </Alert>
@@ -1073,7 +1101,7 @@ export function ProfilePage({ id }: { id: string }) {
                             )}
                             <p className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">
                               Status:{" "}
-                              <span className={c.completed ? "text-green-600" : "text-amber-600"}>
+                              <span className={c.completed ? "text-green" : "text-muted-foreground"}>
                                 {c.completed ? "Completed" : "Pending"}
                               </span>
                             </p>
@@ -1108,6 +1136,29 @@ export function ProfilePage({ id }: { id: string }) {
               </ul>
             )}
           </Card>
+
+          {/* Feasibility Call */}
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+            <h2 className="mb-1.5 text-xl font-bold text-foreground">Feasibility Call</h2>
+            <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
+              Capture notes, map business components, and generate a preparer-ready summary — all in one guided workflow.
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <Button
+                className="w-full"
+                onClick={() => toast.info("Feasibility call workflow coming soon.")}
+              >
+                Start Feasibility Call
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => toast.info("Feasibility summary coming soon.")}
+              >
+                View Feasibility Summary
+              </Button>
+            </div>
+          </div>
 
           {/* Engagements */}
           <Card title="Engagements" id="section-engagements">
@@ -1525,22 +1576,5 @@ function TaxHistoryPanel({
         </DialogContent>
       </Dialog>
     </motion.section>
-  );
-}
-
-function IntakeRow({ label, value }: { label: string; value: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3">
-      <span className="text-sm text-navy">{label}</span>
-      {value ? (
-        <Badge className="bg-green text-green-foreground hover:bg-green">
-          <BadgeCheck className="mr-1 h-3 w-3" /> Yes
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="text-muted-foreground">
-          <X className="mr-1 h-3 w-3" /> No
-        </Badge>
-      )}
-    </div>
   );
 }

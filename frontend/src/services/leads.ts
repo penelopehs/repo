@@ -142,7 +142,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
       i.latest_calc_date != null
         ? new Date(i.latest_calc_date * 1000).toISOString().slice(0, 10)
         : "—",
-    addedAt: i.created_at,
+    addedAt: i.created_at.endsWith('Z') || i.created_at.includes('+') ? i.created_at : i.created_at + 'Z',
     notes: i.notes ?? undefined,
     nextCall: i.next_call
       ? ({ date: i.next_call.date, time: i.next_call.time ?? undefined, callType: i.next_call.call_type } as NextCallInfo)
