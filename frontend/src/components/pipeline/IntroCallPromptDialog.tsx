@@ -121,19 +121,6 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="mb-1.5 block">Call type</Label>
-              <Select value={callType} onValueChange={setCallType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CALL_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label className="mb-1.5 block">Assigned rep</Label>
               <Select value={assignedRep} onValueChange={setAssignedRep}>
                 <SelectTrigger>
