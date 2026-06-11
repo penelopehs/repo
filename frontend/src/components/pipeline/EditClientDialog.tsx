@@ -119,7 +119,9 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     email: lead.email,
     phone: lead.phone,
     source: lead.source,
-    rep: lead.rep,
+    // Track the assigned rep by users.iduser (as a string) so it can be changed
+    // and round-tripped through the update endpoint (repId → salesperson_iduser).
+    rep: lead.repId != null ? String(lead.repId) : "",
     status: lead.status,
     taxYears: lead.taxYears ?? [],
     entityNames: (lead.entityNames ?? []).join(",\n"),
@@ -176,6 +178,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         source: parsed.data.source,
         status: parsed.data.status,
         notes: parsed.data.notes,
+        repId: form.rep ? Number(form.rep) : null,
         salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
         trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
         data,
@@ -254,14 +257,20 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               </Select>
             </Item>
             <Item label="Assigned Sales Rep">
-              <Select value={form.rep || "Unassigned"}>
+              <Select
+                value={form.rep || UNASSIGNED}
+                onValueChange={(v) => setForm({ ...form, rep: v === UNASSIGNED ? "" : v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={form.rep || "Unassigned"}>
-                    {form.rep || "Unassigned"}
+                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>
+                      {userFullName(u) || u.email}
                     </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Item>

@@ -15,7 +15,6 @@ import type {
   LeadSource,
   LeadStatus,
   NextCallInfo,
-  SalesRep,
   TaxYear,
 } from "@/types/crm";
 
@@ -158,7 +157,8 @@ export interface LeadCreateInput {
   email: string;
   phone: string;
   source: LeadSource;
-  rep: SalesRep;
+  /** The assigned sales rep (users.iduser); null lets the backend default it. */
+  repId: number | null;
   /** epr id (identity_people_roles) of a picked existing client, if any. */
   eprId?: number | null;
   taxYears?: TaxYear[];
@@ -211,7 +211,7 @@ export const leadsApi = {
       full_name: `${input.firstName} ${input.lastName}`.trim(),
       // epr_id of the selected existing client (null for a brand-new person).
       epr_id: input.eprId ?? null,
-      rep: input.rep,
+      assigned_sales_rep: input.repId,
       tax_years: input.taxYears ?? [],
       sales_manager_iduser: input.salesManagerId ?? null,
       training_manager_iduser: input.trainingManagerId ?? null,
