@@ -231,9 +231,7 @@ export function AddLeadDialog() {
       toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
       });
-      setForm(initial);
-      setYears([]);
-      setErrors({});
+      resetForm();
       setOpen(false);
       setIntroPromptLead(newLead);
     } catch (err) {
