@@ -95,6 +95,7 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
     // Preserve the persisted filing status so the calculator can rehydrate it
     // instead of always falling back to the default.
     ...(data.filingStatus && { filingStatus: data.filingStatus }),
+    ...(data.yearStatuses && { yearStatuses: data.yearStatuses }),
   };
 }
 

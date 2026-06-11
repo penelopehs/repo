@@ -7,7 +7,7 @@ aggregate, follow-up calls, engagements (+ yearly billing) and saved calculation
 into a focused surface — no per-model CRUD.
 """
 
-from datetime import date, datetime, date as date_type
+from datetime import date, datetime, timezone, date as date_type
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -543,9 +543,12 @@ def update_lead(
     if isinstance(new_status, PipelineStatus):
         new_status = new_status.value
         data["pipeline_status"] = new_status
-    # Closing a lead (terminal "won" stage) starts the engagement clock.
-    if new_status == PipelineStatus.closed.value and lead.engagement_started_at is None:
-        lead.engagement_started_at = datetime.utcnow()
+    # Closing a lead (terminal "won" stage) stamps both engagement and SOW clocks.
+    if new_status == PipelineStatus.closed.value:
+        if lead.engagement_started_at is None:
+            lead.engagement_started_at = datetime.now(timezone.utc)
+        if lead.sow_signed_at is None:
+            lead.sow_signed_at = datetime.now(timezone.utc)
 
     for field, value in data.items():
         setattr(lead, field, value)
@@ -596,7 +599,7 @@ def create_follow_up_call(
             lead.pipeline_status == PipelineStatus.closed.value
             and lead.engagement_started_at is None
         ):
-            lead.engagement_started_at = datetime.utcnow()
+            lead.engagement_started_at = datetime.now(timezone.utc)
     # The call's type mirrors the lead's (possibly just-advanced) pipeline stage.
     call = models.CrmFollowUpCall(
         crm_leads_id=lead_id,

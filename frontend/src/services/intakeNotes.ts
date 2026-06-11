@@ -18,11 +18,18 @@ interface ApiIntakeNote {
   updated_at: string | null;
 }
 
+function asUtc(dt: string): string {
+  // Backend sends naive UTC datetimes without a timezone suffix.
+  // Appending Z tells the browser to treat it as UTC so local-time
+  // conversion works correctly for every user's timezone.
+  return dt.endsWith("Z") || dt.includes("+") ? dt : dt + "Z";
+}
+
 function mapNote(n: ApiIntakeNote): ProfileNote {
   return {
     id: String(n.id),
     text: n.note,
-    createdAt: n.created_at ?? new Date().toISOString(),
+    createdAt: n.created_at ? asUtc(n.created_at) : new Date().toISOString(),
     author: n.created_by_name ?? undefined,
   };
 }

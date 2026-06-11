@@ -1,4 +1,4 @@
-// View Profile page — client overview with engagements, contacts, calls, intake.
+﻿// View Profile page — client overview with engagements, contacts, calls, intake.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -1299,11 +1299,11 @@ function TaxHistoryPanel({
   onUpdate: (yearStatuses: Record<string, TaxYearRecord>) => Promise<void>;
 }) {
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 7 }, (_, i) => currentYear - i);
   const saved = lead.data?.yearStatuses ?? {};
 
   const [activeYear, setActiveYear] = useState<number | null>(null);
-  const [notEligibleYear, setNotEligibleYear] = useState<number | null>(null);
+  const [pendingChange, setPendingChange] = useState<{ year: number; status: TaxYearStatus } | null>(null);
   const [reasonDraft, setReasonDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1327,10 +1327,14 @@ function TaxHistoryPanel({
   const applyStatus = async (year: number, status: TaxYearStatus, reason?: string) => {
     setSaving(true);
     const record: TaxYearRecord = { status };
-    if (status === "not_eligible" && reason) {
-      record.notEligibleReason = reason;
+    if (status === "not_eligible") {
+      record.notEligibleReason = reason ?? "";
       record.notEligibleBy = lead.rep;
       record.notEligibleAt = new Date().toISOString();
+    } else if (reason) {
+      record.changeNote = reason;
+      record.changedBy = lead.rep;
+      record.changedAt = new Date().toISOString();
     }
     try {
       await onUpdate({ ...saved, [year]: record });
@@ -1372,7 +1376,7 @@ function TaxHistoryPanel({
         </div>
 
         {/* Year cards */}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
           {records.map(({ year, record }) => {
             const meta = YEAR_STATUS_META[record.status];
             return (
@@ -1382,6 +1386,8 @@ function TaxHistoryPanel({
                 title={
                   record.status === "not_eligible" && record.notEligibleReason
                     ? `Reason: ${record.notEligibleReason}\nBy: ${record.notEligibleBy} · ${record.notEligibleAt ? new Date(record.notEligibleAt).toLocaleString() : ""}`
+                    : record.changeNote
+                    ? `Note: ${record.changeNote}\nBy: ${record.changedBy} · ${record.changedAt ? new Date(record.changedAt).toLocaleString() : ""}`
                     : undefined
                 }
                 onClick={() => setActiveYear(activeYear === year ? null : year)}
@@ -1425,7 +1431,7 @@ function TaxHistoryPanel({
                   size="sm"
                   variant="outline"
                   disabled={saving}
-                  onClick={() => applyStatus(activeYear, "current")}
+                  onClick={() => { setPendingChange({ year: activeYear, status: "current" }); setReasonDraft(""); }}
                 >
                   <Star className="mr-1.5 h-3.5 w-3.5" /> Current Year
                 </Button>
@@ -1435,7 +1441,7 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="border-green/50 text-green hover:bg-green/10"
-                onClick={() => applyStatus(activeYear, "engaged")}
+                onClick={() => { setPendingChange({ year: activeYear, status: "engaged" }); setReasonDraft(""); }}
               >
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Engaged
               </Button>
@@ -1443,7 +1449,7 @@ function TaxHistoryPanel({
                 size="sm"
                 variant="outline"
                 disabled={saving}
-                onClick={() => applyStatus(activeYear, "eligible_not_engaged")}
+                onClick={() => { setPendingChange({ year: activeYear, status: "eligible_not_engaged" }); setReasonDraft(""); }}
               >
                 <Clock className="mr-1.5 h-3.5 w-3.5" /> Eligible – Not Engaged
               </Button>
@@ -1452,10 +1458,7 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="text-muted-foreground"
-                onClick={() => {
-                  setNotEligibleYear(activeYear);
-                  setReasonDraft("");
-                }}
+                onClick={() => { setPendingChange({ year: activeYear, status: "not_eligible" }); setReasonDraft(""); }}
               >
                 <Ban className="mr-1.5 h-3.5 w-3.5" /> Not Eligible…
               </Button>
@@ -1476,35 +1479,43 @@ function TaxHistoryPanel({
         </div>
       </div>
 
-      {/* Not Eligible dialog */}
+      {/* Status-change reason dialog — shown for every year status change */}
       <Dialog
-        open={notEligibleYear !== null}
-        onOpenChange={(open) => { if (!open) setNotEligibleYear(null); }}
+        open={pendingChange !== null}
+        onOpenChange={(open) => { if (!open) setPendingChange(null); }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark {notEligibleYear} as Not Eligible</DialogTitle>
+            <DialogTitle>
+              Change status for {pendingChange?.year}
+            </DialogTitle>
             <DialogDescription>
-              Provide a reason below. Your name, date, and time will be automatically recorded.
+              {pendingChange?.status === "not_eligible"
+                ? "Provide a reason below. Your name, date, and time will be automatically recorded."
+                : "Optionally add a note explaining this status change."}
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={reasonDraft}
             onChange={(e) => setReasonDraft(e.target.value)}
-            placeholder="e.g. Client did not perform qualifying R&D activities this year…"
+            placeholder={
+              pendingChange?.status === "not_eligible"
+                ? "e.g. Client did not perform qualifying R&D activities this year…"
+                : "e.g. Reason for this status change…"
+            }
             className="min-h-[88px]"
             rows={3}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNotEligibleYear(null)}>
+            <Button variant="outline" onClick={() => setPendingChange(null)}>
               Cancel
             </Button>
             <Button
-              disabled={!reasonDraft.trim() || saving}
+              disabled={(pendingChange?.status === "not_eligible" && !reasonDraft.trim()) || saving}
               onClick={async () => {
-                if (notEligibleYear !== null) {
-                  await applyStatus(notEligibleYear, "not_eligible", reasonDraft.trim());
-                  setNotEligibleYear(null);
+                if (pendingChange !== null) {
+                  await applyStatus(pendingChange.year, pendingChange.status, reasonDraft.trim() || undefined);
+                  setPendingChange(null);
                 }
               }}
             >

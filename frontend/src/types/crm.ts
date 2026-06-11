@@ -125,6 +125,10 @@ export interface TaxYearRecord {
   notEligibleBy?: string;
   /** ISO timestamp of when not-eligible was set */
   notEligibleAt?: string;
+  /** Optional note for any other status change */
+  changeNote?: string;
+  changedBy?: string;
+  changedAt?: string;
 }
 
 /** Raw per-lead aggregate stored in the backend `crm_leads.data` column and

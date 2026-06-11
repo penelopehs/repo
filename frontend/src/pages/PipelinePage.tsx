@@ -50,7 +50,7 @@ import { YearChips } from "@/components/MultiYearSelect";
 import { useLeadsStore } from "@/store/leadsStore";
 import type { Lead, LeadStatus } from "@/types/crm";
 import { PIPELINE_STAGES } from "@/types/crm";
-import { formatDate } from "@/utils/format";
+import { formatDate, formatLocalDate } from "@/utils/format";
 import { buildCalculationSearch, hasExistingCalculation } from "@/utils/calculationContext";
 import { cn } from "@/lib/utils";
 
@@ -519,7 +519,7 @@ function PipelineTable(p: TableProps) {
               <td className="px-5 py-3 text-muted-foreground">
                 {l.latestCalculation === "—" ? "—" : formatDate(l.latestCalculation)}
               </td>
-              <td className="px-5 py-3 text-muted-foreground">{formatDate(l.addedAt)}</td>
+              <td className="px-5 py-3 text-muted-foreground">{formatLocalDate(l.addedAt)}</td>
               <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -649,7 +649,7 @@ function NextCallCell({ lead }: { lead: Lead }) {
   const nc = lead.nextCall;
   if (!nc) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400">
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan/30 bg-cyan/[0.07] px-2.5 py-0.5 text-xs font-medium text-cyan">
         <AlertTriangle className="h-3 w-3" /> Schedule intro call
       </span>
     );

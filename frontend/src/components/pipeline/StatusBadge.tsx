@@ -10,7 +10,7 @@ const META: Record<LeadStatus, { label: string; cls: string }> = {
   feasibility_call: { label: "Feasibility Call", cls: "bg-violet/15 text-violet border-violet/30" },
   tax_preparer_coordination: {
     label: "Tax Preparer Coordination",
-    cls: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+    cls: "bg-primary/15 text-primary border-primary/30",
   },
   closed: { label: "Closed", cls: "bg-green/15 text-green border-green/30" },
 };

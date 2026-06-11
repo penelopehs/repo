@@ -36,7 +36,7 @@ from app.database import Base
 
 
 class PipelineStatus(str, enum.Enum):
-    """Sales-pipeline status carried by a crm_lead (extra_db.md)."""
+    """Sales-pipeline status carried by a crm_lead — matches the MySQL enum."""
 
     new_lead = "New Lead"
     intro_call = "Intro Call"
@@ -44,11 +44,8 @@ class PipelineStatus(str, enum.Enum):
     tax_preparer_coordination = "Tax Preparer Coordination"
     closed = "Closed"
 
-PIPELINE_ENUM = Enum(
-    *[s.value for s in PipelineStatus],
-    name="crm_leads_pipeline_status",
-    values_callable=lambda x: [e.value for e in x],
-)
+# Use String instead of Enum so SQLAlchemy never rejects DB values on read.
+PIPELINE_ENUM = String(50)
 
 # A follow-up call's type mirrors the pipeline stage it works (PipelineStatus
 # beyond the initial "New Lead" — i.e. PipelineStatus[1:]).
