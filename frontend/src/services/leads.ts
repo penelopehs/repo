@@ -13,6 +13,7 @@ import type {
   Lead,
   LeadData,
   LeadDataEntity,
+  LeadDataPerson,
   LeadSource,
   LeadStatus,
   NextCallInfo,
@@ -113,6 +114,35 @@ function normalizeEntityPeople(raw: unknown): Record<string, string[]> {
   return out;
 }
 
+// Bring a stored person up to the current shape: emails/phones are now arrays.
+// Older records carried workEmail/email/workPhone/mobilePhone scalars — fold any
+// of those into the arrays so existing leads keep their contact info.
+function normalizePerson(raw: unknown): LeadDataPerson {
+  const p = (raw ?? {}) as Record<string, unknown>;
+  const list = (...vals: unknown[]): string[] => {
+    const out: string[] = [];
+    for (const v of vals) {
+      if (Array.isArray(v)) {
+        for (const x of v) if (typeof x === "string" && x.trim() && !out.includes(x)) out.push(x);
+      } else if (typeof v === "string" && v.trim() && !out.includes(v)) {
+        out.push(v);
+      }
+    }
+    return out;
+  };
+  return {
+    id: String(p.id ?? `person_${Math.random().toString(36).slice(2)}`),
+    ...(typeof p.personId === "number" && { personId: p.personId }),
+    firstName: String(p.firstName ?? ""),
+    lastName: String(p.lastName ?? ""),
+    ...(typeof p.title === "string" && { title: p.title }),
+    ...(typeof p.firm === "string" && { firm: p.firm }),
+    role: String(p.role ?? ""),
+    emails: list(p.emails, p.workEmail, p.email),
+    phones: list(p.phones, p.workPhone, p.mobilePhone),
+  };
+}
+
 // The backend `data` column is free-form JSON and can be null or (when cleared)
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
 function normalizeData(data: LeadData | null | undefined): LeadData {
@@ -120,7 +150,7 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
     return { people: [], entities: [], calculations: {}, entityPeople: {} };
   }
   return {
-    people: Array.isArray(data.people) ? data.people : [],
+    people: Array.isArray(data.people) ? data.people.map((p) => normalizePerson(p)) : [],
     entities: withEntityIds(Array.isArray(data.entities) ? data.entities : []),
     calculations:
       data.calculations && typeof data.calculations === "object" ? data.calculations : {},

@@ -122,10 +122,10 @@ export interface LeadDataPerson {
   title?: string;
   firm?: string;
   role: string;
-  workEmail: string;
-  email: string;
-  workPhone: string;
-  mobilePhone: string;
+  /** A person has one-to-many emails and phones (no labels — just values),
+   *  mirroring the backend people_email / people_phone tables. */
+  emails: string[];
+  phones: string[];
 }
 
 export type TaxYearStatus = "current" | "current_engaged" | "engaged" | "eligible_not_engaged" | "not_eligible";

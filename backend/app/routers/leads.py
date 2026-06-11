@@ -161,24 +161,24 @@ def _entity_dict(e: models.Entity) -> dict:
     }
 
 
-def _contact_pairs(rows, val_fn) -> Dict[int, Tuple[str, str]]:
-    """person_id -> (primary, secondary) contact value. The primary is the
-    `is_primary` row (else first seen); the secondary is the next distinct
-    value, used to fill the frontend's work/alt (or work/mobile) slots."""
+def _contact_lists(rows, val_fn) -> Dict[int, List[str]]:
+    """person_id -> ordered, de-duped list of contact values (emails or phones).
+    A person has one-to-many emails/phones with no labels; the `is_primary` row
+    (else first seen) floats to the front of the list."""
     buckets: Dict[int, list] = {}
     for r in rows:
         buckets.setdefault(r.people_idperson, []).append(
             (bool(getattr(r, "is_primary", False)), val_fn(r))
         )
-    out: Dict[int, Tuple[str, str]] = {}
+    out: Dict[int, List[str]] = {}
     for pid, items in buckets.items():
         # Stable sort floats the primary to the front, keeping first-seen order
-        # for the rest; then de-dupe to the first two distinct values.
-        vals: list = []
+        # for the rest; then de-dupe.
+        vals: List[str] = []
         for _, v in sorted(items, key=lambda t: not t[0]):
             if v and v not in vals:
                 vals.append(v)
-        out[pid] = (vals[0] if vals else "", vals[1] if len(vals) > 1 else "")
+        out[pid] = vals
     return out
 
 
@@ -246,13 +246,13 @@ def _related_graph(
             bucket.append(pid)
 
     person_ids = set(persons)
-    emails = _contact_pairs(
+    emails = _contact_lists(
         db.query(models.PeopleEmail)
         .filter(models.PeopleEmail.people_idperson.in_(person_ids))
         .all(),
         lambda r: r.email,
     )
-    phones = _contact_pairs(
+    phones = _contact_lists(
         db.query(models.PeoplePhone)
         .filter(models.PeoplePhone.people_idperson.in_(person_ids))
         .all(),
@@ -261,8 +261,6 @@ def _related_graph(
 
     people = []
     for p in persons.values():
-        work_email, alt_email = emails.get(p.idperson, ("", ""))
-        work_phone, mobile_phone = phones.get(p.idperson, ("", ""))
         people.append(
             {
                 "id": str(p.idperson),
@@ -272,10 +270,8 @@ def _related_graph(
                 "title": p.title or "",
                 "firm": p.firm or "",
                 "role": role_by_person.get(p.idperson, ""),
-                "workEmail": work_email,
-                "email": alt_email,
-                "workPhone": work_phone,
-                "mobilePhone": mobile_phone,
+                "emails": emails.get(p.idperson, []),
+                "phones": phones.get(p.idperson, []),
             }
         )
     return list(entities.values()), people, entity_people

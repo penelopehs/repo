@@ -244,13 +244,12 @@ def test_detail_returns_data_blob(client, db_session):
     assert person["personId"] == int(person["id"])
     # The entity↔people link is seeded keyed by entity id → [person id].
     assert data["entityPeople"] == {f"e_db_{entity_id}": [person["id"]]}
+    # Emails/phones are one-to-many lists (this seed person has none).
     assert {k: person[k] for k in (
-        "firstName", "lastName", "title", "firm", "role",
-        "workEmail", "email", "workPhone", "mobilePhone",
+        "firstName", "lastName", "title", "firm", "role", "emails", "phones",
     )} == {
         "firstName": "Dana", "lastName": "Reed", "title": "", "firm": "",
-        "role": "Owner", "workEmail": "", "email": "", "workPhone": "",
-        "mobilePhone": "",
+        "role": "Owner", "emails": [], "phones": [],
     }
 
 

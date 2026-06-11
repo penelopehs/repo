@@ -70,7 +70,6 @@ import { buildCalculationSearch } from "@/utils/calculationContext";
 import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
 import type {
   FollowUpCall,
-  LeadDataPerson,
   ProfileNote,
   TaxYearRecord,
   TaxYearStatus,
@@ -120,14 +119,20 @@ export function ProfilePage({ id }: { id: string }) {
   const [savingNote, setSavingNote] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [contactForm, setContactForm] = useState({
+  const [contactForm, setContactForm] = useState<{
+    firstName: string;
+    lastName: string;
+    role: string;
+    emails: string[];
+    phones: string[];
+    entityIds: string[];
+  }>({
     firstName: "",
     lastName: "",
     role: "",
-    workEmail: "",
-    email: "",
-    workPhone: "",
-    mobilePhone: "",
+    emails: [""],
+    phones: [""],
+    entityIds: [],
   });
 
   const formatPhone = (value: string) => {
@@ -318,39 +323,18 @@ export function ProfilePage({ id }: { id: string }) {
       firstName: "",
       lastName: "",
       role: "",
-      workEmail: "",
-      email: "",
-      workPhone: "",
-      mobilePhone: "",
+      emails: [""],
+      phones: [""],
+      entityIds: [],
     });
     setContactError("");
     setEditingContactId(null);
     setIsAddingContact(false);
   };
 
-  const persistPeople = async (next: LeadDataPerson[]) => {
-    const base = lead.data ?? { people: [], entities: [], calculations: {} };
-    await updateLead(id, { data: { ...base, people: next } });
-  };
-
-  // Entity ⇄ people links (lead.data.entityPeople), keyed by entity id.
+  // Entity ⇄ people links (lead.data.entityPeople), keyed by entity id. Edited
+  // through the contact form (saveContact/removeContact write entityPeople).
   const entityPeople = lead.data?.entityPeople ?? {};
-
-  const toggleEntityPerson = async (entityId: string, personId: string) => {
-    const current = entityPeople[entityId] ?? [];
-    const nextForEntity = current.includes(personId)
-      ? current.filter((p) => p !== personId)
-      : [...current, personId];
-    const next = { ...entityPeople };
-    if (nextForEntity.length === 0) delete next[entityId];
-    else next[entityId] = nextForEntity;
-    const base = lead.data ?? { people: [], entities: [], calculations: {} };
-    try {
-      await updateLead(id, { data: { ...base, entityPeople: next } });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't update associated contacts.");
-    }
-  };
 
   // Reverse lookup: entities a given person is linked to (derived, not stored).
   const entitiesForPerson = (personId: string) =>
@@ -362,24 +346,38 @@ export function ProfilePage({ id }: { id: string }) {
   };
 
   const saveContact = async () => {
-    const trimmed = {
+    const fields = {
       firstName: contactForm.firstName.trim(),
       lastName: contactForm.lastName.trim(),
       role: contactForm.role.trim(),
-      workEmail: contactForm.workEmail.trim(),
-      email: contactForm.email.trim(),
-      workPhone: contactForm.workPhone.trim(),
-      mobilePhone: contactForm.mobilePhone.trim(),
+      // Drop blank rows and de-dupe; one-to-many with no labels.
+      emails: [...new Set(contactForm.emails.map((v) => v.trim()).filter(Boolean))],
+      phones: [...new Set(contactForm.phones.map((v) => v.trim()).filter(Boolean))],
     };
-    if (!trimmed.firstName || !trimmed.lastName || !trimmed.role) {
+    if (!fields.firstName || !fields.lastName || !fields.role) {
       setContactError("First name, last name, and role are required.");
       return;
     }
-    const next = editingContactId
-      ? people.map((p) => (p.id === editingContactId ? { ...p, ...trimmed } : p))
-      : [...people, { id: `person_${Date.now()}`, ...trimmed }];
+    const personId = editingContactId ?? `person_${Date.now()}`;
+    const nextPeople = editingContactId
+      ? people.map((p) => (p.id === editingContactId ? { ...p, ...fields } : p))
+      : [...people, { id: personId, ...fields }];
+
+    // Sync the entity↔people links from the picked entities: add this person to
+    // every selected entity and remove them from the rest.
+    const selected = new Set(contactForm.entityIds);
+    const nextEntityPeople: Record<string, string[]> = {};
+    for (const e of lead.data?.entities ?? []) {
+      const without = (entityPeople[e.id] ?? []).filter((pid) => pid !== personId);
+      const members = selected.has(e.id) ? [...without, personId] : without;
+      if (members.length > 0) nextEntityPeople[e.id] = members;
+    }
+
+    const base = lead.data ?? { people: [], entities: [], calculations: {} };
     try {
-      await persistPeople(next);
+      await updateLead(id, {
+        data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
+      });
       resetContactForm();
       flashSaved();
     } catch (e) {
@@ -389,9 +387,18 @@ export function ProfilePage({ id }: { id: string }) {
 
   const removeContact = async () => {
     if (!editingContactId) return;
-    const next = people.filter((p) => p.id !== editingContactId);
+    const nextPeople = people.filter((p) => p.id !== editingContactId);
+    // Drop the removed person from every entity link.
+    const nextEntityPeople: Record<string, string[]> = {};
+    for (const [entityId, ids] of Object.entries(entityPeople)) {
+      const members = ids.filter((pid) => pid !== editingContactId);
+      if (members.length > 0) nextEntityPeople[entityId] = members;
+    }
+    const base = lead.data ?? { people: [], entities: [], calculations: {} };
     try {
-      await persistPeople(next);
+      await updateLead(id, {
+        data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
+      });
       resetContactForm();
       flashSaved();
     } catch (e) {
@@ -827,8 +834,8 @@ export function ProfilePage({ id }: { id: string }) {
               <div className="mb-4 rounded-xl border border-border bg-muted/30 p-4">
                 <p className="mb-3 text-sm text-muted-foreground">
                   {editingContactId
-                    ? "Update this contact details."
-                    : "Add a contact for this client. All fields are required before you can save."}
+                    ? "Update this contact's details."
+                    : "Add a contact for this client. First name, last name, and role are required."}
                 </p>
                 {contactError && (
                   <Alert variant="destructive" className="mb-3">
@@ -871,61 +878,54 @@ export function ProfilePage({ id }: { id: string }) {
                       placeholder="Controller"
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="contact-work-email">Work Email</Label>
-                      <Input
-                        id="contact-work-email"
-                        type="email"
-                        value={contactForm.workEmail}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({ ...prev, workEmail: e.target.value }))
-                        }
-                        placeholder="jane@company.com"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="contact-email">Email</Label>
-                      <Input
-                        id="contact-email"
-                        type="email"
-                        value={contactForm.email}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({ ...prev, email: e.target.value }))
-                        }
-                        placeholder="jane@personal.com"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label htmlFor="contact-work-phone">Work Phone</Label>
-                      <Input
-                        id="contact-work-phone"
-                        value={contactForm.workPhone}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            workPhone: formatPhone(e.target.value),
-                          }))
-                        }
-                        placeholder="(555) 123-4567"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="contact-mobile-phone">Mobile Phone</Label>
-                      <Input
-                        id="contact-mobile-phone"
-                        value={contactForm.mobilePhone}
-                        onChange={(e) =>
-                          setContactForm((prev) => ({
-                            ...prev,
-                            mobilePhone: formatPhone(e.target.value),
-                          }))
-                        }
-                        placeholder="(555) 987-6543"
-                      />
-                    </div>
+                  <MultiValueField
+                    label="Emails"
+                    type="email"
+                    placeholder="jane@company.com"
+                    values={contactForm.emails}
+                    onChange={(emails) => setContactForm((prev) => ({ ...prev, emails }))}
+                  />
+                  <MultiValueField
+                    label="Phones"
+                    placeholder="(555) 123-4567"
+                    format={formatPhone}
+                    values={contactForm.phones}
+                    onChange={(phones) => setContactForm((prev) => ({ ...prev, phones }))}
+                  />
+                  <div>
+                    <Label className="mb-1.5 block">Associated Entities</Label>
+                    {(lead.data?.entities ?? []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No entities recorded.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(lead.data?.entities ?? []).map((e) => {
+                          const checked = contactForm.entityIds.includes(e.id);
+                          return (
+                            <div
+                              key={e.id}
+                              type="button"
+                              onClick={() =>
+                                setContactForm((prev) => ({
+                                  ...prev,
+                                  entityIds: checked
+                                    ? prev.entityIds.filter((x) => x !== e.id)
+                                    : [...prev.entityIds, e.id],
+                                }))
+                              }
+                              className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                                checked
+                                  ? "border-cyan bg-cyan/10 text-navy"
+                                  : "border-border text-muted-foreground hover:bg-accent",
+                              )}
+                            >
+                              <Checkbox checked={checked} className="pointer-events-none h-3 w-3" />
+                              {e.name}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -967,30 +967,18 @@ export function ProfilePage({ id }: { id: string }) {
                     </p>
                     <p className="text-xs text-muted-foreground">{c.role}</p>
                     <div className="mt-2 space-y-0.5">
-                      {c.workEmail && (
-                        <p className="flex items-center gap-1.5 text-xs">
+                      {c.emails.map((email) => (
+                        <p key={email} className="flex items-center gap-1.5 text-xs">
                           <Mail className="h-3 w-3 text-cyan" />
-                          <span className="text-muted-foreground">Work:</span> {c.workEmail}
+                          {email}
                         </p>
-                      )}
-                      {c.email && (
-                        <p className="flex items-center gap-1.5 text-xs">
-                          <Mail className="h-3 w-3 text-cyan" />
-                          <span className="text-muted-foreground">Email:</span> {c.email}
-                        </p>
-                      )}
-                      {c.workPhone && (
-                        <p className="flex items-center gap-1.5 text-xs">
+                      ))}
+                      {c.phones.map((phone) => (
+                        <p key={phone} className="flex items-center gap-1.5 text-xs">
                           <Phone className="h-3 w-3 text-cyan" />
-                          <span className="text-muted-foreground">Work:</span> {c.workPhone}
+                          {phone}
                         </p>
-                      )}
-                      {c.mobilePhone && (
-                        <p className="flex items-center gap-1.5 text-xs">
-                          <Phone className="h-3 w-3 text-cyan" />
-                          <span className="text-muted-foreground">Mobile:</span> {c.mobilePhone}
-                        </p>
-                      )}
+                      ))}
                     </div>
                     {(() => {
                       const linkedEntities = entitiesForPerson(c.id);
@@ -1015,10 +1003,9 @@ export function ProfilePage({ id }: { id: string }) {
                             firstName: c.firstName,
                             lastName: c.lastName,
                             role: c.role,
-                            workEmail: c.workEmail,
-                            email: c.email,
-                            workPhone: c.workPhone,
-                            mobilePhone: c.mobilePhone,
+                            emails: c.emails.length ? c.emails : [""],
+                            phones: c.phones.length ? c.phones : [""],
+                            entityIds: entitiesForPerson(c.id).map((e) => e.id),
                           });
                           setEditingContactId(c.id);
                           setContactError("");
@@ -1247,6 +1234,65 @@ export function ProfilePage({ id }: { id: string }) {
   );
 }
 
+
+// An editable list of free-text values (emails or phones) — a person has
+// one-to-many of each, with no labels. Always keeps at least one row.
+function MultiValueField({
+  label,
+  type = "text",
+  placeholder,
+  format,
+  values,
+  onChange,
+}: {
+  label: string;
+  type?: string;
+  placeholder?: string;
+  format?: (v: string) => string;
+  values: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const update = (i: number, v: string) =>
+    onChange(values.map((x, idx) => (idx === i ? (format ? format(v) : v) : x)));
+  const removeAt = (i: number) =>
+    onChange(values.length > 1 ? values.filter((_, idx) => idx !== i) : [""]);
+  return (
+    <div>
+      <Label className="mb-1.5 block">{label}</Label>
+      <div className="space-y-2">
+        {values.map((v, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              type={type}
+              value={v}
+              onChange={(e) => update(i, e.target.value)}
+              placeholder={placeholder}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
+              onClick={() => removeAt(i)}
+              aria-label={`Remove ${label}`}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="mt-2 h-7 px-2 text-xs"
+        onClick={() => onChange([...values, ""])}
+      >
+        <Plus className="mr-1 h-3 w-3" /> Add another
+      </Button>
+    </div>
+  );
+}
 
 function Card({
   title,
