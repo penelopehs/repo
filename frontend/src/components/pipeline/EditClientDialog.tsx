@@ -68,7 +68,7 @@ const schema = z
       "tax_preparer_coordination",
       "closed",
     ]),
-    taxYears: z.array(z.number().int()).optional(),
+    taxYears: z.array(z.number().int()).min(1, "Select at least one engagement year"),
     entityNames: z.string().max(2000).optional(),
     notes: z.string().max(2000).optional(),
     // Optional assignments — users.iduser as a string ("" = unassigned).

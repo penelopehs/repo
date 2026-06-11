@@ -102,6 +102,8 @@ export function AddLeadDialog() {
   const [form, setForm] = useState<FormState>(initial);
   const [years, setYears] = useState<TaxYear[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  // Engagement years live outside the zod form, so they get their own error.
+  const [yearsError, setYearsError] = useState<string>();
   const addLead = useLeadsStore((s) => s.addLead);
   const me = useUsersStore((s) => s.me);
   const users = useUsersStore((s) => s.users);
@@ -183,8 +185,10 @@ export function AddLeadDialog() {
     setPhoneOpen(phones.length > 1);
   };
 
-  const toggleYear = (y: TaxYear) =>
+  const toggleYear = (y: TaxYear) => {
+    setYearsError(undefined);
     setYears((p) => (p.includes(y) ? p.filter((x) => x !== y) : [...p, y].sort((a, b) => a - b)));
+  };
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -192,6 +196,7 @@ export function AddLeadDialog() {
     setForm({ ...initial, rep: me ? me.email : "" });
     setYears([]);
     setErrors({});
+    setYearsError(undefined);
     setEprId(null);
     setSuggestions([]);
     setSearchOpen(false);
@@ -204,12 +209,16 @@ export function AddLeadDialog() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
-    if (!parsed.success) {
+    const noYears = years.length === 0;
+    if (!parsed.success || noYears) {
       const fe: Partial<Record<keyof FormState, string>> = {};
-      for (const issue of parsed.error.issues) fe[issue.path[0] as keyof FormState] = issue.message;
+      if (!parsed.success)
+        for (const issue of parsed.error.issues) fe[issue.path[0] as keyof FormState] = issue.message;
       setErrors(fe);
+      setYearsError(noYears ? "Select at least one engagement year" : undefined);
       return;
     }
+    setYearsError(undefined);
     setSubmitting(true);
     try {
       const newLead = await addLead({
@@ -383,7 +392,7 @@ export function AddLeadDialog() {
               </Select>
             </Field>
           </div>
-          <Field label="Engagement Years">
+          <Field label="Engagement Years" error={yearsError}>
             <MultiYearSelect
               value={years}
               onToggle={toggleYear}
