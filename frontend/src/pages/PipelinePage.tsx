@@ -645,12 +645,28 @@ function EntityCell({ names, count }: { names: string[]; count: number }) {
   );
 }
 
+// The call a lead schedules next, keyed by its current pipeline stage. A lead's
+// status is the call it's working through, so the next call is the following
+// stage's (e.g. Feasibility Call → schedule the Tax Preparer Call). `closed`
+// is terminal, so there's nothing left to schedule.
+const NEXT_CALL_BY_STATUS: Record<LeadStatus, string | null> = {
+  new_lead: "Intro Call",
+  intro_call: "Feasibility Call",
+  feasibility_call: "Tax Preparer Call",
+  tax_preparer_coordination: "Close Call",
+  closed: null,
+};
+
 function NextCallCell({ lead }: { lead: Lead }) {
   const nc = lead.nextCall;
   if (!nc) {
+    const nextCall = NEXT_CALL_BY_STATUS[lead.status];
+    if (!nextCall) {
+      return <span className="text-xs text-muted-foreground">—</span>;
+    }
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-cyan/30 bg-cyan/[0.07] px-2.5 py-0.5 text-xs font-medium text-cyan">
-        <AlertTriangle className="h-3 w-3" /> Schedule intro call
+        <AlertTriangle className="h-3 w-3" /> Schedule {nextCall}
       </span>
     );
   }
