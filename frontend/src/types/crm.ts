@@ -162,6 +162,13 @@ export interface LeadData {
   yearStatuses?: Record<string, TaxYearRecord>;
 }
 
+/** Default value for `LeadData.calculations`: an empty array (the persisted
+ *  shape before any year is engaged), typed as the year-keyed map so
+ *  `calculations[year]` reads stay sound. An empty `[]` and an empty `{}` are
+ *  equivalent for keyed access, but the data contract uses `[]`. */
+export const EMPTY_CALCULATIONS: LeadData["calculations"] =
+  [] as unknown as LeadData["calculations"];
+
 export interface Lead {
   id: string;
   fullName: string;

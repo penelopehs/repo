@@ -279,13 +279,14 @@ def _related_graph(
 
 def _initial_data(company: Optional[str], tax_years) -> dict:
     """Seed the lead's data JSON: one entity (the provided company / entity
-    name) with a stable id, an empty bucket per tax year, an empty people list,
-    and an empty entity→people map for the frontend to fill in."""
+    name) with a stable id, an empty (`[]`) calculation per tax year, an empty
+    people list, and an empty entity→people map for the frontend to fill in.
+    `calculations` is an empty list when there are no tax years yet."""
     return {
         "entities": (
             [{"id": f"e_{_entity_slug(company)}", "name": company}] if company else []
         ),
-        "calculations": {str(year): {} for year in (tax_years or [])},
+        "calculations": {str(year): [] for year in tax_years} if tax_years else [],
         "people": [],
         "entityPeople": {},
     }

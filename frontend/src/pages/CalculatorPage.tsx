@@ -33,7 +33,7 @@ import {
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { buildCalculationSearch, calculationYears } from "@/utils/calculationContext";
-import { type Entity, type Lead, type LeadData, type TaxYear } from "@/types/crm";
+import { type Entity, type Lead, type LeadData, type TaxYear, EMPTY_CALCULATIONS } from "@/types/crm";
 import {
   calculateSOW,
   calculateFederal,
@@ -270,7 +270,7 @@ export function CalculatorPage() {
     if (!p) return;
     const current = getLead(String(p.leadId));
     if (!current) return;
-    const existing: LeadData = current.data ?? { people: [], entities: [], calculations: {} };
+    const existing: LeadData = current.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
     const data: LeadData = {
       ...existing,
       // Entity ids live on the master list, not inside the calculation.

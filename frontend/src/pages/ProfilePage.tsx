@@ -60,6 +60,7 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
+import { entitiesFromLead, stripEntityIds } from "@/store/calculatorStore";
 import { useEngagementsStore } from "@/store/engagementsStore";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
@@ -68,7 +69,7 @@ import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
+import { pipelineStageIndex, PIPELINE_STAGES, EMPTY_CALCULATIONS } from "@/types/crm";
 import type {
   FollowUpCall,
   ProfileNote,
@@ -374,7 +375,7 @@ export function ProfilePage({ id }: { id: string }) {
       if (members.length > 0) nextEntityPeople[e.id] = members;
     }
 
-    const base = lead.data ?? { people: [], entities: [], calculations: {} };
+    const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
     try {
       await updateLead(id, {
         data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
@@ -395,7 +396,7 @@ export function ProfilePage({ id }: { id: string }) {
       const members = ids.filter((pid) => pid !== editingContactId);
       if (members.length > 0) nextEntityPeople[entityId] = members;
     }
-    const base = lead.data ?? { people: [], entities: [], calculations: {} };
+    const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
     try {
       await updateLead(id, {
         data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
@@ -449,8 +450,22 @@ export function ProfilePage({ id }: { id: string }) {
       <TaxHistoryPanel
         lead={lead}
         onUpdate={async (yearStatuses) => {
-          const base = lead.data ?? { people: [], entities: [], calculations: {} };
-          await updateLead(id, { data: { ...base, yearStatuses } });
+          const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
+          // Mirror every engaged year into its own calculation: a copy of the
+          // master entity list in the calculator's saved (id-less) format. Years
+          // that already hold a non-empty calculation are left untouched; the
+          // default for a year is [].
+          const masterCards = stripEntityIds(entitiesFromLead(base.entities ?? []));
+          const calculations: Record<string, unknown> = { ...(base.calculations ?? {}) };
+          for (const [year, record] of Object.entries(yearStatuses)) {
+            if (record.status === "engaged" || record.status === "current_engaged") {
+              const existing = calculations[year];
+              if (!Array.isArray(existing) || existing.length === 0) {
+                calculations[year] = masterCards;
+              }
+            }
+          }
+          await updateLead(id, { data: { ...base, yearStatuses, calculations } });
         }}
       />
 

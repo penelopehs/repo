@@ -7,7 +7,7 @@
 // client type), so the list is mapped directly — no per-row detail fetch.
 
 import { api } from "@/services/api";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { ALL_TAX_YEARS, EMPTY_CALCULATIONS } from "@/types/crm";
 import type {
   ClientType,
   Lead,
@@ -147,13 +147,15 @@ function normalizePerson(raw: unknown): LeadDataPerson {
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
 function normalizeData(data: LeadData | null | undefined): LeadData {
   if (!data || Array.isArray(data)) {
-    return { people: [], entities: [], calculations: {}, entityPeople: {} };
+    return { people: [], entities: [], calculations: EMPTY_CALCULATIONS, entityPeople: {} };
   }
   return {
     people: Array.isArray(data.people) ? data.people.map((p) => normalizePerson(p)) : [],
     entities: withEntityIds(Array.isArray(data.entities) ? data.entities : []),
     calculations:
-      data.calculations && typeof data.calculations === "object" ? data.calculations : {},
+      data.calculations && typeof data.calculations === "object"
+        ? data.calculations
+        : EMPTY_CALCULATIONS,
     entityPeople: normalizeEntityPeople(data.entityPeople),
     // Preserve the persisted filing status so the calculator can rehydrate it
     // instead of always falling back to the default.
