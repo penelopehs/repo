@@ -43,26 +43,45 @@ const SOURCES: LeadSource[] = [
   "Other",
 ];
 
-const schema = z.object({
-  firstName: z.string().trim().min(1, "Required").max(60),
-  lastName: z.string().trim().min(1, "Required").max(60),
-  company: z.string().trim().min(1, "Required").max(160),
-  email: z.string().trim().email("Invalid email").max(255),
-  phone: z.string().trim().min(7, "Invalid phone").max(40),
-  source: z.enum([
-    "Referral",
-    "Website",
-    "Cold Call",
-    "Conference",
-    "LinkedIn",
-    "Partner",
-    "Other",
-  ]),
-  rep: z.string().trim().min(1, "Required"),
-  // Optional assignments — users.iduser as a string ("" = unassigned).
-  salesManager: z.string().optional(),
-  trainingManager: z.string().optional(),
-});
+const schema = z
+  .object({
+    firstName: z.string().trim().min(1, "Required").max(60),
+    lastName: z.string().trim().min(1, "Required").max(60),
+    company: z.string().trim().min(1, "Required").max(160),
+    // Email and phone are each optional on their own, but at least one is
+    // required — enforced in the superRefine below.
+    email: z.string().trim().max(255),
+    phone: z.string().trim().max(40),
+    source: z.enum([
+      "Referral",
+      "Website",
+      "Cold Call",
+      "Conference",
+      "LinkedIn",
+      "Partner",
+      "Other",
+    ]),
+    rep: z.string().trim().min(1, "Required"),
+    // Optional assignments — users.iduser as a string ("" = unassigned).
+    salesManager: z.string().optional(),
+    trainingManager: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = data.email.length > 0;
+    const hasPhone = data.phone.length > 0;
+    if (!hasEmail && !hasPhone) {
+      const message = "Email or phone required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message });
+      return;
+    }
+    if (hasEmail && !z.string().email().safeParse(data.email).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Invalid email" });
+    }
+    if (hasPhone && data.phone.length < 7) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Invalid phone" });
+    }
+  });
 
 type FormState = z.infer<typeof schema>;
 
@@ -83,6 +102,8 @@ export function AddLeadDialog() {
   const [form, setForm] = useState<FormState>(initial);
   const [years, setYears] = useState<TaxYear[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  // Engagement years live outside the zod form, so they get their own error.
+  const [yearsError, setYearsError] = useState<string>();
   const addLead = useLeadsStore((s) => s.addLead);
   const me = useUsersStore((s) => s.me);
   const users = useUsersStore((s) => s.users);
@@ -164,8 +185,10 @@ export function AddLeadDialog() {
     setPhoneOpen(phones.length > 1);
   };
 
-  const toggleYear = (y: TaxYear) =>
+  const toggleYear = (y: TaxYear) => {
+    setYearsError(undefined);
     setYears((p) => (p.includes(y) ? p.filter((x) => x !== y) : [...p, y].sort((a, b) => a - b)));
+  };
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -173,6 +196,7 @@ export function AddLeadDialog() {
     setForm({ ...initial, rep: me ? me.email : "" });
     setYears([]);
     setErrors({});
+    setYearsError(undefined);
     setEprId(null);
     setSuggestions([]);
     setSearchOpen(false);
@@ -185,12 +209,16 @@ export function AddLeadDialog() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
-    if (!parsed.success) {
+    const noYears = years.length === 0;
+    if (!parsed.success || noYears) {
       const fe: Partial<Record<keyof FormState, string>> = {};
-      for (const issue of parsed.error.issues) fe[issue.path[0] as keyof FormState] = issue.message;
+      if (!parsed.success)
+        for (const issue of parsed.error.issues) fe[issue.path[0] as keyof FormState] = issue.message;
       setErrors(fe);
+      setYearsError(noYears ? "Select at least one engagement year" : undefined);
       return;
     }
+    setYearsError(undefined);
     setSubmitting(true);
     try {
       const newLead = await addLead({
@@ -364,7 +392,7 @@ export function AddLeadDialog() {
               </Select>
             </Field>
           </div>
-          <Field label="Engagement Years">
+          <Field label="Engagement Years" error={yearsError}>
             <MultiYearSelect
               value={years}
               onToggle={toggleYear}

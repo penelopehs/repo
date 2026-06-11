@@ -406,18 +406,42 @@ def test_follow_up_call_crud(client):
     assert created.status_code == 201
     call = created.json()
     assert call["completed"] is False
+    # A new lead's first call stamps "Intro Call" and advances the lead there.
+    assert call["call_type"] == "Intro Call"
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Intro Call"
 
     # Read: list for the lead.
     listed = client.get(f"/leads/{lead['id']}/follow-up-calls")
     assert listed.status_code == 200
     assert [c["id"] for c in listed.json()] == [call["id"]]
 
-    # Update: lead-scoped patch.
+    # Update: lead-scoped patch. Completing a call does NOT advance the lead; the
+    # pipeline advances when the next call is scheduled.
     patched = client.patch(
         f"/leads/{lead['id']}/follow-up-calls/{call['id']}", json={"completed": True}
     )
     assert patched.status_code == 200
     assert patched.json()["completed"] is True
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Intro Call"
+
+    # Scheduling the next call now that the previous one is completed advances
+    # the lead +1 stage and stamps the new call's type.
+    nxt = client.post(
+        f"/leads/{lead['id']}/follow-up-calls",
+        json={"scheduled_date": "2026-06-17", "notes": "feasibility"},
+    )
+    assert nxt.status_code == 201
+    assert nxt.json()["call_type"] == "Feasibility Call"
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Feasibility Call"
+
+    # Scheduling another call while the latest is still open does NOT advance.
+    pending = client.post(
+        f"/leads/{lead['id']}/follow-up-calls",
+        json={"scheduled_date": "2026-06-24"},
+    )
+    assert pending.status_code == 201
+    assert pending.json()["call_type"] == "Feasibility Call"
+    assert client.get(f"/leads/{lead['id']}").json()["pipeline_status"] == "Feasibility Call"
 
     # 404 when the call isn't on this lead (unknown call, or wrong lead).
     other = client.post("/leads", json={"first_name": "Other", "last_name": "Lead"}).json()

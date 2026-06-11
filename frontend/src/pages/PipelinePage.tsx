@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   Users,
   Phone,
-  BadgeCheck,
   Layers,
   Search,
   ArrowUp,
@@ -15,12 +14,14 @@ import {
   ArrowUpDown,
   Calculator,
   FileSignature,
+  FileText,
+  ScrollText,
+  Briefcase,
   Pencil,
   Trash2,
   MoreHorizontal,
   X,
   AlertTriangle,
-  CalendarClock,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,22 +49,16 @@ import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { YearChips } from "@/components/MultiYearSelect";
 import { useLeadsStore } from "@/store/leadsStore";
 import type { Lead, LeadStatus } from "@/types/crm";
-import { formatDate } from "@/utils/format";
+import { PIPELINE_STAGES } from "@/types/crm";
+import { formatDate, formatLocalDate } from "@/utils/format";
 import { buildCalculationSearch, hasExistingCalculation } from "@/utils/calculationContext";
 import { cn } from "@/lib/utils";
 
-type KpiFilter = "total" | "new" | "active" | "calc" | "sow" | "intro_due" | "unscheduled" | null;
+type KpiFilter = LeadStatus | "total" | null;
 type SortField = "status" | "rep" | "entities" | "latest" | "added" | "years";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
-
-const KPI_TO_STATUS: Record<"new" | "active" | "calc" | "sow", LeadStatus> = {
-  new: "new",
-  active: "active_engagement",
-  calc: "calculation_sent",
-  sow: "sow_signed",
-};
 
 export function PipelinePage() {
   const leads = useLeadsStore((s) => s.leads);
@@ -72,7 +67,6 @@ export function PipelinePage() {
   const fetchLeads = useLeadsStore((s) => s.fetchLeads);
   const deleteLead = useLeadsStore((s) => s.deleteLead);
   const setStatus = useLeadsStore((s) => s.setStatus);
-  const promote = useLeadsStore((s) => s.promoteToActive);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -98,21 +92,17 @@ export function PipelinePage() {
     [leads, repFilter],
   );
 
-  const kpis = useMemo(
-    () => ({
+  const kpis = useMemo(() => {
+    const count = (s: LeadStatus) => repFilteredLeads.filter((l) => l.status === s).length;
+    return {
       total: repFilteredLeads.length,
-      new: repFilteredLeads.filter((l) => l.status === "new").length,
-      active: repFilteredLeads.filter((l) => l.status === "active_engagement").length,
-      calcSent: repFilteredLeads.filter((l) => l.status === "calculation_sent").length,
-      sowSigned: repFilteredLeads.filter((l) => l.status === "sow_signed").length,
-      introDue: repFilteredLeads.filter((l) => l.nextCall?.callType === "Intro Call").length,
-      unscheduled: repFilteredLeads.filter((l) => !l.nextCall).length,
-    }),
-    [repFilteredLeads],
-  );
-
-  const active = useMemo(() => leads.filter((l) => l.status === "active_engagement"), [leads]);
-  const sowReady = useMemo(() => leads.filter((l) => l.status === "sow_signed"), [leads]);
+      new_lead: count("new_lead"),
+      intro_call: count("intro_call"),
+      feasibility_call: count("feasibility_call"),
+      tax_preparer_coordination: count("tax_preparer_coordination"),
+      closed: count("closed"),
+    };
+  }, [repFilteredLeads]);
 
   const isFiltered = !!kpiFilter || query.trim().length > 0 || !!repFilter;
 
@@ -121,12 +111,7 @@ export function PipelinePage() {
     let rows = repFilteredLeads.filter((l) => {
       const matchQ =
         !q || l.fullName.toLowerCase().includes(q) || l.company.toLowerCase().includes(q);
-      let matchK = true;
-      if (kpiFilter === "total") matchK = true;
-      else if (kpiFilter === "intro_due") matchK = l.nextCall?.callType === "Intro Call";
-      else if (kpiFilter === "unscheduled") matchK = !l.nextCall;
-      else if (kpiFilter && kpiFilter in KPI_TO_STATUS)
-        matchK = l.status === KPI_TO_STATUS[kpiFilter as keyof typeof KPI_TO_STATUS];
+      const matchK = !kpiFilter || kpiFilter === "total" || l.status === kpiFilter;
       return matchQ && matchK;
     });
     rows = [...rows].sort((a, b) => {
@@ -250,8 +235,8 @@ export function PipelinePage() {
         </div>
       </div>
 
-      {/* Clickable KPIs */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
+      {/* Clickable KPIs — one per pipeline stage, plus Total. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiButton active={kpiFilter === "total"} onClick={() => onKpiClick("total")}>
           <KpiCard
             label="Total"
@@ -262,52 +247,42 @@ export function PipelinePage() {
             mini
           />
         </KpiButton>
-        <KpiButton active={kpiFilter === "new"} onClick={() => onKpiClick("new")}>
-          <KpiCard label="New" value={kpis.new} icon={Users} accent="cyan" mini />
+        <KpiButton active={kpiFilter === "new_lead"} onClick={() => onKpiClick("new_lead")}>
+          <KpiCard label="New Lead" value={kpis.new_lead} icon={Users} accent="cyan" mini />
         </KpiButton>
-        <KpiButton active={kpiFilter === "active"} onClick={() => onKpiClick("active")}>
-          <KpiCard label="Active" value={kpis.active} icon={Phone} accent="green" mini />
+        <KpiButton active={kpiFilter === "intro_call"} onClick={() => onKpiClick("intro_call")}>
+          <KpiCard label="Intro Call" value={kpis.intro_call} icon={FileText} accent="orange" mini />
         </KpiButton>
-        <KpiButton active={kpiFilter === "calc"} onClick={() => onKpiClick("calc")}>
+        <KpiButton
+          active={kpiFilter === "feasibility_call"}
+          onClick={() => onKpiClick("feasibility_call")}
+        >
           <KpiCard
-            label="Tax Prepare"
-            value={kpis.calcSent}
+            label="Feasibility"
+            value={kpis.feasibility_call}
+            icon={ScrollText}
+            accent="violet"
+            mini
+          />
+        </KpiButton>
+        <KpiButton
+          active={kpiFilter === "tax_preparer_coordination"}
+          onClick={() => onKpiClick("tax_preparer_coordination")}
+        >
+          <KpiCard
+            label="Tax Preparer"
+            value={kpis.tax_preparer_coordination}
             icon={Calculator}
             accent="orange"
             mini
           />
         </KpiButton>
-        <KpiButton active={kpiFilter === "sow"} onClick={() => onKpiClick("sow")}>
-          <KpiCard
-            label="Closed"
-            value={kpis.sowSigned}
-            icon={BadgeCheck}
-            accent="violet"
-            mini
-          />
-        </KpiButton>
-        <KpiButton active={kpiFilter === "intro_due"} onClick={() => onKpiClick("intro_due")}>
-          <KpiCard
-            label="Intro Calls Due"
-            value={kpis.introDue}
-            icon={CalendarClock}
-            accent="cyan"
-            mini
-          />
-        </KpiButton>
-        <KpiButton active={kpiFilter === "unscheduled"} onClick={() => onKpiClick("unscheduled")}>
-          <KpiCard
-            label="Calls Unscheduled"
-            value={kpis.unscheduled}
-            icon={AlertTriangle}
-            accent="orange"
-            mini
-          />
+        <KpiButton active={kpiFilter === "closed"} onClick={() => onKpiClick("closed")}>
+          <KpiCard label="Closed" value={kpis.closed} icon={Briefcase} accent="green" mini />
         </KpiButton>
       </div>
 
-      {/* Section cards intentionally not rendered — KPI filters scope the unified table below.
-          Logic for `active` / `sowReady` is preserved above for future reuse. */}
+      {/* Section cards intentionally not rendered — KPI filters scope the unified table below. */}
 
       {/* All Leads & Clients */}
       <section className="rounded-2xl border border-border bg-card shadow-card">
@@ -340,9 +315,9 @@ export function PipelinePage() {
           onProfile={goProfile}
           onCalc={goCalc}
           onEdit={(l) => setEditing(l)}
-          onSignSow={async (l) => {
-            try { await setStatus(l.id, "sow_signed"); toast.success("SOW signed", { description: l.company }); }
-            catch (e) { toast.error("Couldn't sign SOW", { description: e instanceof Error ? e.message : undefined }); }
+          onClose={async (l) => {
+            try { await setStatus(l.id, "closed"); toast.success("Lead closed", { description: l.company }); }
+            catch (e) { toast.error("Couldn't close lead", { description: e instanceof Error ? e.message : undefined }); }
           }}
           onDelete={(l) => setPendingDelete(l.id)}
           emptyText={loading ? "Loading leads…" : "No leads match your filters."}
@@ -414,17 +389,8 @@ export function PipelinePage() {
 }
 
 function kpiLabel(f: Exclude<KpiFilter, null>) {
-  return (
-    ({
-      total: "Total",
-      new: "New",
-      active: "Active",
-      calc: "Tax Prepare",
-      sow: "Closed",
-      intro_due: "Intro Calls Due",
-      unscheduled: "Calls Unscheduled",
-    } as Record<string, string>)[f] ?? f
-  );
+  if (f === "total") return "Total";
+  return PIPELINE_STAGES.find((s) => s.value === f)?.label ?? f;
 }
 
 function KpiButton({
@@ -459,7 +425,7 @@ interface TableProps {
   onProfile: (l: Lead) => void;
   onCalc: (l: Lead) => void;
   onEdit: (l: Lead) => void;
-  onSignSow: (l: Lead) => void;
+  onClose: (l: Lead) => void;
   onDelete: (l: Lead) => void;
   emptyText?: string;
 }
@@ -553,7 +519,7 @@ function PipelineTable(p: TableProps) {
               <td className="px-5 py-3 text-muted-foreground">
                 {l.latestCalculation === "—" ? "—" : formatDate(l.latestCalculation)}
               </td>
-              <td className="px-5 py-3 text-muted-foreground">{formatDate(l.addedAt)}</td>
+              <td className="px-5 py-3 text-muted-foreground">{formatLocalDate(l.addedAt)}</td>
               <td className="px-5 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -571,8 +537,8 @@ function PipelineTable(p: TableProps) {
                         ? "Open Existing Calculation"
                         : "Create Calculation"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => p.onSignSow(l)}>
-                      <FileSignature className="mr-2 h-4 w-4" /> Sign SOW
+                    <DropdownMenuItem onClick={() => p.onClose(l)}>
+                      <FileSignature className="mr-2 h-4 w-4" /> Mark Closed
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
@@ -683,7 +649,7 @@ function NextCallCell({ lead }: { lead: Lead }) {
   const nc = lead.nextCall;
   if (!nc) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400">
+      <span className="inline-flex items-center gap-1 rounded-full border border-cyan/30 bg-cyan/[0.07] px-2.5 py-0.5 text-xs font-medium text-cyan">
         <AlertTriangle className="h-3 w-3" /> Schedule intro call
       </span>
     );

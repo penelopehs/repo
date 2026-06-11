@@ -75,7 +75,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   },
 
   promoteToActive: async (id) => {
-    const updated = await leadsApi.update(id, { status: "active_engagement" });
+    const updated = await leadsApi.update(id, { status: "closed" });
     set((s) => ({ leads: s.leads.map((x) => (x.id === id ? updated : x)) }));
   },
 

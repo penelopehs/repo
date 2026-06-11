@@ -6,17 +6,25 @@
 //   PATCH /leads/{lead_id}/follow-up-calls/{call_id}
 
 import { api } from "@/services/api";
-import type { FollowUpCall } from "@/types/crm";
+import type { FollowUpCall, LeadStatus } from "@/types/crm";
 
 interface ApiFollowUpCall {
   id: number;
   scheduled_date: string; // ISO date "YYYY-MM-DD"
   scheduled_time: string | null;
   notes: string | null;
-  call_type: string | null;
+  call_type: string | null; // backend PipelineStatus value, e.g. "Intro Call"
   assigned_rep_name: string | null;
   completed: boolean;
 }
+
+// Backend Title Case PipelineStatus value → frontend snake_case LeadStatus.
+const CALL_TYPE_FROM_API: Record<string, LeadStatus> = {
+  "Intro Call": "intro_call",
+  "Feasibility Call": "feasibility_call",
+  "Tax Preparer Coordination": "tax_preparer_coordination",
+  Closed: "closed",
+};
 
 function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
   return {
@@ -25,9 +33,9 @@ function mapCall(leadId: string, c: ApiFollowUpCall): FollowUpCall {
     date: c.scheduled_date,
     time: c.scheduled_time ?? "",
     notes: c.notes ?? "",
-    callType: c.call_type,
     assignedRepName: c.assigned_rep_name,
     completed: c.completed,
+    callType: c.call_type ? CALL_TYPE_FROM_API[c.call_type] : undefined,
   };
 }
 
@@ -39,7 +47,11 @@ export interface FollowUpCallCreateInput {
   assignedRepName?: string;
 }
 
-export type FollowUpCallPatch = Partial<Pick<FollowUpCall, "date" | "time" | "notes" | "callType" | "assignedRepName" | "completed">>;
+// callType is decoupled from the read model's LeadStatus: the dialog sends a
+// free-text call type (e.g. "Intro Call") that the backend maps onto its enum.
+export type FollowUpCallPatch = Partial<
+  Pick<FollowUpCall, "date" | "time" | "notes" | "assignedRepName" | "completed">
+> & { callType?: string };
 
 export const followUpCallsApi = {
   async list(leadId: string): Promise<FollowUpCall[]> {

@@ -54,18 +54,19 @@ interface ApiLeadListItem {
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
 
 const STATUS_FROM_API: Record<string, LeadStatus> = {
-  Lead: "new",
-  "Calculation Sent": "calculation_sent",
-  "SOW Signed": "sow_signed",
-  "Active Engagement": "active_engagement",
+  "New Lead": "new_lead",
+  "Intro Call": "intro_call",
+  "Feasibility Call": "feasibility_call",
+  "Tax Preparer Coordination": "tax_preparer_coordination",
+  Closed: "closed",
 };
 
 const STATUS_TO_API: Record<LeadStatus, string> = {
-  new: "Lead",
-  calculation_sent: "Calculation Sent",
-  sow_signed: "SOW Signed",
-  active_engagement: "Active Engagement",
-  lost: "Lost", // no backend enum value yet — sent as-is for the future update.
+  new_lead: "New Lead",
+  intro_call: "Intro Call",
+  feasibility_call: "Feasibility Call",
+  tax_preparer_coordination: "Tax Preparer Coordination",
+  closed: "Closed",
 };
 
 const TAX_YEARS = new Set<number>(ALL_TAX_YEARS);
@@ -94,6 +95,7 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
     // Preserve the persisted filing status so the calculator can rehydrate it
     // instead of always falling back to the default.
     ...(data.filingStatus && { filingStatus: data.filingStatus }),
+    ...(data.yearStatuses && { yearStatuses: data.yearStatuses }),
   };
 }
 
@@ -126,7 +128,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
     salesManagerName: i.sales_manager_name ?? undefined,
     trainingManagerId: i.training_manager_iduser ?? null,
     trainingManagerName: i.training_manager_name ?? undefined,
-    status: STATUS_FROM_API[i.pipeline_status] ?? "new",
+    status: STATUS_FROM_API[i.pipeline_status] ?? "new_lead",
     clientType: toClientType(i.client_type),
     engagementYears: taxYears.length,
     taxYears,
@@ -140,7 +142,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
       i.latest_calc_date != null
         ? new Date(i.latest_calc_date * 1000).toISOString().slice(0, 10)
         : "—",
-    addedAt: i.created_at,
+    addedAt: i.created_at.endsWith('Z') || i.created_at.includes('+') ? i.created_at : i.created_at + 'Z',
     notes: i.notes ?? undefined,
     nextCall: i.next_call
       ? ({ date: i.next_call.date, time: i.next_call.time ?? undefined, callType: i.next_call.call_type } as NextCallInfo)

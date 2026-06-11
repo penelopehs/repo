@@ -18,6 +18,15 @@ export const formatDate = (iso: string): string =>
     timeZone: "UTC",
   });
 
+/** Like formatDate but renders in the user's local timezone — use this for
+ *  full ISO datetime strings (created_at, etc.) rather than plain date strings. */
+export const formatLocalDate = (iso: string): string =>
+  new Date(iso).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
 export const formatTime = (time: string): string => {
   const [hourStr, minute] = time.split(":");
   const hour = parseInt(hourStr, 10);

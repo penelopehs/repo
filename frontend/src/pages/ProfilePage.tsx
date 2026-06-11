@@ -1,4 +1,4 @@
-// View Profile page — client overview with engagements, contacts, calls, intake.
+﻿// View Profile page — client overview with engagements, contacts, calls, intake.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   ArrowLeft,
+  ArrowRight,
   Briefcase,
   Mail,
   Phone,
@@ -13,17 +14,17 @@ import {
   Users,
   Layers,
   CalendarClock,
-  BadgeCheck,
-  X,
   Pencil,
   Trash2,
   Calculator as CalcIcon,
   Loader2,
   Star,
   Clock,
-  CheckCircle2,
   Ban,
   AlertTriangle,
+  CheckCircle2,
+  Circle,
+  Info as InfoIcon,
 } from "lucide-react";
 import {
   BarChart,
@@ -57,10 +58,29 @@ import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
 import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
-import { formatCurrency, formatDate, formatTime } from "@/utils/format";
+import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-import type { FollowUpCall, LeadDataPerson, ProfileNote, TaxYearRecord, TaxYearStatus } from "@/types/crm";
+import { pipelineStageIndex, PIPELINE_STAGES } from "@/types/crm";
+import type {
+  FollowUpCall,
+  LeadDataPerson,
+  ProfileNote,
+  TaxYearRecord,
+  TaxYearStatus,
+} from "@/types/crm";
+import { useUsersStore } from "@/store/usersStore";
+
+// The four scheduled calls a lead works through after "New Lead". Their order
+// mirrors the pipeline stages (intro_call → feasibility_call →
+// tax_preparer_coordination → closed); a lead's stage index says how many of
+// these calls are done.
+const CALL_STEPS = [
+  { title: "Intro Call", noun: "intro call" },
+  { title: "Feasibility Call", noun: "feasibility call" },
+  { title: "Tax Prepare Call", noun: "tax preparer call" },
+  { title: "Close Call", noun: "close call" },
+] as const;
 
 // Stable empty reference so the zustand selector below doesn't return a fresh
 // array on every read (which would make useSyncExternalStore loop forever).
@@ -68,6 +88,8 @@ const NO_CALLS: FollowUpCall[] = [];
 const NO_NOTES: ProfileNote[] = [];
 
 export function ProfilePage({ id }: { id: string }) {
+  const me = useUsersStore((s) => s.me);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
@@ -179,6 +201,13 @@ export function ProfilePage({ id }: { id: string }) {
     }
   };
 
+  // Toggle a follow-up call's completed state. The store refreshes the lead
+  // afterwards, so the Call Progress / status badge (driven off the lead) and
+  // the call's own completed flag stay in sync.
+  const handleToggleCallComplete = async (call: FollowUpCall) => {
+    await updateCall(id, call.id, { completed: !call.completed });
+  };
+
   const { engagements, entities: clientEntities } = byClient(id);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
@@ -188,6 +217,10 @@ export function ProfilePage({ id }: { id: string }) {
       void fetchLead(id).finally(() => setLeadLoading(false));
     }
   }, [id, lead, fetchLead]);
+
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
 
   useEffect(() => {
     void fetchCalls(id);
@@ -229,6 +262,17 @@ export function ProfilePage({ id }: { id: string }) {
     (c) => new Date(`${c.date}T${c.time}`).getTime() >= Date.now(),
   ).length;
 
+  // Soonest pending future call — drives the "active" Call Progress step.
+  const nextCall = useMemo(() => {
+    const future = calls
+      .filter((c) => !c.completed && new Date(`${c.date}T${c.time}`).getTime() >= Date.now())
+      .sort(
+        (a, b) =>
+          new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime(),
+      );
+    return future[0] ?? null;
+  }, [calls]);
+
   if (!lead) {
     if (leadLoading) {
       return (
@@ -250,6 +294,18 @@ export function ProfilePage({ id }: { id: string }) {
 
   // People & Contacts live on the lead's `data.people[]` and persist via PATCH /leads/{id}.
   const people = lead.data?.people ?? [];
+
+  // Call Progress: the lead advances one pipeline stage each time a call is
+  // *scheduled*, so stageIndex is the number of scheduled calls (0 = New Lead).
+  const stageIndex = pipelineStageIndex(lead.status);
+  // The call working the lead's current stage (undefined for a brand-new lead).
+  // While it's still open the next step can't be scheduled yet, so the pipeline
+  // is "in progress" on this call rather than on the next step.
+  const currentCall = calls.find((c) => c.callType === lead.status);
+  const currentOpen = !!currentCall && !currentCall.completed;
+  const activeStep = stageIndex < CALL_STEPS.length ? CALL_STEPS[stageIndex] : null;
+  // Warn when the in-progress call has no upcoming follow-up scheduled yet.
+  const needsCall = !!activeStep && upcomingCalls === 0;
 
   const resetContactForm = () => {
     setContactForm({
@@ -342,9 +398,9 @@ export function ProfilePage({ id }: { id: string }) {
             <p className="text-sm text-muted-foreground">{lead.company}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <StatusBadge status={lead.status} />
-              {!calls.some((c) => c.callType === "Intro Call") && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-700/50 dark:bg-amber-950/30 dark:text-amber-400">
-                  <AlertTriangle className="h-3 w-3" /> No intro call scheduled
+              {needsCall && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan/30 bg-cyan/[0.07] px-2.5 py-1 text-xs font-medium text-cyan">
+                  <AlertTriangle className="h-3 w-3" /> No {activeStep.noun} scheduled
                 </span>
               )}
             </div>
@@ -413,13 +469,108 @@ export function ProfilePage({ id }: { id: string }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* Left column */}
         <div className="space-y-6">
+          {/* Call Progress */}
+          <Card title="Call Progress">
+            <ol className="space-y-2">
+              {CALL_STEPS.map((step, i) => {
+                // Each scheduled call advances the stage, so steps below
+                // stageIndex already have a call — completed or merely scheduled.
+                // Look up this stage's call to tell the two apart (a
+                // scheduled-but-open call reads as "Scheduled", not "Completed").
+                // The step at stageIndex only becomes "active" once the current
+                // call is completed; while it's still open, the next step stays
+                // pending so just one step shows as in progress.
+                const stepStatus = PIPELINE_STAGES[i + 1]?.value;
+                const stepCall = calls.find((c) => c.callType === stepStatus);
+                const state =
+                  stepCall && !stepCall.completed
+                    ? "scheduled"
+                    : i < stageIndex
+                      ? "done"
+                      : i === stageIndex && !currentOpen
+                        ? "active"
+                        : "pending";
+                const sub =
+                  state === "done"
+                    ? "Completed"
+                    : state === "scheduled"
+                      ? `Scheduled for ${formatDate(stepCall!.date)}`
+                      : state === "active"
+                        ? nextCall
+                          ? `Scheduled for ${formatDate(nextCall.date)}`
+                          : "Not yet scheduled"
+                        : i === CALL_STEPS.length - 1
+                          ? "Pending prior steps"
+                          : `Pending ${CALL_STEPS[i - 1].noun}`;
+                const Icon = state === "done" ? CheckCircle2 : Circle;
+                const highlighted = state === "active" || state === "scheduled";
+                return (
+                  <li
+                    key={step.title}
+                    className={cn(
+                      "flex items-start gap-3 rounded-xl border p-4 transition-colors",
+                      highlighted ? "border-cyan/50 bg-cyan/5" : "border-border",
+                      state === "pending" && "opacity-60",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "mt-0.5 h-4 w-4 shrink-0",
+                        state === "done"
+                          ? "text-green-600"
+                          : highlighted
+                            ? "text-cyan"
+                            : "text-muted-foreground",
+                      )}
+                    />
+                    <div className="flex-1">
+                      <p
+                        className={cn(
+                          "text-sm font-semibold",
+                          state === "pending" ? "text-muted-foreground" : "text-navy",
+                        )}
+                      >
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{sub}</p>
+                      {/* Feasibility Call action button */}
+                      {i === 1 && state !== "done" && (
+                        <div className="mt-2.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={state === "pending"}
+                            className={cn(
+                              "gap-1.5",
+                              state === "scheduled" || state === "active"
+                                ? "border-cyan/50 text-cyan hover:bg-cyan/10"
+                                : "opacity-50",
+                            )}
+                            onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                          >
+                            Go to Feasibility Call <ArrowRight className="h-3.5 w-3.5" />
+                          </Button>
+                          {state === "pending" && (
+                            <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
+                              <InfoIcon className="h-3 w-3 shrink-0" /> Schedule the Feasibility Call to enable
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </Card>
+
           {/* General Info */}
           <Card title="General Information">
             <div className="grid gap-4 sm:grid-cols-2">
               <Info label="Lead Source" value={lead.source} />
               <Info
                 label="Client Since"
-                value={lead.engagedSince ? formatDate(lead.engagedSince) : formatDate(lead.addedAt)}
+                value={lead.engagedSince ? formatDate(lead.engagedSince) : formatLocalDate(lead.addedAt)}
               />
               <Info label="Phone" value={lead.phone ? formatPhone(lead.phone) : lead.phone} icon={<Phone className="h-3 w-3" />} />
               <Info label="Email" value={lead.email} icon={<Mail className="h-3 w-3" />} />
@@ -489,9 +640,13 @@ export function ProfilePage({ id }: { id: string }) {
                           </span>
                           <div className="flex items-center gap-3">
                             <span>
-                              {formatDate(note.createdAt)}{" "}
+                              {new Date(note.createdAt).toLocaleDateString(undefined, {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}{" "}
                               <span className="text-cyan">
-                                {new Date(note.createdAt).toLocaleTimeString("en-US", {
+                                {new Date(note.createdAt).toLocaleTimeString(undefined, {
                                   hour: "numeric",
                                   minute: "2-digit",
                                 })}
@@ -638,8 +793,8 @@ export function ProfilePage({ id }: { id: string }) {
 
         {/* Right sidebar */}
         <div className="space-y-6">
-          {/* Sales Rep */}
-          <Card title="Assigned Sales Representative">
+          {/* Sales Rep — hidden when the signed-in user is this lead's own rep. */}
+          {me?.iduser !== lead.repId && <Card title="Assigned Sales Representative">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 text-cyan text-sm font-bold ring-1 ring-cyan/25">
                 {lead.rep
@@ -653,7 +808,7 @@ export function ProfilePage({ id }: { id: string }) {
                 <p className="text-xs text-muted-foreground">Senior Sales Representative</p>
               </div>
             </div>
-          </Card>
+          </Card>}
 
           {/* People & Contacts */}
           <Card
@@ -876,6 +1031,135 @@ export function ProfilePage({ id }: { id: string }) {
             </ul>
           </Card>
 
+          
+          {/* Follow-up Calls */}
+          <Card
+            id="section-calls"
+            title="Follow-up Calls"
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditingCall(null);
+                  setOpenCall(true);
+                }}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Schedule
+              </Button>
+            }
+          >
+            {needsCall && (
+              <Alert className="mb-4 border-2 border-cyan/70 bg-cyan/[0.07]">
+                <AlertTriangle className="h-4 w-4 text-cyan" />
+                <AlertDescription className="text-cyan">
+                  Schedule {activeStep.noun} to advance this lead.
+                </AlertDescription>
+              </Alert>
+            )}
+            {calls.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No follow-ups scheduled.</p>
+            ) : (
+              <ul className="space-y-2">
+                {[...calls]
+                  .sort((a, b) => {
+                    if ((a.completed ?? false) !== (b.completed ?? false))
+                      return Number(a.completed ?? false) - Number(b.completed ?? false);
+                    const diff =
+                      new Date(`${a.date}T${a.time}`).getTime() -
+                      new Date(`${b.date}T${b.time}`).getTime();
+                    // Pending: soonest first (ascending). Completed: most recent
+                    // first (descending).
+                    return a.completed ? -diff : diff;
+                  })
+                  .map((c) => {
+                    const isToday = c.date === new Date().toISOString().slice(0, 10);
+                    return (
+                      <li
+                        key={c.id}
+                        className={`rounded-lg border p-3 text-sm transition-colors ${isToday && !c.completed ? "border-cyan/50 bg-cyan/5" : "border-border"}`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-navy">
+                                {formatDate(c.date)} · {formatTime(c.time)}
+                              </p>
+                              {isToday && !c.completed && (
+                                <span className="rounded-full bg-cyan px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                  Today
+                                </span>
+                              )}
+                            </div>
+                            {c.notes && (
+                              <p className="mt-1 text-xs text-muted-foreground">{c.notes}</p>
+                            )}
+                            {c.assignedRepName && (
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Rep: {c.assignedRepName}
+                              </p>
+                            )}
+                            <p className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                              Status:{" "}
+                              <span className={c.completed ? "text-green" : "text-muted-foreground"}>
+                                {c.completed ? "Completed" : "Pending"}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <label className="flex items-center gap-2 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-navy">
+                              <input
+                                type="checkbox"
+                                checked={!!c.completed}
+                                onChange={() => void handleToggleCallComplete(c)}
+                                className="h-3.5 w-3.5 rounded border-border text-green-600 focus:ring-green-500"
+                              />
+                              Complete
+                            </label>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-navy"
+                              title="Edit call"
+                              onClick={() => {
+                                setEditingCall(c);
+                                setOpenCall(true);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
+            )}
+          </Card>
+
+          {/* Feasibility Call */}
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
+            <h2 className="mb-1.5 text-xl font-bold text-foreground">Feasibility Call</h2>
+            <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
+              Capture notes, map business components, and generate a preparer-ready summary — all in one guided workflow.
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <Button
+                className="w-full"
+                onClick={() => toast.info("Feasibility call workflow coming soon.")}
+              >
+                Start Feasibility Call
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => toast.info("Feasibility summary coming soon.")}
+              >
+                View Feasibility Summary
+              </Button>
+            </div>
+          </div>
+
           {/* Engagements */}
           <Card title="Engagements" id="section-engagements">
             {engagements.length === 0 && lead.taxYears.length === 0 ? (
@@ -954,148 +1238,6 @@ export function ProfilePage({ id }: { id: string }) {
             )}
           </Card>
 
-          {/* Follow-up Calls */}
-          <Card
-            id="section-calls"
-            title="Follow-up Calls"
-            action={
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setEditingCall(null);
-                  setOpenCall(true);
-                }}
-              >
-                <Plus className="mr-1 h-3 w-3" /> Add
-              </Button>
-            }
-          >
-            <ul className="space-y-2">
-              {/* Yellow reminder when no intro call has ever been booked */}
-              {!calls.some((c) => c.callType === "Intro Call") && (
-                <li className="rounded-lg border-l-4 border-l-amber-400 border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-700/50 dark:bg-amber-950/20">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-amber-800 dark:text-amber-300">
-                          No intro call scheduled
-                        </p>
-                        <span className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                          Reminder
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                        Lead added {formatDate(lead.addedAt)} — intro call not yet booked.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => { setEditingCall(null); setOpenCall(true); }}
-                        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-cyan hover:underline"
-                      >
-                        <Phone className="h-3 w-3" /> Schedule now →
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              )}
-
-              {calls.length === 0 && (
-                <li className="text-sm text-muted-foreground">No follow-ups scheduled.</li>
-              )}
-
-              {[...calls]
-                .sort((a, b) => {
-                  if ((a.completed ?? false) !== (b.completed ?? false))
-                    return Number(a.completed ?? false) - Number(b.completed ?? false);
-                  const diff =
-                    new Date(`${a.date}T${a.time}`).getTime() -
-                    new Date(`${b.date}T${b.time}`).getTime();
-                  return a.completed ? -diff : diff;
-                })
-                .map((c) => {
-                  const isToday = c.date === new Date().toISOString().slice(0, 10);
-                  const isUpcoming = !c.completed && new Date(`${c.date}T${c.time || "00:00"}`).getTime() >= Date.now();
-                  const isIntro = c.callType === "Intro Call";
-                  return (
-                    <li
-                      key={c.id}
-                      className={cn(
-                        "rounded-lg border-l-4 border p-3 text-sm transition-colors",
-                        c.completed
-                          ? "border-l-green-400 border-green-100 bg-green-50/50 dark:border-green-800/40 dark:bg-green-950/10"
-                          : isIntro
-                            ? "border-l-cyan border-cyan/20 bg-cyan/5"
-                            : isToday
-                              ? "border-l-cyan/50 border-cyan/20 bg-cyan/5"
-                              : "border-l-border border-border",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-navy">
-                              {c.callType || "Follow-up Call"}
-                            </p>
-                            {isUpcoming && (
-                              <span className="rounded-full bg-cyan/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan">
-                                Upcoming
-                              </span>
-                            )}
-                            {c.completed && (
-                              <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-700 dark:bg-green-900/40 dark:text-green-400">
-                                Completed
-                              </span>
-                            )}
-                            {isToday && !c.completed && (
-                              <span className="rounded-full bg-cyan px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                Today
-                              </span>
-                            )}
-                          </div>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {formatDate(c.date)}
-                            {c.time && ` · ${formatTime(c.time)}`}
-                            {c.assignedRepName && ` · ${c.assignedRepName}`}
-                          </p>
-                          {c.notes && (
-                            <p className="mt-1 text-xs text-muted-foreground italic">{c.notes}</p>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 flex-col items-end gap-2">
-                          <Button
-                            size="sm"
-                            variant={c.completed ? "outline" : "outline"}
-                            className={cn(
-                              "h-7 rounded-full px-3 text-xs",
-                              c.completed
-                                ? "border-green-300 text-green-700 hover:bg-green-50"
-                                : "border-border text-muted-foreground hover:text-navy",
-                            )}
-                            onClick={() => void updateCall(id, c.id, { completed: !c.completed })}
-                          >
-                            {c.completed ? "Completed ✓" : "Mark complete"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-navy"
-                            title="Edit call"
-                            onClick={() => {
-                              setEditingCall(c);
-                              setOpenCall(true);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-            </ul>
-          </Card>
-
           {/* Quick action */}
           <Button
             variant="outline"
@@ -1111,7 +1253,7 @@ export function ProfilePage({ id }: { id: string }) {
         clientId={id}
         call={editingCall}
         defaultCallType={
-          !editingCall && !calls.some((c) => c.callType === "Intro Call")
+          !editingCall && !calls.some((c) => c.callType === "intro_call")
             ? "Intro Call"
             : undefined
         }
@@ -1208,11 +1350,11 @@ function TaxHistoryPanel({
   onUpdate: (yearStatuses: Record<string, TaxYearRecord>) => Promise<void>;
 }) {
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 6 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: 7 }, (_, i) => currentYear - i);
   const saved = lead.data?.yearStatuses ?? {};
 
   const [activeYear, setActiveYear] = useState<number | null>(null);
-  const [notEligibleYear, setNotEligibleYear] = useState<number | null>(null);
+  const [pendingChange, setPendingChange] = useState<{ year: number; status: TaxYearStatus } | null>(null);
   const [reasonDraft, setReasonDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1236,10 +1378,14 @@ function TaxHistoryPanel({
   const applyStatus = async (year: number, status: TaxYearStatus, reason?: string) => {
     setSaving(true);
     const record: TaxYearRecord = { status };
-    if (status === "not_eligible" && reason) {
-      record.notEligibleReason = reason;
+    if (status === "not_eligible") {
+      record.notEligibleReason = reason ?? "";
       record.notEligibleBy = lead.rep;
       record.notEligibleAt = new Date().toISOString();
+    } else if (reason) {
+      record.changeNote = reason;
+      record.changedBy = lead.rep;
+      record.changedAt = new Date().toISOString();
     }
     try {
       await onUpdate({ ...saved, [year]: record });
@@ -1281,7 +1427,7 @@ function TaxHistoryPanel({
         </div>
 
         {/* Year cards */}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
           {records.map(({ year, record }) => {
             const meta = YEAR_STATUS_META[record.status];
             return (
@@ -1291,6 +1437,8 @@ function TaxHistoryPanel({
                 title={
                   record.status === "not_eligible" && record.notEligibleReason
                     ? `Reason: ${record.notEligibleReason}\nBy: ${record.notEligibleBy} · ${record.notEligibleAt ? new Date(record.notEligibleAt).toLocaleString() : ""}`
+                    : record.changeNote
+                    ? `Note: ${record.changeNote}\nBy: ${record.changedBy} · ${record.changedAt ? new Date(record.changedAt).toLocaleString() : ""}`
                     : undefined
                 }
                 onClick={() => setActiveYear(activeYear === year ? null : year)}
@@ -1334,7 +1482,7 @@ function TaxHistoryPanel({
                   size="sm"
                   variant="outline"
                   disabled={saving}
-                  onClick={() => applyStatus(activeYear, "current")}
+                  onClick={() => { setPendingChange({ year: activeYear, status: "current" }); setReasonDraft(""); }}
                 >
                   <Star className="mr-1.5 h-3.5 w-3.5" /> Current Year
                 </Button>
@@ -1344,7 +1492,7 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="border-green/50 text-green hover:bg-green/10"
-                onClick={() => applyStatus(activeYear, "engaged")}
+                onClick={() => { setPendingChange({ year: activeYear, status: "engaged" }); setReasonDraft(""); }}
               >
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Engaged
               </Button>
@@ -1352,7 +1500,7 @@ function TaxHistoryPanel({
                 size="sm"
                 variant="outline"
                 disabled={saving}
-                onClick={() => applyStatus(activeYear, "eligible_not_engaged")}
+                onClick={() => { setPendingChange({ year: activeYear, status: "eligible_not_engaged" }); setReasonDraft(""); }}
               >
                 <Clock className="mr-1.5 h-3.5 w-3.5" /> Eligible – Not Engaged
               </Button>
@@ -1361,10 +1509,7 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="text-muted-foreground"
-                onClick={() => {
-                  setNotEligibleYear(activeYear);
-                  setReasonDraft("");
-                }}
+                onClick={() => { setPendingChange({ year: activeYear, status: "not_eligible" }); setReasonDraft(""); }}
               >
                 <Ban className="mr-1.5 h-3.5 w-3.5" /> Not Eligible…
               </Button>
@@ -1385,35 +1530,43 @@ function TaxHistoryPanel({
         </div>
       </div>
 
-      {/* Not Eligible dialog */}
+      {/* Status-change reason dialog — shown for every year status change */}
       <Dialog
-        open={notEligibleYear !== null}
-        onOpenChange={(open) => { if (!open) setNotEligibleYear(null); }}
+        open={pendingChange !== null}
+        onOpenChange={(open) => { if (!open) setPendingChange(null); }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark {notEligibleYear} as Not Eligible</DialogTitle>
+            <DialogTitle>
+              Change status for {pendingChange?.year}
+            </DialogTitle>
             <DialogDescription>
-              Provide a reason below. Your name, date, and time will be automatically recorded.
+              {pendingChange?.status === "not_eligible"
+                ? "Provide a reason below. Your name, date, and time will be automatically recorded."
+                : "Optionally add a note explaining this status change."}
             </DialogDescription>
           </DialogHeader>
           <Textarea
             value={reasonDraft}
             onChange={(e) => setReasonDraft(e.target.value)}
-            placeholder="e.g. Client did not perform qualifying R&D activities this year…"
+            placeholder={
+              pendingChange?.status === "not_eligible"
+                ? "e.g. Client did not perform qualifying R&D activities this year…"
+                : "e.g. Reason for this status change…"
+            }
             className="min-h-[88px]"
             rows={3}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNotEligibleYear(null)}>
+            <Button variant="outline" onClick={() => setPendingChange(null)}>
               Cancel
             </Button>
             <Button
-              disabled={!reasonDraft.trim() || saving}
+              disabled={(pendingChange?.status === "not_eligible" && !reasonDraft.trim()) || saving}
               onClick={async () => {
-                if (notEligibleYear !== null) {
-                  await applyStatus(notEligibleYear, "not_eligible", reasonDraft.trim());
-                  setNotEligibleYear(null);
+                if (pendingChange !== null) {
+                  await applyStatus(pendingChange.year, pendingChange.status, reasonDraft.trim() || undefined);
+                  setPendingChange(null);
                 }
               }}
             >
@@ -1423,22 +1576,5 @@ function TaxHistoryPanel({
         </DialogContent>
       </Dialog>
     </motion.section>
-  );
-}
-
-function IntakeRow({ label, value }: { label: string; value: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3">
-      <span className="text-sm text-navy">{label}</span>
-      {value ? (
-        <Badge className="bg-green text-green-foreground hover:bg-green">
-          <BadgeCheck className="mr-1 h-3 w-3" /> Yes
-        </Badge>
-      ) : (
-        <Badge variant="outline" className="text-muted-foreground">
-          <X className="mr-1 h-3 w-3" /> No
-        </Badge>
-      )}
-    </div>
   );
 }

@@ -7,7 +7,7 @@ aggregate, follow-up calls, engagements (+ yearly billing) and saved calculation
 into a focused surface — no per-model CRUD.
 """
 
-from datetime import date, datetime, date as date_type
+from datetime import date, datetime, timezone, date as date_type
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.auth import verify_token
 from app.database import get_db
-from app.models import LEAD_STATUSES, PipelineStatus
+from app.models import PipelineStatus
 
 router = APIRouter(tags=["leads"], dependencies=[Depends(verify_token)])
 
@@ -245,7 +245,7 @@ def list_leads(
     db: Session = Depends(get_db),
     status: Optional[str] = Query(
         None,
-        description="Comma-separated pipeline statuses, e.g. 'Lead,Calculation Sent' "
+        description="Comma-separated pipeline statuses, e.g. 'New Lead,Intro Call' "
         "for the New Leads table.",
     ),
 ):
@@ -380,7 +380,7 @@ def create_lead(
         last_name=body.last_name,
         email=body.email,
         phone=body.phone,
-        pipeline_status=PipelineStatus.lead.value,
+        pipeline_status=PipelineStatus.new_lead.value,
         lead_source=body.lead_source,
         salesperson_iduser=body.assigned_sales_rep or caller.iduser,
         sales_manager_iduser=body.sales_manager_iduser,
@@ -446,6 +446,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
             scheduled_date=c.scheduled_date,
             scheduled_time=c.scheduled_time,
             notes=c.notes,
+            call_type=c.call_type,
             completed=bool(c.completed),
         )
         for c in db.query(models.CrmFollowUpCall)
@@ -542,10 +543,12 @@ def update_lead(
     if isinstance(new_status, PipelineStatus):
         new_status = new_status.value
         data["pipeline_status"] = new_status
-    if new_status == PipelineStatus.sow_signed.value and lead.sow_signed_at is None:
-        lead.sow_signed_at = datetime.utcnow()
-    if new_status == PipelineStatus.active_engagement.value and lead.engagement_started_at is None:
-        lead.engagement_started_at = datetime.utcnow()
+    # Closing a lead (terminal "won" stage) stamps both engagement and SOW clocks.
+    if new_status == PipelineStatus.closed.value:
+        if lead.engagement_started_at is None:
+            lead.engagement_started_at = datetime.now(timezone.utc)
+        if lead.sow_signed_at is None:
+            lead.sow_signed_at = datetime.now(timezone.utc)
 
     for field, value in data.items():
         setattr(lead, field, value)
@@ -574,13 +577,36 @@ def delete_lead(lead_id: int, db: Session = Depends(get_db)):
 def create_follow_up_call(
     lead_id: int, body: schemas.FollowUpCallCreate, db: Session = Depends(get_db)
 ):
-    _get_lead(db, lead_id)
+    lead = _get_lead(db, lead_id)
+    # Scheduling a call advances the lead one pipeline stage, but only once the
+    # previous call has been completed. A brand-new lead has no prior call, so
+    # its first call is always allowed to advance (New Lead -> Intro Call). This
+    # keeps a lead from skipping ahead while an earlier call is still open.
+    latest = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead_id)
+        .order_by(
+            models.CrmFollowUpCall.scheduled_date.desc(),
+            models.CrmFollowUpCall.idcrm_follow_up_call.desc(),
+        )
+        .first()
+    )
+    if latest is None or latest.completed:
+        lead.pipeline_status = models.next_pipeline_status(lead.pipeline_status)
+        # Reaching the terminal "Closed" stage starts the engagement clock,
+        # mirroring update_lead.
+        if (
+            lead.pipeline_status == PipelineStatus.closed.value
+            and lead.engagement_started_at is None
+        ):
+            lead.engagement_started_at = datetime.now(timezone.utc)
+    # The call's type mirrors the lead's (possibly just-advanced) pipeline stage.
     call = models.CrmFollowUpCall(
         crm_leads_id=lead_id,
         scheduled_date=body.scheduled_date,
         scheduled_time=body.scheduled_time,
         notes=body.notes,
-        call_type=body.call_type,
+        call_type=lead.pipeline_status,
         assigned_rep_name=body.assigned_rep_name,
         completed=False,
     )
@@ -616,8 +642,11 @@ def update_follow_up_call(
     db: Session = Depends(get_db),
 ):
     call = _get_lead_call(db, lead_id, call_id)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    data = body.model_dump(exclude_unset=True)
+    for field, value in data.items():
         setattr(call, field, value)
+    # Completing a call no longer advances the lead; the pipeline now advances
+    # when the *next* call is scheduled (see create_follow_up_call).
     db.commit()
     db.refresh(call)
     return _call_read(call)
@@ -856,9 +885,9 @@ def save_calculations(
 ):
     lead = _get_lead(db, lead_id)
     lead.data = body.data
-    # Mirror the old saveCalculation behaviour: a fresh Lead becomes Calculation Sent.
-    if lead.pipeline_status == PipelineStatus.lead.value:
-        lead.pipeline_status = PipelineStatus.calculation_sent.value
+    # Saving a calculation advances a brand-new lead into the Intro Call stage.
+    if lead.pipeline_status == PipelineStatus.new_lead.value:
+        lead.pipeline_status = PipelineStatus.intro_call.value
     db.commit()
     db.refresh(lead)
     return _build_detail(db, lead)

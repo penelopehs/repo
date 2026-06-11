@@ -49,7 +49,30 @@ export interface Entity {
 }
 
 // Leads / Pipeline
-export type LeadStatus = "new" | "calculation_sent" | "sow_signed" | "active_engagement" | "lost";
+//
+// Pipeline stages mirror the backend `PipelineStatus` enum (models.py). They are
+// ordered: a lead advances New Lead → Intro Call → Feasibility Call → Tax
+// Preparer Coordination → Closed. The numeric index of `status` in
+// PIPELINE_STAGES is the lead's progress through the pipeline.
+export type LeadStatus =
+  | "new_lead"
+  | "intro_call"
+  | "feasibility_call"
+  | "tax_preparer_coordination"
+  | "closed";
+
+/** Ordered pipeline stages with display labels (index = pipeline progress). */
+export const PIPELINE_STAGES: { value: LeadStatus; label: string }[] = [
+  { value: "new_lead", label: "New Lead" },
+  { value: "intro_call", label: "Intro Call" },
+  { value: "feasibility_call", label: "Feasibility Call" },
+  { value: "tax_preparer_coordination", label: "Tax Preparer Coordination" },
+  { value: "closed", label: "Closed" },
+];
+
+/** Progress index of a status within the pipeline (0 = New Lead). */
+export const pipelineStageIndex = (status: LeadStatus): number =>
+  Math.max(0, PIPELINE_STAGES.findIndex((s) => s.value === status));
 
 export type LeadSource =
   | "Referral"
@@ -102,6 +125,10 @@ export interface TaxYearRecord {
   notEligibleBy?: string;
   /** ISO timestamp of when not-eligible was set */
   notEligibleAt?: string;
+  /** Optional note for any other status change */
+  changeNote?: string;
+  changedBy?: string;
+  changedAt?: string;
 }
 
 /** Raw per-lead aggregate stored in the backend `crm_leads.data` column and
@@ -218,9 +245,10 @@ export interface FollowUpCall {
   date: string;
   time: string;
   notes: string;
-  callType?: string | null;
   assignedRepName?: string | null;
   completed?: boolean;
+  /** Pipeline stage this call works (mirrors the lead's status at creation). */
+  callType?: LeadStatus;
 }
 
 export interface NextCallInfo {

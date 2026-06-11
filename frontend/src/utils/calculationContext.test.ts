@@ -10,7 +10,7 @@ const lead = {
   phone: "(415) 555-2310",
   source: "Referral",
   rep: "David Kim",
-  status: "calculation_sent",
+  status: "intro_call",
   engagementYears: 3,
   taxYears: [2023, 2024],
   engagedSince: "2022-03-14",
