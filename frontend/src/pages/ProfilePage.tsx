@@ -930,9 +930,8 @@ export function ProfilePage({ id }: { id: string }) {
                         {(lead.data?.entities ?? []).map((e) => {
                           const checked = contactForm.entityIds.includes(e.id);
                           return (
-                            <button
+                            <div
                               key={e.id}
-                              type="button"
                               onClick={() =>
                                 setContactForm((prev) => ({
                                   ...prev,
@@ -950,7 +949,7 @@ export function ProfilePage({ id }: { id: string }) {
                             >
                               <Checkbox checked={checked} className="pointer-events-none h-3 w-3" />
                               {e.name}
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
