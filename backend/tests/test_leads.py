@@ -488,6 +488,24 @@ def test_follow_up_call_on_missing_lead_404(client):
     assert resp.status_code == 404
 
 
+def test_detail_includes_next_call(client):
+    # Regression: GET /leads/{id} (used by the pipeline's per-lead refresh after
+    # the intro-call prompt) must report the next upcoming call, not null.
+    lead = client.post("/leads", json={"first_name": "Next", "last_name": "Call"}).json()
+    assert client.get(f"/leads/{lead['id']}").json()["next_call"] is None
+
+    far = "2999-01-15"
+    client.post(
+        f"/leads/{lead['id']}/follow-up-calls",
+        json={"scheduled_date": far, "scheduled_time": "10:00 AM", "notes": "intro"},
+    )
+
+    nc = client.get(f"/leads/{lead['id']}").json()["next_call"]
+    assert nc is not None
+    assert nc["date"] == far
+    assert nc["call_type"] == "Intro Call"
+
+
 def test_intake_note_crud(client):
     lead = client.post("/leads", json={"first_name": "Notes", "last_name": "Lead"}).json()
 

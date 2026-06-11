@@ -598,6 +598,12 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
                 )
             )
 
+    call_rows = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead.crm_lead_id)
+        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
+        .all()
+    )
     follow_up_calls = [
         schemas.FollowUpCallRead(
             id=c.idcrm_follow_up_call,
@@ -607,10 +613,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
             call_type=c.call_type,
             completed=bool(c.completed),
         )
-        for c in db.query(models.CrmFollowUpCall)
-        .filter(models.CrmFollowUpCall.crm_leads_id == lead.crm_lead_id)
-        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
-        .all()
+        for c in call_rows
     ]
 
     intake_questions = [
@@ -632,6 +635,28 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     )
     author_names = _user_name_map(db, [n.created_by_iduser for n in note_rows])
     intake_notes = [_note_read(n, author_names) for n in note_rows]
+
+    # Next upcoming (non-completed, future) call — same rule as the leads list,
+    # derived from the rows already fetched so detail/refresh stay in sync with
+    # the pipeline's Next Call column.
+    today = date.today()
+    upcoming = sorted(
+        (
+            c
+            for c in call_rows
+            if not c.completed and c.scheduled_date >= today
+        ),
+        key=lambda c: (c.scheduled_date, c.scheduled_time or ""),
+    )
+    next_call = (
+        schemas.NextCallInfo(
+            date=upcoming[0].scheduled_date,
+            time=upcoming[0].scheduled_time,
+            call_type=upcoming[0].call_type,
+        )
+        if upcoming
+        else None
+    )
 
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
@@ -663,6 +688,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         intake_notes=intake_notes,
         data=lead.data,
         tax_years=_lead_tax_years(lead.data),
+        next_call=next_call,
     )
 
 
