@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { ProfilePage } from "@/pages/ProfilePage";
 
 export const Route = createFileRoute("/clients/$id")({
   head: () => ({
     meta: [
-      { title: "Client Profile — Sales Billing CRM" },
+      { title: "Client Profile — Acquire Sales" },
       {
         name: "description",
         content: "Client overview with engagements, contacts, intake, and follow-up calls.",
@@ -17,5 +17,11 @@ export const Route = createFileRoute("/clients/$id")({
 
 function ClientProfileRoute() {
   const { id } = Route.useParams();
-  return <ProfilePage id={id} />;
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  if (pathname === `/clients/${id}`) {
+    return <ProfilePage id={id} />;
+  }
+
+  return <Outlet />;
 }

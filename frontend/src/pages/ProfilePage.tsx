@@ -546,7 +546,13 @@ export function ProfilePage({ id }: { id: string }) {
                                 ? "border-cyan/50 text-cyan hover:bg-cyan/10"
                                 : "opacity-50",
                             )}
-                            onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                            onClick={() =>
+                              navigate({
+                                to: "/clients/$id/feasibility-call",
+                                params: { id },
+                                search: { callId: undefined },
+                              })
+                            }
                           >
                             Go to Feasibility Call <ArrowRight className="h-3.5 w-3.5" />
                           </Button>
@@ -1146,14 +1152,26 @@ export function ProfilePage({ id }: { id: string }) {
             <div className="flex flex-col gap-2.5">
               <Button
                 className="w-full"
-                onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                onClick={() =>
+                  navigate({
+                    to: "/clients/$id/feasibility-call",
+                    params: { id },
+                    search: { callId: "new" },
+                  })
+                }
               >
                 Start Feasibility Call
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => toast.info("Feasibility summary coming soon.")}
+                onClick={() =>
+                  navigate({
+                    to: "/clients/$id/feasibility-call",
+                    params: { id },
+                    search: { callId: undefined },
+                  })
+                }
               >
                 View Feasibility Summary
               </Button>
