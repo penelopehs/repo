@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadDataEntity, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
+import type { Lead, LeadDataEntity, LeadSource, LeadStatus, SalesRep, TaxYear, TaxYearRecord } from "@/types/crm";
 import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
@@ -151,7 +151,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       // company, entities and tax years live in the `data` blob (the PATCH
       // endpoint has no top-level columns for them). Rebuild it from the form,
       // preserving people and any existing per-year calculation buckets.
-      const base = lead.data ?? { people: [], entities: [], calculations: {} };
+      const base = lead.data ?? { people: [], entities: [], calculations: {},  yearStatuses: {}};
       const company = parsed.data.company.trim();
       const extraEntities = (parsed.data.entityNames ?? "")
         .split(/[,\n]/)
@@ -182,10 +182,16 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       // existing bucket; default new years to an empty array for the calculator
       // to seed from the entity list on first open.
       const calculations: Record<string, unknown> = {};
+      const yearStatuses: Record<string, TaxYearRecord> = {};
       for (const y of form.taxYears) {
         calculations[String(y)] = base.calculations[String(y)] ?? [];
+        // Carry over an existing per-year status; years without one are left
+        // unset (consumers fall back to a default), and statuses for tax years
+        // removed in this edit are dropped.
+        const existing = base.yearStatuses?.[String(y)];
+        if (existing) yearStatuses[String(y)] = existing;
       }
-      const data = { ...base, entities, calculations, entityPeople };
+      const data = { ...base, entities, calculations, entityPeople, yearStatuses };
 
       await update(lead.id, {
         firstName: parsed.data.firstName,
