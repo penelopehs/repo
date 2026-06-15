@@ -783,6 +783,7 @@ export function ProfilePage({ id }: { id: string }) {
                       <tr className="border-b border-border text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <th className="px-4 py-3">Entity Name</th>
                         <th className="px-4 py-3">EIN</th>
+                        <th className="px-4 py-3">Location</th>
                         <th className="px-4 py-3">Associated Contacts</th>
                       </tr>
                     </thead>
@@ -790,7 +791,7 @@ export function ProfilePage({ id }: { id: string }) {
                       {entities.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={3}
+                            colSpan={4}
                             className="px-4 py-6 text-center text-sm text-muted-foreground"
                           >
                             No entities recorded.
@@ -805,6 +806,9 @@ export function ProfilePage({ id }: { id: string }) {
                               <td className="px-4 py-3 font-medium text-navy">{e.name}</td>
                               <td className="px-4 py-3 tabular-nums text-muted-foreground whitespace-nowrap">
                                 {e.ein || "—"}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                {[e.city, e.state].filter(Boolean).join(", ") || "—"}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1217,8 +1221,8 @@ export function ProfilePage({ id }: { id: string }) {
                 <ul className="mb-4 space-y-2">
                   {/* Synthetic row from lead.taxYears when no backend engagements exist */}
                   {engagements.length === 0 && lead.taxYears.length > 0 && (
-                    <li className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3 text-sm">
-                      <div>
+                    <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-gradient-frost p-3 text-sm">
+                      <div className="shrink-0">
                         <p className="font-semibold text-navy">R&amp;D Tax Credit</p>
                         <div className="mt-0.5">
                           <StatusBadge status={lead.status} />
@@ -1230,9 +1234,9 @@ export function ProfilePage({ id }: { id: string }) {
                   {engagements.map((e) => (
                     <li
                       key={e.id}
-                      className="flex items-center justify-between rounded-lg border border-border bg-gradient-frost p-3 text-sm"
+                      className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-gradient-frost p-3 text-sm"
                     >
-                      <div>
+                      <div className="shrink-0">
                         <p className="font-semibold text-navy">{e.type}</p>
                         <p className="text-xs text-muted-foreground">
                           {e.phase} · {e.status}

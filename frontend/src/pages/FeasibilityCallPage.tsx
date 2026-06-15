@@ -307,12 +307,6 @@ const BCM_ROWS: {
   large?: boolean;
 }[] = [
   {
-    key: "name",
-    label: "Business Component Name",
-    type: "input",
-    placeholder: "What is this component called?",
-  },
-  {
     key: "description",
     label: "Brief Description",
     sub: "Process or activity",
@@ -1284,7 +1278,6 @@ const TEXT_FIELD_KEYS = new Set<keyof BCMComponent>([
 
 function countFilledRows(comp: BCMComponent): number {
   let n = 0;
-  if (comp.name.trim()) n++;
   if (comp.description.trim()) n++;
   if (comp.timeframe.trim()) n++;
   if (comp.entities.length > 0) n++;
@@ -1473,7 +1466,7 @@ function BCMBuilderStep({
                   <button
                     type="button"
                     onClick={addColumn}
-                    className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-white/20 py-4 text-white/35 transition-colors hover:border-cyan hover:text-cyan"
+                    className="flex h-full w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-white/50 bg-white/10 py-4 text-white transition-colors hover:border-white hover:bg-white/20"
                     title="Add business component"
                   >
                     <Plus className="h-4 w-4" />
