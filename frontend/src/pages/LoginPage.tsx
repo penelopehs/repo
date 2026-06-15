@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMsal } from "@azure/msal-react";
 import { loginRequest } from "@/lib/auth/authConfig";
 
-/* ── Revenue Chart Streams canvas ── */
+/* â”€â”€ Revenue Chart Streams canvas â”€â”€ */
 function RevenueCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -25,7 +25,7 @@ function RevenueCanvas() {
       { baseY: 0.42, amp: 0.05, freq1: 0.030, freq2: 0.020, freq3: 0.011, color: "145,170,157", lineW: 0.8, speed: 0.5 },
     ];
 
-    // Scrolling Y-value buffers — one value per horizontal pixel
+    // Scrolling Y-value buffers â€” one value per horizontal pixel
     let bufs: Float32Array[] = [];
     let t = 0;
 
@@ -43,7 +43,7 @@ function RevenueCanvas() {
       });
     };
 
-    // Smooth noise: sum of sine waves — mimics real revenue data movement
+    // Smooth noise: sum of sine waves â€” mimics real revenue data movement
     const nextY = (c: typeof CHARTS[0], t: number) =>
       c.baseY * canvas.height
       + Math.sin(t * c.freq1 * 40)  * c.amp * canvas.height
@@ -54,7 +54,7 @@ function RevenueCanvas() {
       t += 0.012;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      /* ── Subtle grid ── */
+      /* â”€â”€ Subtle grid â”€â”€ */
       const GRID = 55;
       ctx.lineWidth = 0.5;
       ctx.strokeStyle = "rgba(145,170,157,0.05)";
@@ -65,7 +65,7 @@ function RevenueCanvas() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
       }
 
-      /* ── Horizontal tick labels (faint) ── */
+      /* â”€â”€ Horizontal tick labels (faint) â”€â”€ */
       ctx.font = "10px monospace";
       ctx.fillStyle = "rgba(145,170,157,0.12)";
       for (let y = GRID; y < canvas.height; y += GRID) {
@@ -73,7 +73,7 @@ function RevenueCanvas() {
         ctx.fillText(label, 8, y - 3);
       }
 
-      /* ── Scroll each buffer left, append new right-edge value ── */
+      /* â”€â”€ Scroll each buffer left, append new right-edge value â”€â”€ */
       CHARTS.forEach((c, i) => {
         const buf = bufs[i];
         buf.copyWithin(0, 1);                        // shift left
@@ -158,7 +158,7 @@ function RevenueCanvas() {
   return <canvas ref={canvasRef} className="pointer-events-none absolute inset-0 h-full w-full" />;
 }
 
-/* ── Login page ── */
+/* â”€â”€ Login page â”€â”€ */
 export function LoginPage() {
   const { instance } = useMsal();
   const [loading, setLoading] = useState(false);
@@ -208,7 +208,7 @@ export function LoginPage() {
             className="flex h-9 w-9 items-center justify-center rounded-lg"
             style={{ background: "rgba(145,170,157,0.1)", border: "1px solid rgba(145,170,157,0.2)" }}
           >
-            <span className="text-xs font-bold" style={{ color: "#91AA9D" }}>SB</span>
+            <span className="text-xs font-bold" style={{ color: "#91AA9D" }}>AS</span>
           </div>
           <span className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "rgba(145,170,157,0.55)" }}>
             Acquire Tax Credits
@@ -279,11 +279,11 @@ export function LoginPage() {
           className="text-[11px] uppercase tracking-widest"
           style={{ color: "rgba(145,170,157,0.2)" }}
         >
-          © {new Date().getFullYear()} Acquire Tax Credits
+          Â© {new Date().getFullYear()} Acquire Tax Credits
         </motion.p>
       </div>
 
-      {/* Right panel — form */}
+      {/* Right panel â€” form */}
       <div className="relative z-10 flex flex-1 items-center justify-center p-8">
         <div
           className="absolute bottom-0 left-0 top-0 hidden w-px lg:block"
@@ -359,3 +359,5 @@ export function LoginPage() {
     </div>
   );
 }
+
+

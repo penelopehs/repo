@@ -91,7 +91,14 @@ export type SalesRep = string;
 export type ClientType = "New" | "Returning";
 
 export interface LeadDataEntity {
+  /** Stable per-lead id used to link people to this entity (see
+   *  LeadData.entityPeople). Assigned by the frontend on load/save. */
+  id: string;
+  /** Source entity id (entities.entity_id) when seeded from the client graph. */
+  entityId?: number;
   name: string;
+  ein?: string;
+  city?: string;
   state?: string;
   employeeCount?: number | "";
   estimatedQRAs?: number | "";
@@ -107,13 +114,18 @@ export interface LeadDataEntity {
  *  (the backend persists `data` as a free-form JSON blob). */
 export interface LeadDataPerson {
   id: string;
+  /** Source person id (people.idperson) when seeded from the client graph. */
+  personId?: number;
   firstName: string;
   lastName: string;
+  /** Job title and firm, seeded from the people record. */
+  title?: string;
+  firm?: string;
   role: string;
-  workEmail: string;
-  email: string;
-  workPhone: string;
-  mobilePhone: string;
+  /** A person has one-to-many emails and phones (no labels — just values),
+   *  mirroring the backend people_email / people_phone tables. */
+  emails: string[];
+  phones: string[];
 }
 
 export type TaxYearStatus = "current" | "current_engaged" | "engaged" | "eligible_not_engaged" | "not_eligible";
@@ -141,10 +153,21 @@ export interface LeadData {
    *  an array of the calculator's entity cards (Entity[]) once saved, or an
    *  empty array before the calculator has been opened for that year. */
   calculations: Record<string, Entity[] | unknown>;
+  /** Many-to-many links between entities and people, keyed by entity id
+   *  (LeadDataEntity.id) → array of person ids (LeadDataPerson.id). The reverse
+   *  view (a person's entities) is derived from this single source of truth. */
+  entityPeople?: Record<string, string[]>;
   filingStatus?: FilingStatus;
   /** Per-year R&D eligibility status overrides. Keyed by year as a string. */
   yearStatuses?: Record<string, TaxYearRecord>;
 }
+
+/** Default value for `LeadData.calculations`: an empty array (the persisted
+ *  shape before any year is engaged), typed as the year-keyed map so
+ *  `calculations[year]` reads stay sound. An empty `[]` and an empty `{}` are
+ *  equivalent for keyed access, but the data contract uses `[]`. */
+export const EMPTY_CALCULATIONS: LeadData["calculations"] =
+  [] as unknown as LeadData["calculations"];
 
 export interface Lead {
   id: string;
@@ -182,6 +205,8 @@ export interface Lead {
   intakeNotes?: ProfileNote[];
   intake?: IntakeAnswers;
   nextCall?: NextCallInfo | null;
+  /** Engagements linked to this lead — populated on detail fetch (GET /leads/{id}). */
+  engagements?: Engagement[];
 }
 
 export interface ProfileNote {

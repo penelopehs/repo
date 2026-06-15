@@ -45,7 +45,7 @@ export function AppHeader() {
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">
             <span className="text-sm font-bold tracking-tight" style={{ color: "var(--logo)" }}>
-              SB
+              AS
             </span>
           </div>
           <div className="hidden sm:block leading-tight">
@@ -163,3 +163,5 @@ export function AppHeader() {
     </header>
   );
 }
+
+

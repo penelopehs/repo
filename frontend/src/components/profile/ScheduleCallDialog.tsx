@@ -1,4 +1,6 @@
-// Schedule / edit follow-up call modal — includes call type and assigned rep.
+// Schedule / edit follow-up call modal — assigned rep, date/time and notes.
+// The call type isn't user-editable; it's derived from the pipeline stage
+// (defaultCallType) on add and preserved from the existing call on edit.
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -26,8 +28,6 @@ import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import type { FollowUpCall } from "@/types/crm";
-
-const CALL_TYPES = ["Intro Call", "Follow-up Call", "Check-in", "Discovery Call", "Other"];
 
 interface Props {
   clientId: string;
@@ -99,36 +99,21 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="mb-1.5 block">Call type</Label>
-              <Select value={callType} onValueChange={setCallType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CALL_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 block">Assigned rep</Label>
-              <Select value={assignedRep} onValueChange={setAssignedRep}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select rep…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => {
-                    const name = userFullName(u) || u.email;
-                    return (
-                      <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label className="mb-1.5 block">Assigned rep</Label>
+            <Select value={assignedRep} onValueChange={setAssignedRep}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select rep…" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => {
+                  const name = userFullName(u) || u.email;
+                  return (
+                    <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

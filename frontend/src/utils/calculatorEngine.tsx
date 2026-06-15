@@ -1,4 +1,4 @@
-import { toNumber } from "@/utils/format";
+﻿import { toNumber } from "@/utils/format";
 import type { Entity } from "@/types/crm";
 
 export interface EntityFormulaResult {
@@ -84,12 +84,12 @@ export function entityFormulas(entity: Entity): EntityFormulaResult {
   return { formula2, formula3, formula50, sowEstimate };
 }
 
-/** Step 2 — per-entity SOW estimate (mirrors Calc.entityFormulas → sowEstimate). */
+/** Step 2 â€” per-entity SOW estimate (mirrors Calc.entityFormulas â†’ sowEstimate). */
 export function calculateSOW(entity: Entity): number {
   return entityFormulas(entity).sowEstimate;
 }
 
-/** Step 3 — aggregate federal credit estimate across all entities. */
+/** Step 3 â€” aggregate federal credit estimate across all entities. */
 export function calculateFederal(entities: Entity[]): FederalEstimateResult {
   let Sum_50 = 0;
   let Sum_3 = 0;
@@ -140,7 +140,7 @@ export function calculateFederal(entities: Entity[]): FederalEstimateResult {
   };
 }
 
-/** Step 4 — state credit for one entity using the engagement federal estimate. */
+/** Step 4 â€” state credit for one entity using the engagement federal estimate. */
 export function calculateState(state: string, federal: number): StateCreditResult {
   const stateData = STATE_DATA[state];
   if (!stateData || !federal) {
@@ -161,7 +161,7 @@ export function getFinalBill(federal: number, tier: string) {
   const rate = TIER_PCT[tier];
   if (rate == null) return null;
   const computed = federal * rate;
-  // Final bill can never be below $6,000 — floor to a seeded value in [$6,000, $8,000].
+  // Final bill can never be below $6,000 â€” floor to a seeded value in [$6,000, $8,000].
   const finalBill = computed < 6000
     ? 6000 + seededRand(federal, 77) * 2000
     : computed;
@@ -180,7 +180,7 @@ export function getPhases(finalBill: number, seed: number = finalBill) {
   const [w1, w2, w3, w4] = raw.map((r) => r / sum);
 
   // Apply $6k floor to phase 1; redistribute any excess proportionally across 2-4.
-  let phase1 = Math.max(6000, finalBill * w1);
+  const phase1 = Math.max(6000, finalBill * w1);
   const remaining = finalBill - phase1;
   const rSum = w2 + w3 + w4;
 
@@ -257,7 +257,7 @@ export interface BillingTotals {
 
 // Aggregate billing figures for the Overview KPIs / print report. Federal Credit
 // Estimate is the single source of truth; Federal Total mirrors it. Safe when
-// `result` is null (no complete entities) — everything falls back to 0.
+// `result` is null (no complete entities) â€” everything falls back to 0.
 export function computeTotals(
   completeEntities: Entity[],
   result: EngagementCalculation | null,
@@ -293,3 +293,4 @@ export function isEntityComplete(e: Entity): boolean {
     numericFields.every((k) => e[k] !== "" && e[k] !== null && e[k] !== undefined)
   );
 }
+

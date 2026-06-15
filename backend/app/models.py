@@ -319,3 +319,21 @@ class CrmFollowUpCall(Base):
     completed = Column(Boolean, nullable=False, server_default=text("0"))
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
+
+
+class CrmFeasibilityCall(Base):
+    __tablename__ = "crm_feasibility_calls"
+
+    idcrm_feasibility_call = Column(Integer, primary_key=True, autoincrement=True)
+    crm_leads_id = Column(
+        Integer,
+        ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    call_setup = Column(JSON, nullable=False)
+    components = Column(JSON, nullable=False)
+    generated_output = Column(JSON, nullable=True)
+    created_at = Column(DateTime, nullable=False, server_default=_CREATED)
+    updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
+
+    __table_args__ = (Index("idx_crm_feasibility_call_lead", "crm_leads_id"),)

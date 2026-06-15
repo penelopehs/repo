@@ -126,7 +126,7 @@ export function AddLeadDialog() {
   // Load the user list once, and default the (disabled) rep to the signed-in user.
   useEffect(() => { void ensureUsers(); }, [ensureUsers]);
   useEffect(() => {
-    if (me) setForm((f) => (f.rep ? f : { ...f, rep: me.email }));
+    if (me) setForm((f) => (f.rep ? f : { ...f, rep: String(me.iduser) }));
   }, [me]);
 
   // Debounced client search whenever a name/company field changes.
@@ -152,6 +152,7 @@ export function AddLeadDialog() {
       }
     }, 250);
     return () => { active = false; clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.firstName, form.lastName, form.company]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -193,7 +194,7 @@ export function AddLeadDialog() {
   const [submitting, setSubmitting] = useState(false);
 
   const resetForm = () => {
-    setForm({ ...initial, rep: me ? me.email : "" });
+    setForm({ ...initial, rep: me ? String(me.iduser) : "" });
     setYears([]);
     setErrors({});
     setYearsError(undefined);
@@ -225,15 +226,14 @@ export function AddLeadDialog() {
         ...parsed.data,
         eprId,
         taxYears: years,
+        repId: Number(parsed.data.rep),
         salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
         trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
       });
       toast.success("Lead added", {
         description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
       });
-      setForm(initial);
-      setYears([]);
-      setErrors({});
+      resetForm();
       setOpen(false);
       setIntroPromptLead(newLead);
     } catch (err) {
@@ -382,11 +382,11 @@ export function AddLeadDialog() {
               </Select>
             </Field>
             <Field label="Assigned Sales Representative">
-              <Select value={form.rep}>
+              <Select value={form.rep} onValueChange={(v) => set("rep", v)}>
                 <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
                 <SelectContent>
                   {users.map((u) => (
-                    <SelectItem key={u.iduser} value={u.email}>{userFullName(u) || u.email}</SelectItem>
+                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

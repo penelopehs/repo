@@ -268,3 +268,37 @@ class EngagementUpdate(BaseModel):
 
 class CalculationsUpdate(BaseModel):
     data: Any
+
+
+# ── Feasibility calls ──────────────────────────────────────────────────────────
+
+class FeasibilityEntityRead(BaseModel):
+    id: int
+    name: str
+    type: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+
+
+class FeasibilityEntityCreate(BaseModel):
+    name: str
+    entity_type: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    ein: Optional[str] = None
+
+
+class FeasibilityCallCreate(BaseModel):
+    call_setup: Any
+    components: Any
+    generated_output: Optional[Any] = None
+
+
+class FeasibilityCallRead(BaseModel):
+    id: int
+    crm_leads_id: int
+    call_setup: Any
+    components: Any
+    generated_output: Optional[Any] = None
+    created_at: datetime
+    updated_at: datetime

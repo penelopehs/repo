@@ -7,8 +7,9 @@ aggregate, follow-up calls, engagements (+ yearly billing) and saved calculation
 into a focused surface — no per-model CRUD.
 """
 
+import re
 from datetime import date, datetime, timezone, date as date_type
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
@@ -138,13 +139,156 @@ def _entities_count(data) -> int:
     return 0
 
 
+def _entity_slug(name: Optional[str]) -> str:
+    """URL-safe slug used to derive a stable entity id from its name. Mirrors the
+    frontend's scheme (services/leads.ts) so ids agree on both sides."""
+    s = re.sub(r"[^a-z0-9]+", "-", (name or "").strip().lower()).strip("-")
+    return s or "entity"
+
+
+def _entity_dict(e: models.Entity) -> dict:
+    """An entity shaped for the lead's `data.entities[]` (frontend
+    LeadDataEntity). This is the master reference list; each tax year keeps its
+    own working copy under `data.calculations`. `id` is the stable key used by
+    `data.entityPeople` to link people to this entity."""
+    return {
+        "id": f"e_db_{e.entity_id}",
+        "entityId": e.entity_id,
+        "name": e.entity_name,
+        "ein": e.ein or "",
+        "state": e.state or "",
+        "city": e.city or "",
+    }
+
+
+def _contact_lists(rows, val_fn) -> Dict[int, List[str]]:
+    """person_id -> ordered, de-duped list of contact values (emails or phones).
+    A person has one-to-many emails/phones with no labels; the `is_primary` row
+    (else first seen) floats to the front of the list."""
+    buckets: Dict[int, list] = {}
+    for r in rows:
+        buckets.setdefault(r.people_idperson, []).append(
+            (bool(getattr(r, "is_primary", False)), val_fn(r))
+        )
+    out: Dict[int, List[str]] = {}
+    for pid, items in buckets.items():
+        # Stable sort floats the primary to the front, keeping first-seen order
+        # for the rest; then de-dupe.
+        vals: List[str] = []
+        for _, v in sorted(items, key=lambda t: not t[0]):
+            if v and v not in vals:
+                vals.append(v)
+        out[pid] = vals
+    return out
+
+
+def _related_graph(
+    db: Session, person_id: int
+) -> Tuple[List[dict], List[dict], Dict[str, List[str]]]:
+    """Seeded from a person, return (entities, people, entity_people) for
+    `crm_leads.data`: every entity that person is attached to, plus everyone who
+    shares those entities (with role + contacts), and the entity→people links
+    keyed by entity id. Shapes match the frontend LeadDataEntity /
+    LeadDataPerson types and LeadData.entityPeople.
+
+    The core is the four-table join
+    ``entity_people_roles → entities → people → people_roles``, widened from a
+    single person to everyone on that person's entities so co-contacts come
+    along. Emails/phones are one-to-many, so they stay separate batched lookups
+    (joining them in would multiply rows)."""
+    # Entities the seed person is attached to — the scope for the main join.
+    seed_entities = (
+        db.query(models.EntityPeopleRole.entities_entity_id)
+        .filter(models.EntityPeopleRole.people_idperson == person_id)
+        .distinct()
+        .scalar_subquery()
+    )
+
+    rows = (
+        db.query(
+            models.Entity,
+            models.Person,
+            models.PeopleRole.role_name,
+        )
+        .select_from(models.EntityPeopleRole)
+        .join(
+            models.Entity,
+            models.Entity.entity_id == models.EntityPeopleRole.entities_entity_id,
+        )
+        .join(
+            models.Person,
+            models.Person.idperson == models.EntityPeopleRole.people_idperson,
+        )
+        .join(
+            models.PeopleRole,
+            models.PeopleRole.idroles == models.EntityPeopleRole.roles_idroles,
+        )
+        .filter(models.EntityPeopleRole.entities_entity_id.in_(seed_entities))
+        .all()
+    )
+    if not rows:
+        return [], [], {}
+
+    # De-dupe entities by id and people by id (a person can recur across several
+    # entity/role rows); first role seen wins. The same loop records the
+    # entity→people links (entityPeople), keyed by the entity's stable id.
+    entities: Dict[int, dict] = {}
+    persons: Dict[int, models.Person] = {}
+    role_by_person: Dict[int, str] = {}
+    entity_people: Dict[str, List[str]] = {}
+    for entity, person, role_name in rows:
+        ent = entities.setdefault(entity.entity_id, _entity_dict(entity))
+        persons.setdefault(person.idperson, person)
+        role_by_person.setdefault(person.idperson, role_name or "")
+        bucket = entity_people.setdefault(ent["id"], [])
+        pid = str(person.idperson)
+        if pid not in bucket:
+            bucket.append(pid)
+
+    person_ids = set(persons)
+    emails = _contact_lists(
+        db.query(models.PeopleEmail)
+        .filter(models.PeopleEmail.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.email,
+    )
+    phones = _contact_lists(
+        db.query(models.PeoplePhone)
+        .filter(models.PeoplePhone.people_idperson.in_(person_ids))
+        .all(),
+        lambda r: r.phone,
+    )
+
+    people = []
+    for p in persons.values():
+        people.append(
+            {
+                "id": str(p.idperson),
+                "personId": p.idperson,
+                "firstName": p.first_name,
+                "lastName": p.last_name,
+                "title": p.title or "",
+                "firm": p.firm or "",
+                "role": role_by_person.get(p.idperson, ""),
+                "emails": emails.get(p.idperson, []),
+                "phones": phones.get(p.idperson, []),
+            }
+        )
+    return list(entities.values()), people, entity_people
+
+
 def _initial_data(company: Optional[str], tax_years) -> dict:
     """Seed the lead's data JSON: one entity (the provided company / entity
-    name), an empty bucket per tax year, and an empty people list."""
+    name) with a stable id, an empty (`[]`) calculation per tax year, an empty
+    people list, and an empty entity→people map for the frontend to fill in.
+    `calculations` is an empty list when there are no tax years yet."""
     return {
-        "entities": [{"name": company}] if company else [],
-        "calculations": {str(year): {} for year in (tax_years or [])},
+        "entities": (
+            [{"id": f"e_{_entity_slug(company)}", "name": company}] if company else []
+        ),
+        "calculations": {str(year): [] for year in tax_years} if tax_years else [],
         "people": [],
+        "entityPeople": {},
     }
 
 
@@ -374,6 +518,20 @@ def create_lead(
         else _initial_data(body.company, body.tax_years)
     )
 
+    # Seed the related entities/people graph from the linked EPR's person, so
+    # the lead opens with the full client roster (master entity list + contacts)
+    # rather than just the seed company. Each tax year copies data.entities into
+    # its own calculation later.
+    if body.epr_id is not None and isinstance(data, dict):
+        entities, people, entity_people = _related_graph(db, epr.people_idperson)
+        if entities:
+            data["entities"] = entities
+        if people:
+            data["people"] = people
+        # Seed the entity↔people links so the lead opens with the client roster
+        # already wired up (keyed by entity id; see LeadData.entityPeople).
+        data["entityPeople"] = entity_people
+
     lead = models.CrmLead(
         epr_id=body.epr_id,
         first_name=body.first_name,
@@ -440,6 +598,12 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
                 )
             )
 
+    call_rows = (
+        db.query(models.CrmFollowUpCall)
+        .filter(models.CrmFollowUpCall.crm_leads_id == lead.crm_lead_id)
+        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
+        .all()
+    )
     follow_up_calls = [
         schemas.FollowUpCallRead(
             id=c.idcrm_follow_up_call,
@@ -449,10 +613,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
             call_type=c.call_type,
             completed=bool(c.completed),
         )
-        for c in db.query(models.CrmFollowUpCall)
-        .filter(models.CrmFollowUpCall.crm_leads_id == lead.crm_lead_id)
-        .order_by(models.CrmFollowUpCall.scheduled_date.desc())
-        .all()
+        for c in call_rows
     ]
 
     intake_questions = [
@@ -474,6 +635,28 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     )
     author_names = _user_name_map(db, [n.created_by_iduser for n in note_rows])
     intake_notes = [_note_read(n, author_names) for n in note_rows]
+
+    # Next upcoming (non-completed, future) call — same rule as the leads list,
+    # derived from the rows already fetched so detail/refresh stay in sync with
+    # the pipeline's Next Call column.
+    today = date.today()
+    upcoming = sorted(
+        (
+            c
+            for c in call_rows
+            if not c.completed and c.scheduled_date >= today
+        ),
+        key=lambda c: (c.scheduled_date, c.scheduled_time or ""),
+    )
+    next_call = (
+        schemas.NextCallInfo(
+            date=upcoming[0].scheduled_date,
+            time=upcoming[0].scheduled_time,
+            call_type=upcoming[0].call_type,
+        )
+        if upcoming
+        else None
+    )
 
     return schemas.LeadDetail(
         id=lead.crm_lead_id,
@@ -505,6 +688,7 @@ def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
         intake_notes=intake_notes,
         data=lead.data,
         tax_years=_lead_tax_years(lead.data),
+        next_call=next_call,
     )
 
 
@@ -898,3 +1082,114 @@ def clear_calculations(lead_id: int, db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id)
     lead.data = []
     db.commit()
+
+
+# ── Feasibility: entity search ─────────────────────────────────────────────────
+
+@router.get("/feasibility/entities", response_model=List[schemas.FeasibilityEntityRead])
+def search_feasibility_entities(q: str = "", db: Session = Depends(get_db)):
+    query = db.query(models.Entity, models.EntityTypeRef).outerjoin(
+        models.EntityTypeRef,
+        models.EntityTypeRef.id == models.Entity.entity_types_id,
+    )
+    if q.strip():
+        query = query.filter(models.Entity.entity_name.ilike(f"%{q.strip()}%"))
+    rows = query.limit(20).all()
+    return [
+        schemas.FeasibilityEntityRead(
+            id=e.entity_id,
+            name=e.entity_name,
+            type=et.entity_type_name if et else None,
+            city=e.city,
+            state=e.state,
+        )
+        for e, et in rows
+    ]
+
+
+# ── Feasibility: entity create ─────────────────────────────────────────────────
+
+@router.post(
+    "/leads/{lead_id}/feasibility/entities",
+    response_model=schemas.FeasibilityEntityRead,
+    status_code=201,
+)
+def create_feasibility_entity(
+    lead_id: int,
+    body: schemas.FeasibilityEntityCreate,
+    db: Session = Depends(get_db),
+):
+    lead = _get_lead(db, lead_id)
+    client_id = _lead_client_id(db, lead)
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Lead has no linked entity — cannot determine which client to attach to.",
+        )
+
+    entity_type_id = None
+    if body.entity_type:
+        et = (
+            db.query(models.EntityTypeRef)
+            .filter(models.EntityTypeRef.entity_type_name == body.entity_type)
+            .first()
+        )
+        if not et:
+            et = models.EntityTypeRef(entity_type_name=body.entity_type)
+            db.add(et)
+            db.flush()
+        entity_type_id = et.id
+
+    entity = models.Entity(
+        clients_idclients=client_id,
+        entity_name=body.name,
+        state=body.state,
+        city=body.city,
+        ein=body.ein,
+        entity_types_id=entity_type_id,
+    )
+    db.add(entity)
+    db.commit()
+    db.refresh(entity)
+
+    type_name = body.entity_type if entity_type_id else None
+    return schemas.FeasibilityEntityRead(
+        id=entity.entity_id,
+        name=entity.entity_name,
+        type=type_name,
+        city=entity.city,
+        state=entity.state,
+    )
+
+
+# ── Feasibility: save call ─────────────────────────────────────────────────────
+
+@router.post(
+    "/leads/{lead_id}/feasibility-calls",
+    response_model=schemas.FeasibilityCallRead,
+    status_code=201,
+)
+def save_feasibility_call(
+    lead_id: int,
+    body: schemas.FeasibilityCallCreate,
+    db: Session = Depends(get_db),
+):
+    _get_lead(db, lead_id)
+    call = models.CrmFeasibilityCall(
+        crm_leads_id=lead_id,
+        call_setup=body.call_setup,
+        components=body.components,
+        generated_output=body.generated_output,
+    )
+    db.add(call)
+    db.commit()
+    db.refresh(call)
+    return schemas.FeasibilityCallRead(
+        id=call.idcrm_feasibility_call,
+        crm_leads_id=call.crm_leads_id,
+        call_setup=call.call_setup,
+        components=call.components,
+        generated_output=call.generated_output,
+        created_at=call.created_at,
+        updated_at=call.updated_at,
+    )
