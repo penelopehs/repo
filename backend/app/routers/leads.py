@@ -1082,3 +1082,114 @@ def clear_calculations(lead_id: int, db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id)
     lead.data = []
     db.commit()
+
+
+# ── Feasibility: entity search ─────────────────────────────────────────────────
+
+@router.get("/feasibility/entities", response_model=List[schemas.FeasibilityEntityRead])
+def search_feasibility_entities(q: str = "", db: Session = Depends(get_db)):
+    query = db.query(models.Entity, models.EntityTypeRef).outerjoin(
+        models.EntityTypeRef,
+        models.EntityTypeRef.id == models.Entity.entity_types_id,
+    )
+    if q.strip():
+        query = query.filter(models.Entity.entity_name.ilike(f"%{q.strip()}%"))
+    rows = query.limit(20).all()
+    return [
+        schemas.FeasibilityEntityRead(
+            id=e.entity_id,
+            name=e.entity_name,
+            type=et.entity_type_name if et else None,
+            city=e.city,
+            state=e.state,
+        )
+        for e, et in rows
+    ]
+
+
+# ── Feasibility: entity create ─────────────────────────────────────────────────
+
+@router.post(
+    "/leads/{lead_id}/feasibility/entities",
+    response_model=schemas.FeasibilityEntityRead,
+    status_code=201,
+)
+def create_feasibility_entity(
+    lead_id: int,
+    body: schemas.FeasibilityEntityCreate,
+    db: Session = Depends(get_db),
+):
+    lead = _get_lead(db, lead_id)
+    client_id = _lead_client_id(db, lead)
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Lead has no linked entity — cannot determine which client to attach to.",
+        )
+
+    entity_type_id = None
+    if body.entity_type:
+        et = (
+            db.query(models.EntityTypeRef)
+            .filter(models.EntityTypeRef.entity_type_name == body.entity_type)
+            .first()
+        )
+        if not et:
+            et = models.EntityTypeRef(entity_type_name=body.entity_type)
+            db.add(et)
+            db.flush()
+        entity_type_id = et.id
+
+    entity = models.Entity(
+        clients_idclients=client_id,
+        entity_name=body.name,
+        state=body.state,
+        city=body.city,
+        ein=body.ein,
+        entity_types_id=entity_type_id,
+    )
+    db.add(entity)
+    db.commit()
+    db.refresh(entity)
+
+    type_name = body.entity_type if entity_type_id else None
+    return schemas.FeasibilityEntityRead(
+        id=entity.entity_id,
+        name=entity.entity_name,
+        type=type_name,
+        city=entity.city,
+        state=entity.state,
+    )
+
+
+# ── Feasibility: save call ─────────────────────────────────────────────────────
+
+@router.post(
+    "/leads/{lead_id}/feasibility-calls",
+    response_model=schemas.FeasibilityCallRead,
+    status_code=201,
+)
+def save_feasibility_call(
+    lead_id: int,
+    body: schemas.FeasibilityCallCreate,
+    db: Session = Depends(get_db),
+):
+    _get_lead(db, lead_id)
+    call = models.CrmFeasibilityCall(
+        crm_leads_id=lead_id,
+        call_setup=body.call_setup,
+        components=body.components,
+        generated_output=body.generated_output,
+    )
+    db.add(call)
+    db.commit()
+    db.refresh(call)
+    return schemas.FeasibilityCallRead(
+        id=call.idcrm_feasibility_call,
+        crm_leads_id=call.crm_leads_id,
+        call_setup=call.call_setup,
+        components=call.components,
+        generated_output=call.generated_output,
+        created_at=call.created_at,
+        updated_at=call.updated_at,
+    )

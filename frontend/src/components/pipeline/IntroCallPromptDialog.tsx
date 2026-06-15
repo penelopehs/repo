@@ -28,8 +28,6 @@ import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import type { Lead } from "@/types/crm";
 
-const CALL_TYPES = ["Intro Call", "Follow-up Call", "Check-in", "Discovery Call", "Other"];
-
 interface Props {
   lead: Lead;
   open: boolean;
@@ -46,7 +44,6 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const defaultDate = tomorrow.toISOString().slice(0, 10);
 
-  const [callType, setCallType] = useState("Intro Call");
   const [assignedRep, setAssignedRep] = useState("");
   const [date, setDate] = useState(defaultDate);
   const [time, setTime] = useState("10:00");
@@ -57,7 +54,6 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    setCallType("Intro Call");
     setDate(defaultDate);
     setTime("10:00");
     setNotes("");
@@ -75,7 +71,7 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
         date,
         time,
         notes,
-        callType,
+        callType: "Intro Call",
         assignedRepName: assignedRep,
       });
       toast.success("Intro call scheduled", { description: `${date} at ${time}` });
@@ -122,23 +118,21 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
         </div>
 
         <div className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="mb-1.5 block">Assigned rep</Label>
-              <Select value={assignedRep} onValueChange={setAssignedRep}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select rep…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => {
-                    const name = userFullName(u) || u.email;
-                    return (
-                      <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <Label className="mb-1.5 block">Assigned rep</Label>
+            <Select value={assignedRep} onValueChange={setAssignedRep}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select rep…" />
+              </SelectTrigger>
+              <SelectContent>
+                {users.map((u) => {
+                  const name = userFullName(u) || u.email;
+                  return (
+                    <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

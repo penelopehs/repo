@@ -152,6 +152,7 @@ export function AddLeadDialog() {
       }
     }, 250);
     return () => { active = false; clearTimeout(t); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.firstName, form.lastName, form.company]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>

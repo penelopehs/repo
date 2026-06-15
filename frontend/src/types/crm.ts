@@ -205,6 +205,8 @@ export interface Lead {
   intakeNotes?: ProfileNote[];
   intake?: IntakeAnswers;
   nextCall?: NextCallInfo | null;
+  /** Engagements linked to this lead — populated on detail fetch (GET /leads/{id}). */
+  engagements?: Engagement[];
 }
 
 export interface ProfileNote {

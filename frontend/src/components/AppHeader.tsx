@@ -1,4 +1,4 @@
-// Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
+﻿// Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
 
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { Calculator, Users, LogIn, LogOut, FileText, Menu, Sun, Moon } from "lucide-react";
@@ -45,11 +45,11 @@ export function AppHeader() {
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">
             <span className="text-sm font-bold tracking-tight" style={{ color: "var(--logo)" }}>
-              SB
+              AS
             </span>
           </div>
           <div className="hidden sm:block leading-tight">
-            <p className="text-sm font-bold text-white">Sales Billing Calculator</p>
+            <p className="text-sm font-bold text-white">Acquire Sales</p>
             <p className="text-[11px] text-white/70">R&amp;D Tax Credit &amp; Billing</p>
           </div>
         </Link>
@@ -163,3 +163,5 @@ export function AppHeader() {
     </header>
   );
 }
+
+

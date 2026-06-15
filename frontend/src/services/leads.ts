@@ -10,6 +10,10 @@ import { api } from "@/services/api";
 import { ALL_TAX_YEARS, EMPTY_CALCULATIONS } from "@/types/crm";
 import type {
   ClientType,
+  Engagement,
+  EngagementPhase,
+  EngagementStatus,
+  EngagementType,
   Lead,
   LeadData,
   LeadDataEntity,
@@ -21,6 +25,16 @@ import type {
 } from "@/types/crm";
 
 // ── Backend DTOs (subset of backend/app/schemas.py we consume) ──────────────────
+
+interface ApiEngagementRead {
+  id: number;
+  type: string | null;
+  status: string | null;
+  phase: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  tax_years: number[];
+}
 
 interface ApiLeadListItem {
   id: number;
@@ -50,6 +64,8 @@ interface ApiLeadListItem {
   data: LeadData | null;
   notes: string | null;
   next_call: { date: string; time: string | null; call_type: string | null } | null;
+  // Only present on GET /leads/{id} (detail), not on the list endpoint.
+  engagements?: ApiEngagementRead[];
 }
 
 // ── Status mapping (frontend snake_case ⇄ backend Title Case enum) ──────────────
@@ -143,6 +159,20 @@ function normalizePerson(raw: unknown): LeadDataPerson {
   };
 }
 
+function mapEngagement(leadId: string, e: ApiEngagementRead): Engagement {
+  return {
+    id: String(e.id),
+    clientId: leadId,
+    type: (e.type ?? "R&D Tax Credit") as EngagementType,
+    status: (e.status ?? "Active") as EngagementStatus,
+    phase: (e.phase ?? "Intake") as EngagementPhase,
+    years: toTaxYears(e.tax_years),
+    billing: [],
+    createdAt: e.start_date ?? "",
+  };
+}
+
+
 // The backend `data` column is free-form JSON and can be null or (when cleared)
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
 function normalizeData(data: LeadData | null | undefined): LeadData {
@@ -212,6 +242,7 @@ function mapListItem(i: ApiLeadListItem): Lead {
     nextCall: i.next_call
       ? ({ date: i.next_call.date, time: i.next_call.time ?? undefined, callType: i.next_call.call_type } as NextCallInfo)
       : null,
+    engagements: (i.engagements ?? []).map((e) => mapEngagement(String(i.id), e)),
   };
 }
 
@@ -264,19 +295,13 @@ export const leadsApi = {
   },
 
   async create(input: LeadCreateInput): Promise<Lead> {
-    // `client_name` makes the backend provision a client account up-front.
-    // POST /leads echoes back the created lead in the same shape as the list
-    // endpoint, so the new row is built straight from the response.
     const item = await api.post<ApiLeadListItem>("/leads", {
-      client_name: input.company,
+      first_name: input.firstName,
+      last_name: input.lastName,
       company: input.company,
       email: input.email,
       phone: input.phone,
       lead_source: input.source,
-      first_name: input.firstName,
-      last_name: input.lastName,
-      full_name: `${input.firstName} ${input.lastName}`.trim(),
-      // epr_id of the selected existing client (null for a brand-new person).
       epr_id: input.eprId ?? null,
       assigned_sales_rep: input.repId,
       tax_years: input.taxYears ?? [],

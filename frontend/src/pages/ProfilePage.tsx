@@ -1,4 +1,4 @@
-﻿// View Profile page — client overview with engagements, contacts, calls, intake.
+// View Profile page — client overview with engagements, contacts, calls, intake.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -61,7 +61,6 @@ import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
 import { entitiesFromLead, stripEntityIds } from "@/store/calculatorStore";
-import { useEngagementsStore } from "@/store/engagementsStore";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
@@ -71,6 +70,7 @@ import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
 import { pipelineStageIndex, PIPELINE_STAGES, EMPTY_CALCULATIONS } from "@/types/crm";
 import type {
+
   FollowUpCall,
   ProfileNote,
   TaxYearRecord,
@@ -103,7 +103,6 @@ export function ProfilePage({ id }: { id: string }) {
   // Start in the loading state when the lead isn't already cached, so a direct
   // load shows a spinner rather than a flash of "Client not found".
   const [leadLoading, setLeadLoading] = useState(!lead);
-  const byClient = useEngagementsStore((s) => s.byClient);
   const calls = useFollowUpCallsStore((s) => s.byLead[id] ?? NO_CALLS);
   const fetchCalls = useFollowUpCallsStore((s) => s.fetch);
   const updateCall = useFollowUpCallsStore((s) => s.update);
@@ -221,7 +220,7 @@ export function ProfilePage({ id }: { id: string }) {
     await updateCall(id, call.id, { completed: !call.completed });
   };
 
-  const { engagements } = byClient(id);
+  const engagements = useMemo(() => lead?.engagements ?? [], [lead?.engagements]);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
   useEffect(() => {
@@ -250,8 +249,7 @@ export function ProfilePage({ id }: { id: string }) {
         void updateCall(id, c.id, { completed: true });
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calls.length, updateCall, id]);
+  }, [calls, updateCall, id]);
 
   const chartData = useMemo(() => {
     const map = new Map<number, number>();
@@ -598,7 +596,13 @@ export function ProfilePage({ id }: { id: string }) {
                                 ? "border-cyan/50 text-cyan hover:bg-cyan/10"
                                 : "opacity-50",
                             )}
-                            onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                            onClick={() =>
+                              navigate({
+                                to: "/clients/$id/feasibility-call",
+                                params: { id },
+                                search: { callId: undefined },
+                              })
+                            }
                           >
                             Go to Feasibility Call <ArrowRight className="h-3.5 w-3.5" />
                           </Button>
@@ -1178,14 +1182,26 @@ export function ProfilePage({ id }: { id: string }) {
             <div className="flex flex-col gap-2.5">
               <Button
                 className="w-full"
-                onClick={() => toast.info("Feasibility call workflow coming soon.")}
+                onClick={() =>
+                  navigate({
+                    to: "/clients/$id/feasibility-call",
+                    params: { id },
+                    search: { callId: "new" },
+                  })
+                }
               >
                 Start Feasibility Call
               </Button>
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => toast.info("Feasibility summary coming soon.")}
+                onClick={() =>
+                  navigate({
+                    to: "/clients/$id/feasibility-call",
+                    params: { id },
+                    search: { callId: undefined },
+                  })
+                }
               >
                 View Feasibility Summary
               </Button>
@@ -1670,3 +1686,4 @@ function TaxHistoryPanel({
     </motion.section>
   );
 }
+
