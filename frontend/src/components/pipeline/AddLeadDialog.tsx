@@ -1,0 +1,563 @@
+// "Add New Lead" modal — validated with zod, dispatches to leads store.
+
+import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Check, Loader2, Plus } from "lucide-react";
+import type { Lead, LeadSource, SalesRep, TaxYear } from "@/types/crm";
+import { useLeadsStore } from "@/store/leadsStore";
+import { useUsersStore } from "@/store/usersStore";
+import { userFullName } from "@/services/users";
+import { clientsApi, type ClientContactRow } from "@/services/clients";
+import { MultiYearSelect } from "@/components/MultiYearSelect";
+import { ALL_TAX_YEARS } from "@/types/crm";
+import { IntroCallPromptDialog } from "@/components/pipeline/IntroCallPromptDialog";
+
+const SOURCES: LeadSource[] = [
+  "Referral",
+  "Website",
+  "Cold Call",
+  "Conference",
+  "LinkedIn",
+  "Partner",
+  "Other",
+];
+
+const schema = z
+  .object({
+    firstName: z.string().trim().min(1, "Required").max(60),
+    lastName: z.string().trim().min(1, "Required").max(60),
+    company: z.string().trim().min(1, "Required").max(160),
+    // Email and phone are each optional on their own, but at least one is
+    // required — enforced in the superRefine below.
+    email: z.string().trim().max(255),
+    phone: z.string().trim().max(40),
+    source: z.enum([
+      "Referral",
+      "Website",
+      "Cold Call",
+      "Conference",
+      "LinkedIn",
+      "Partner",
+      "Other",
+    ]),
+    rep: z.string().trim().min(1, "Required"),
+    // Optional assignments — users.iduser as a string ("" = unassigned).
+    salesManager: z.string().optional(),
+    trainingManager: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = data.email.length > 0;
+    const hasPhone = data.phone.length > 0;
+    if (!hasEmail && !hasPhone) {
+      const message = "Email or phone required";
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message });
+      return;
+    }
+    if (hasEmail && !z.string().email().safeParse(data.email).success) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Invalid email" });
+    }
+    if (hasPhone && data.phone.length < 7) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["phone"], message: "Invalid phone" });
+    }
+  });
+
+type FormState = z.infer<typeof schema>;
+
+const initial: FormState = {
+  firstName: "",
+  lastName: "",
+  company: "",
+  email: "",
+  phone: "",
+  source: "Website",
+  rep: "",
+  salesManager: "",
+  trainingManager: "",
+};
+
+// Sentinel SelectItem value for "no assignment" (Radix forbids empty values).
+const UNASSIGNED = "unassigned";
+
+// Fields that drive the client-search dropdown.
+type SearchKey = "firstName" | "lastName" | "company";
+
+export function AddLeadDialog() {
+  const [open, setOpen] = useState(false);
+  const [introPromptLead, setIntroPromptLead] = useState<Lead | null>(null);
+  const [form, setForm] = useState<FormState>(initial);
+  const [years, setYears] = useState<TaxYear[]>([]);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  // Engagement years live outside the zod form, so they get their own error.
+  const [yearsError, setYearsError] = useState<string>();
+  const addLead = useLeadsStore((s) => s.addLead);
+  const me = useUsersStore((s) => s.me);
+  const users = useUsersStore((s) => s.users);
+  const ensureUsers = useUsersStore((s) => s.ensureLoaded);
+
+  // Client autocomplete: the picked epr id (hidden), current matches, and UI flags.
+  const [eprId, setEprId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<ClientContactRow[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  // Set right after a pick so the field updates don't re-trigger a search.
+  const skipNextSearch = useRef(false);
+
+  // Alternate emails/phones of the picked client — offered when there's >1.
+  const [emailOptions, setEmailOptions] = useState<string[]>([]);
+  const [phoneOptions, setPhoneOptions] = useState<string[]>([]);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [phoneOpen, setPhoneOpen] = useState(false);
+
+  // Load the user list once, and default the (disabled) rep to the signed-in user.
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
+  useEffect(() => {
+    if (me) setForm((f) => (f.rep ? f : { ...f, rep: String(me.iduser) }));
+  }, [me]);
+
+  // Debounced client search whenever a name/company field changes.
+  useEffect(() => {
+    if (skipNextSearch.current) {
+      skipNextSearch.current = false;
+      return;
+    }
+    const { firstName, lastName, company } = form;
+    if (!firstName.trim() && !lastName.trim() && !company.trim()) {
+      setSuggestions([]);
+      setSearchOpen(false);
+      setSearching(false);
+      return;
+    }
+    let active = true;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const rows = await clientsApi.search({ firstName, lastName, company });
+        if (!active) return;
+        setSuggestions(rows);
+        setSearchOpen(true);
+      } catch {
+        if (active) {
+          setSuggestions([]);
+          setSearchOpen(false);
+        }
+      } finally {
+        if (active) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.firstName, form.lastName, form.company]);
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  // Editing a search field by hand invalidates any previously picked client.
+  const setSearchField = (k: SearchKey, v: string) => {
+    setEprId(null);
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  const pickSuggestion = (row: ClientContactRow) => {
+    skipNextSearch.current = true;
+    const emails = row.emails ?? [];
+    const phones = row.phones ?? [];
+    setForm((f) => ({
+      ...f,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      company: row.entity_name,
+      email: emails[0] ?? f.email,
+      phone: phones[0] ?? f.phone,
+    }));
+    setEprId(row.identity_people_roles);
+    setSuggestions([]);
+    setSearchOpen(false);
+    // Offer the remaining contact options when the client has more than one.
+    setEmailOptions(emails);
+    setPhoneOptions(phones);
+    setEmailOpen(emails.length > 1);
+    setPhoneOpen(phones.length > 1);
+  };
+
+  const toggleYear = (y: TaxYear) => {
+    setYearsError(undefined);
+    setYears((p) => (p.includes(y) ? p.filter((x) => x !== y) : [...p, y].sort((a, b) => a - b)));
+  };
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setForm({ ...initial, rep: me ? String(me.iduser) : "" });
+    setYears([]);
+    setErrors({});
+    setYearsError(undefined);
+    setEprId(null);
+    setSuggestions([]);
+    setSearchOpen(false);
+    setEmailOptions([]);
+    setPhoneOptions([]);
+    setEmailOpen(false);
+    setPhoneOpen(false);
+  };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = schema.safeParse(form);
+    const noYears = years.length === 0;
+    if (!parsed.success || noYears) {
+      const fe: Partial<Record<keyof FormState, string>> = {};
+      if (!parsed.success)
+        for (const issue of parsed.error.issues)
+          fe[issue.path[0] as keyof FormState] = issue.message;
+      setErrors(fe);
+      setYearsError(noYears ? "Select at least one engagement year" : undefined);
+      return;
+    }
+    setYearsError(undefined);
+    setSubmitting(true);
+    try {
+      const newLead = await addLead({
+        ...parsed.data,
+        eprId,
+        taxYears: years,
+        repId: Number(parsed.data.rep),
+        salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
+        trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
+      });
+      toast.success("Lead added", {
+        description: `${parsed.data.firstName} ${parsed.data.lastName} · ${parsed.data.company}`,
+      });
+      resetForm();
+      setOpen(false);
+      setIntroPromptLead(newLead);
+    } catch (err) {
+      toast.error("Couldn't add lead", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      {introPromptLead && (
+        <IntroCallPromptDialog
+          lead={introPromptLead}
+          open={!!introPromptLead}
+          onOpenChange={(o) => {
+            if (!o) setIntroPromptLead(null);
+          }}
+        />
+      )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated">
+            <Plus className="mr-1.5 h-4 w-4" /> Add New Lead
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-navy">Add New Lead</DialogTitle>
+            <DialogDescription>
+              {eprId !== null
+                ? "Existing client"
+                : "Create a new lead and assign a representative."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submit} className="grid gap-4">
+            {/* Name + company drive the client-search dropdown (spans full width). */}
+            <div className="relative">
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="First Name" error={errors.firstName}>
+                  <Input
+                    value={form.firstName}
+                    onChange={(e) => setSearchField("firstName", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Jane"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Last Name" error={errors.lastName}>
+                  <Input
+                    value={form.lastName}
+                    onChange={(e) => setSearchField("lastName", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Doe"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Company / Entity" error={errors.company}>
+                  <Input
+                    value={form.company}
+                    onChange={(e) => setSearchField("company", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Acme Inc."
+                    autoComplete="off"
+                  />
+                </Field>
+              </div>
+
+              {searchOpen && (searching || suggestions.length > 0) && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover py-1 shadow-elevated">
+                  {searching && suggestions.length === 0 ? (
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+                    </div>
+                  ) : (
+                    suggestions.map((row) => (
+                      <button
+                        key={row.identity_people_roles}
+                        type="button"
+                        // Keep the input focused so onBlur doesn't close before onClick.
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickSuggestion(row)}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
+                      >
+                        <span className="font-medium text-navy">
+                          {row.first_name} {row.last_name}
+                        </span>
+                        <span className="truncate text-muted-foreground">{row.entity_name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email" error={errors.email}>
+                <ContactPicker
+                  options={emailOptions}
+                  open={emailOpen}
+                  setOpen={setEmailOpen}
+                  selected={form.email}
+                  onPick={(v) => set("email", v)}
+                >
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                    onFocus={() => emailOptions.length > 1 && setEmailOpen(true)}
+                    onBlur={() => window.setTimeout(() => setEmailOpen(false), 120)}
+                    placeholder="jane@acme.com"
+                    autoComplete="off"
+                  />
+                </ContactPicker>
+              </Field>
+              <Field label="Phone" error={errors.phone}>
+                <ContactPicker
+                  options={phoneOptions}
+                  open={phoneOpen}
+                  setOpen={setPhoneOpen}
+                  selected={form.phone}
+                  onPick={(v) => set("phone", v)}
+                >
+                  <PhoneInput
+                    value={form.phone}
+                    onChange={(v) => set("phone", v)}
+                    onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
+                    onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
+                    autoComplete="off"
+                  />
+                </ContactPicker>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Lead Source">
+                <Select value={form.source} onValueChange={(v) => set("source", v as LeadSource)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Assigned Sales Representative">
+                <Select value={form.rep} onValueChange={(v) => set("rep", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Loading…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <Field label="Engagement Years" error={yearsError}>
+              <MultiYearSelect
+                value={years}
+                onToggle={toggleYear}
+                onSelectAll={() => setYears([...ALL_TAX_YEARS])}
+                onClear={() => setYears([])}
+              />
+            </Field>
+
+            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
+            <div className="text-gray-500 font-normal flex">
+              <div className="whitespace-nowrap">Optional Assignments</div>
+              <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field optional label="Sales Manager">
+                <Select
+                  value={form.salesManager || UNASSIGNED}
+                  onValueChange={(v) => set("salesManager", v === UNASSIGNED ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field optional label="Training Manager">
+                <Select
+                  value={form.trainingManager || UNASSIGNED}
+                  onValueChange={(v) => set("trainingManager", v === UNASSIGNED ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
+                Add Lead
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function ContactPicker({
+  options,
+  open,
+  setOpen,
+  selected,
+  onPick,
+  children,
+}: {
+  options: string[];
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  selected: string;
+  onPick: (v: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      {children}
+      {open && options.length > 1 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border bg-popover py-1 shadow-elevated">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              // Keep the input focused so onBlur doesn't close before onClick.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onPick(opt);
+                setOpen(false);
+              }}
+              className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
+            >
+              <span className="truncate">{opt}</span>
+              {opt === selected && <Check className="h-3.5 w-3.5 shrink-0 text-cyan" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  optional = false,
+  label,
+  error,
+  children,
+}: {
+  optional?: boolean;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <Label className="mb-1.5 block">
+        {label}
+        {optional && <span className="text-gray-500 ml-2 text-xs font-normal">optional</span>}
+      </Label>
+      {children}
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}

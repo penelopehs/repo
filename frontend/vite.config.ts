@@ -1,0 +1,33 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import tsconfigPaths from "vite-tsconfig-paths";
+
+export default defineConfig({
+  base: "/",
+
+  plugins: [
+    TanStackRouterVite({
+      target: "react",
+      routesDirectory: "./src/routes",
+      generatedRouteTree: "./src/routeTree.gen.ts",
+    }),
+    react(),
+    tailwindcss(),
+    tsconfigPaths(),
+  ],
+
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+  },
+
+  // Serve the production build at localhost:5173 (not 127.0.0.1) so it matches
+  // the auth provider's registered redirect URI.
+  preview: {
+    host: "localhost",
+    port: 5173,
+    strictPort: true,
+  },
+});

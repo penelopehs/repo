@@ -1,0 +1,261 @@
+/* ==========================================================================
+   Imports (MUST be first)
+   ========================================================================== */
+
+@import "tailwindcss" source(none);
+@import "tw-animate-css";
+
+@source "../src";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   Theme Tokens
+   ========================================================================== */
+
+@theme inline {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-frost: var(--frost);
+  --color-orange: var(--orange);
+  --color-orange-foreground: var(--orange-foreground);
+  --color-cyan: var(--cyan);
+  --color-cyan-foreground: var(--cyan-foreground);
+  --color-green: var(--green-brand);
+  --color-green-foreground: var(--green-foreground);
+  --color-violet: var(--violet);
+  --color-violet-foreground: var(--violet-foreground);
+  --color-logo: var(--logo);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --shadow-card: 0 1px 2px 0 oklch(0.15 0.05 250 / 0.04), 0 1px 3px 0 oklch(0.15 0.05 250 / 0.06);
+
+  --shadow-elevated:
+    0 4px 16px -2px oklch(0.15 0.05 250 / 0.08), 0 2px 6px -1px oklch(0.15 0.05 250 / 0.05);
+
+  --shadow-hover:
+    0 12px 32px -4px oklch(0.15 0.05 250 / 0.12), 0 4px 12px -2px oklch(0.15 0.05 250 / 0.08);
+
+  --gradient-navy: linear-gradient(135deg, #0d1b2a, #172d40);
+  --gradient-orange: linear-gradient(135deg, #3e606f, #91aa9d);
+  --gradient-cyan: linear-gradient(135deg, #91aa9d, #d1dbbd);
+  --gradient-frost: linear-gradient(180deg, #fcfff5, #f0f5ec);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+:root {
+  --radius: 0.625rem;
+
+  /* Light mode — Neutral Blue palette */
+  --background: #fcfff5;
+  --foreground: #0d1b2a;
+
+  --card: #ffffff;
+  --card-foreground: #0d1b2a;
+
+  --popover: #ffffff;
+  --popover-foreground: #0d1b2a;
+
+  --primary: #3e606f;
+  --primary-foreground: #fcfff5;
+
+  --secondary: #d1dbbd;
+  --secondary-foreground: #0d1b2a;
+
+  --muted: #d1dbbd;
+  --muted-foreground: #3e606f;
+
+  --accent: #e8ede0;
+  --accent-foreground: #0d1b2a;
+
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: #fcfff5;
+
+  --border: rgba(145, 170, 157, 0.35);
+  --input: rgba(145, 170, 157, 0.35);
+  --ring: #3e606f;
+
+  --navy: #0d1b2a;
+  --frost: #fcfff5;
+  --orange: #3e606f;
+  --orange-foreground: #fcfff5;
+  --cyan: #91aa9d;
+  --green-brand: oklch(0.7 0.13 185);
+  --violet: oklch(0.6 0.13 305);
+  --logo: #91aa9d;
+
+  --sidebar: #fcfff5;
+  --sidebar-foreground: #0d1b2a;
+  --sidebar-primary: #3e606f;
+  --sidebar-accent: #d1dbbd;
+  --sidebar-border: rgba(145, 170, 157, 0.35);
+  --sidebar-ring: #3e606f;
+}
+
+.dark {
+  /* Dark mode — deep navy */
+  --background: #0d1b2a;
+  --foreground: #fcfff5;
+
+  --card: #112236;
+  --card-foreground: #fcfff5;
+
+  --popover: #112236;
+  --popover-foreground: #fcfff5;
+
+  --primary: #3e606f;
+  --primary-foreground: #fcfff5;
+
+  --secondary: #172d40;
+  --secondary-foreground: #fcfff5;
+
+  --muted: #172d40;
+  --muted-foreground: #91aa9d;
+
+  --accent: #172d40;
+  --accent-foreground: #fcfff5;
+
+  --destructive: oklch(0.6 0.22 25);
+  --destructive-foreground: #fcfff5;
+
+  --border: rgba(145, 170, 157, 0.18);
+  --input: rgba(145, 170, 157, 0.18);
+  --ring: #91aa9d;
+
+  --frost: #112236;
+  --orange: #91aa9d;
+  --orange-foreground: #0d1b2a;
+  --logo: #91aa9d;
+  --gradient-frost: linear-gradient(180deg, #14253a, #112236);
+}
+
+/* ==========================================================================
+   Base styles
+   ========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: var(--color-border);
+  }
+
+  html,
+  body {
+    font-family: "Inter", system-ui, sans-serif;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5 {
+    color: var(--color-foreground);
+    letter-spacing: -0.02em;
+  }
+
+  /* text-navy in dark mode: render as palette cream */
+  .dark .text-navy {
+    color: #d1dbbd !important;
+  }
+}
+
+/* ==========================================================================
+   Utilities
+   ========================================================================== */
+
+@layer utilities {
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .shadow-hover {
+    box-shadow: var(--shadow-hover);
+  }
+
+  .bg-gradient-navy {
+    background-image: var(--gradient-navy);
+  }
+  .bg-gradient-orange {
+    background-image: var(--gradient-orange);
+  }
+  .bg-gradient-cyan {
+    background-image: var(--gradient-cyan);
+  }
+  .bg-gradient-frost {
+    background-image: var(--gradient-frost);
+  }
+
+  .glass {
+    background: color-mix(in oklab, var(--card) 70%, transparent);
+    backdrop-filter: blur(10px) saturate(140%);
+  }
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out;
+}
