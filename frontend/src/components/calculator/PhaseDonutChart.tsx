@@ -49,7 +49,11 @@ export function PhaseDonutChart({
               ))}
             </Pie>
             <Tooltip
-              formatter={(value: number, _name: string, props: { payload?: { label: string; pct: number } }) => [
+              formatter={(
+                value: number,
+                _name: string,
+                props: { payload?: { label: string; pct: number } },
+              ) => [
                 `${formatCurrency(value)} (${props.payload?.pct.toFixed(1)}%)`,
                 props.payload?.label,
               ]}
@@ -59,7 +63,9 @@ export function PhaseDonutChart({
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xs text-muted-foreground">Total</span>
-          <span className="text-sm font-bold text-navy tabular-nums">{formatCurrency(phases.total)}</span>
+          <span className="text-sm font-bold text-navy tabular-nums">
+            {formatCurrency(phases.total)}
+          </span>
         </div>
       </div>
 
@@ -67,12 +73,17 @@ export function PhaseDonutChart({
         {data.map((d) => (
           <div key={d.label} className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+              <span
+                className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: d.color }}
+              />
               <span className="font-medium text-navy">{d.label}</span>
             </div>
             <div className="flex items-center gap-3 tabular-nums">
               <span className="text-xs text-muted-foreground">{d.pct.toFixed(1)}%</span>
-              <span className="font-semibold" style={{ color: d.color }}>{formatCurrency(d.value)}</span>
+              <span className="font-semibold" style={{ color: d.color }}>
+                {formatCurrency(d.value)}
+              </span>
             </div>
           </div>
         ))}

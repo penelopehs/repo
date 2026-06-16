@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Trash2, Building2, DollarSign, BadgeCheck, AlertCircle, Users, Plus } from "lucide-react";
+import {
+  ChevronDown,
+  Trash2,
+  Building2,
+  DollarSign,
+  BadgeCheck,
+  AlertCircle,
+  Users,
+  Plus,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Label } from "@/components/ui/label";
@@ -91,9 +100,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
               {stateEligible && " · State Credit Eligible"}
             </p>
           </div>
-          <div className="ml-3 flex items-center gap-2 font-medium text-navy">
-            {taxYear}
-          </div>
+          <div className="ml-3 flex items-center gap-2 font-medium text-navy">{taxYear}</div>
         </div>
         <div className="flex items-center gap-2">
           {complete && stateEligible ? (
@@ -235,12 +242,12 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   <div>
                     <Label>Employee Count</Label>
                     <MoneyInput
-                        value={entity.employeeCount === "" ? "" : entity.employeeCount}
-                        onChange={(e) =>
+                      value={entity.employeeCount === "" ? "" : entity.employeeCount}
+                      onChange={(e) =>
                         update(entity.id, "employeeCount", e === "" ? "" : Number(e))
                       }
-                        placeholder="0"
-                      />
+                      placeholder="0"
+                    />
                   </div>
                 </div>
               </div>
@@ -271,13 +278,15 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   {complete && stateEligible ? (
                     <div className="rounded-lg border border-green/30 bg-green/5 p-3 text-sm text-green">
                       <span className="inline-flex items-center gap-2 font-semibold">
-                        <BadgeCheck className="h-4 w-4" /> Eligible for R&amp;D Tax Credit (Federal + State)
+                        <BadgeCheck className="h-4 w-4" /> Eligible for R&amp;D Tax Credit (Federal
+                        + State)
                       </span>
                     </div>
                   ) : complete && !stateEligible ? (
                     <div className="rounded-lg border border-cyan/30 bg-cyan/5 p-3 text-sm text-cyan">
                       <span className="inline-flex items-center gap-2 font-semibold">
-                        <BadgeCheck className="h-4 w-4" /> Federal credit only — no state credit for this state
+                        <BadgeCheck className="h-4 w-4" /> Federal credit only — no state credit for
+                        this state
                       </span>
                     </div>
                   ) : (
@@ -344,7 +353,9 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                               <input
                                 className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-navy outline-none focus:ring-1 focus:ring-violet/40"
                                 value={owner.firstName}
-                                onChange={(e) => updateOwner(entity.id, owner.id, "firstName", e.target.value)}
+                                onChange={(e) =>
+                                  updateOwner(entity.id, owner.id, "firstName", e.target.value)
+                                }
                                 placeholder="Jane"
                                 maxLength={60}
                               />
@@ -354,7 +365,9 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                               <input
                                 className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-navy outline-none focus:ring-1 focus:ring-violet/40"
                                 value={owner.lastName}
-                                onChange={(e) => updateOwner(entity.id, owner.id, "lastName", e.target.value)}
+                                onChange={(e) =>
+                                  updateOwner(entity.id, owner.id, "lastName", e.target.value)
+                                }
                                 placeholder="Doe"
                                 maxLength={60}
                               />
@@ -364,7 +377,9 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                               <input
                                 className="w-full rounded border border-border bg-background px-2 py-1 text-xs text-navy outline-none focus:ring-1 focus:ring-violet/40"
                                 value={owner.role}
-                                onChange={(e) => updateOwner(entity.id, owner.id, "role", e.target.value)}
+                                onChange={(e) =>
+                                  updateOwner(entity.id, owner.id, "role", e.target.value)
+                                }
                                 placeholder="CEO"
                                 maxLength={60}
                               />
@@ -383,12 +398,16 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                                       entity.id,
                                       owner.id,
                                       "ownershipPct",
-                                      e.target.value === "" ? "" : Math.min(100, Number(e.target.value)),
+                                      e.target.value === ""
+                                        ? ""
+                                        : Math.min(100, Number(e.target.value)),
                                     )
                                   }
                                   placeholder="0"
                                 />
-                                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                  %
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -399,7 +418,12 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                                 ? `${owner.firstName} ${owner.lastName}`.trim()
                                 : "Unnamed"}
                             </span>
-                            <span className={cn("font-bold tabular-nums", pct > 0 ? "text-violet" : "text-muted-foreground")}>
+                            <span
+                              className={cn(
+                                "font-bold tabular-nums",
+                                pct > 0 ? "text-violet" : "text-muted-foreground",
+                              )}
+                            >
                               {pct}%
                             </span>
                           </div>
@@ -409,22 +433,27 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   </div>
                 )}
 
-                {entity.owners.length > 0 && (() => {
-                  const total = entity.owners.reduce(
-                    (sum, o) => sum + (typeof o.ownershipPct === "number" ? o.ownershipPct : 0),
-                    0,
-                  );
-                  const over = total > 100;
-                  return (
-                    <div className={cn(
-                      "mt-2 flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold",
-                      over ? "bg-destructive/10 text-destructive" : "bg-muted/40 text-navy",
-                    )}>
-                      <span>Total Ownership</span>
-                      <span className="tabular-nums">{total}%{over ? " — exceeds 100%" : total === 100 ? " ✓" : ""}</span>
-                    </div>
-                  );
-                })()}
+                {entity.owners.length > 0 &&
+                  (() => {
+                    const total = entity.owners.reduce(
+                      (sum, o) => sum + (typeof o.ownershipPct === "number" ? o.ownershipPct : 0),
+                      0,
+                    );
+                    const over = total > 100;
+                    return (
+                      <div
+                        className={cn(
+                          "mt-2 flex items-center justify-between rounded-md px-3 py-1.5 text-xs font-semibold",
+                          over ? "bg-destructive/10 text-destructive" : "bg-muted/40 text-navy",
+                        )}
+                      >
+                        <span>Total Ownership</span>
+                        <span className="tabular-nums">
+                          {total}%{over ? " — exceeds 100%" : total === 100 ? " ✓" : ""}
+                        </span>
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           </motion.div>

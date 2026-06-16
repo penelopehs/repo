@@ -123,7 +123,7 @@ export function YearButtons({
           <button
             key={y}
             type="button"
-            onClick={() => active ? null : onToggle(y)}
+            onClick={() => (active ? null : onToggle(y))}
             aria-pressed={active}
             className={cn(
               "cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",

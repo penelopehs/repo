@@ -25,7 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Lead, LeadDataEntity, LeadSource, LeadStatus, SalesRep, TaxYear, TaxYearRecord } from "@/types/crm";
+import type {
+  Lead,
+  LeadDataEntity,
+  LeadSource,
+  LeadStatus,
+  SalesRep,
+  TaxYear,
+  TaxYearRecord,
+} from "@/types/crm";
 import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
@@ -110,7 +118,9 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   const users = useUsersStore((s) => s.users);
   const ensureUsers = useUsersStore((s) => s.ensureLoaded);
 
-  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
 
   const buildForm = () => ({
     firstName: lead.firstName,
@@ -151,12 +161,12 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       // company, entities and tax years live in the `data` blob (the PATCH
       // endpoint has no top-level columns for them). Rebuild it from the form,
       // preserving people and any existing per-year calculation buckets.
-      const base = lead.data ?? { people: [], entities: [], calculations: {},  yearStatuses: {}};
+      const base = lead.data ?? { people: [], entities: [], calculations: {}, yearStatuses: {} };
       const company = parsed.data.company.trim();
       const extraEntities = (parsed.data.entityNames ?? "")
         .split(/[,\n]/)
         .map((s) => s.trim())
-          .filter(Boolean)
+        .filter(Boolean)
         .filter((n) => n !== company);
       const names = company ? [company, ...extraEntities] : extraEntities;
       // Rebuild the entity list, preserving each entity's stable id (and thus
@@ -205,13 +215,15 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         salesManagerId: parsed.data.salesManager ? Number(parsed.data.salesManager) : null,
         trainingManagerId: parsed.data.trainingManager ? Number(parsed.data.trainingManager) : null,
         data,
-    });
+      });
       toast.success("Client updated", {
         description: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
       });
-    setOpen(false);
+      setOpen(false);
     } catch (err) {
-      toast.error("Couldn't update client", { description: err instanceof Error ? err.message : undefined });
+      toast.error("Couldn't update client", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -257,10 +269,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               />
             </Item>
             <Item label="Phone">
-              <PhoneInput
-                value={form.phone}
-                onChange={(v) => setForm({ ...form, phone: v })}
-              />
+              <PhoneInput value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
             </Item>
             <Item label="Lead Source">
               <Select
@@ -359,9 +368,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
             <Item optional label="Sales Manager">
               <Select
                 value={form.salesManager || UNASSIGNED}
-                onValueChange={(v) =>
-                  setForm({ ...form, salesManager: v === UNASSIGNED ? "" : v })
-                }
+                onValueChange={(v) => setForm({ ...form, salesManager: v === UNASSIGNED ? "" : v })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Unassigned" />
@@ -400,10 +407,19 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
           </div>
 
           <DialogFooter>
-            <Button disabled={submitting} type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button
+              disabled={submitting}
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+            >
               Cancel
             </Button>
-            <Button disabled={submitting} type="submit" className="bg-orange text-white hover:bg-orange/90">
+            <Button
+              disabled={submitting}
+              type="submit"
+              className="bg-orange text-white hover:bg-orange/90"
+            >
               Save Changes
             </Button>
           </DialogFooter>
@@ -413,10 +429,21 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
   );
 }
 
-function Item({ optional = false, label, children }: { optional?: boolean; label: string; children: React.ReactNode }) {
+function Item({
+  optional = false,
+  label,
+  children,
+}: {
+  optional?: boolean;
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <Label className="mb-1.5 block">{label}{optional && (<span className="text-gray-500 ml-2 text-xs font-normal">optional</span>)}</Label>
+      <Label className="mb-1.5 block">
+        {label}
+        {optional && <span className="text-gray-500 ml-2 text-xs font-normal">optional</span>}
+      </Label>
       {children}
     </div>
   );

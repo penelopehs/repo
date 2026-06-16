@@ -19,10 +19,46 @@ function RevenueCanvas() {
 
     // Chart line config
     const CHARTS = [
-      { baseY: 0.28, amp: 0.09, freq1: 0.018, freq2: 0.041, freq3: 0.007, color: "145,170,157", lineW: 1.5, speed: 1.0 },
-      { baseY: 0.52, amp: 0.07, freq1: 0.012, freq2: 0.033, freq3: 0.005, color: "209,219,189", lineW: 1.2, speed: 0.7 },
-      { baseY: 0.72, amp: 0.11, freq1: 0.022, freq2: 0.055, freq3: 0.009, color: "62,96,111",   lineW: 1.8, speed: 1.3 },
-      { baseY: 0.42, amp: 0.05, freq1: 0.030, freq2: 0.020, freq3: 0.011, color: "145,170,157", lineW: 0.8, speed: 0.5 },
+      {
+        baseY: 0.28,
+        amp: 0.09,
+        freq1: 0.018,
+        freq2: 0.041,
+        freq3: 0.007,
+        color: "145,170,157",
+        lineW: 1.5,
+        speed: 1.0,
+      },
+      {
+        baseY: 0.52,
+        amp: 0.07,
+        freq1: 0.012,
+        freq2: 0.033,
+        freq3: 0.005,
+        color: "209,219,189",
+        lineW: 1.2,
+        speed: 0.7,
+      },
+      {
+        baseY: 0.72,
+        amp: 0.11,
+        freq1: 0.022,
+        freq2: 0.055,
+        freq3: 0.009,
+        color: "62,96,111",
+        lineW: 1.8,
+        speed: 1.3,
+      },
+      {
+        baseY: 0.42,
+        amp: 0.05,
+        freq1: 0.03,
+        freq2: 0.02,
+        freq3: 0.011,
+        color: "145,170,157",
+        lineW: 0.8,
+        speed: 0.5,
+      },
     ];
 
     // Scrolling Y-value buffers â€” one value per horizontal pixel
@@ -30,25 +66,26 @@ function RevenueCanvas() {
     let t = 0;
 
     const resize = () => {
-      canvas.width  = window.innerWidth;
+      canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
       bufs = CHARTS.map((c) => {
         const buf = new Float32Array(canvas.width);
         for (let x = 0; x < canvas.width; x++) {
-          buf[x] = c.baseY * canvas.height
-            + Math.sin(x * c.freq1) * c.amp * canvas.height
-            + Math.sin(x * c.freq2) * c.amp * 0.4 * canvas.height;
+          buf[x] =
+            c.baseY * canvas.height +
+            Math.sin(x * c.freq1) * c.amp * canvas.height +
+            Math.sin(x * c.freq2) * c.amp * 0.4 * canvas.height;
         }
         return buf;
       });
     };
 
     // Smooth noise: sum of sine waves â€” mimics real revenue data movement
-    const nextY = (c: typeof CHARTS[0], t: number) =>
-      c.baseY * canvas.height
-      + Math.sin(t * c.freq1 * 40)  * c.amp * canvas.height
-      + Math.sin(t * c.freq2 * 18)  * c.amp * 0.45 * canvas.height
-      + Math.sin(t * c.freq3 * 110) * c.amp * 0.2  * canvas.height;
+    const nextY = (c: (typeof CHARTS)[0], t: number) =>
+      c.baseY * canvas.height +
+      Math.sin(t * c.freq1 * 40) * c.amp * canvas.height +
+      Math.sin(t * c.freq2 * 18) * c.amp * 0.45 * canvas.height +
+      Math.sin(t * c.freq3 * 110) * c.amp * 0.2 * canvas.height;
 
     const draw = () => {
       t += 0.012;
@@ -59,24 +96,30 @@ function RevenueCanvas() {
       ctx.lineWidth = 0.5;
       ctx.strokeStyle = "rgba(145,170,157,0.05)";
       for (let x = 0; x < canvas.width; x += GRID) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
       }
       for (let y = 0; y < canvas.height; y += GRID) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
       }
 
       /* â”€â”€ Horizontal tick labels (faint) â”€â”€ */
       ctx.font = "10px monospace";
       ctx.fillStyle = "rgba(145,170,157,0.12)";
       for (let y = GRID; y < canvas.height; y += GRID) {
-        const label = `$${Math.round((canvas.height - y) / canvas.height * 2400)}K`;
+        const label = `$${Math.round(((canvas.height - y) / canvas.height) * 2400)}K`;
         ctx.fillText(label, 8, y - 3);
       }
 
       /* â”€â”€ Scroll each buffer left, append new right-edge value â”€â”€ */
       CHARTS.forEach((c, i) => {
         const buf = bufs[i];
-        buf.copyWithin(0, 1);                        // shift left
+        buf.copyWithin(0, 1); // shift left
         buf[buf.length - 1] = nextY(c, t * c.speed); // new value
 
         const W = canvas.width;
@@ -180,7 +223,6 @@ export function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen overflow-hidden" style={{ background: "#0D1B2A" }}>
-
       {/* Revenue chart streams */}
       <RevenueCanvas />
 
@@ -188,11 +230,17 @@ export function LoginPage() {
       <div className="pointer-events-none absolute inset-0">
         <div
           className="absolute -left-40 top-1/3 h-[500px] w-[500px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, #1a3a5c 0%, transparent 70%)", filter: "blur(80px)" }}
+          style={{
+            background: "radial-gradient(circle, #1a3a5c 0%, transparent 70%)",
+            filter: "blur(80px)",
+          }}
         />
         <div
           className="absolute bottom-0 right-1/4 h-[400px] w-[600px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, #3E606F 0%, transparent 70%)", filter: "blur(100px)" }}
+          style={{
+            background: "radial-gradient(circle, #3E606F 0%, transparent 70%)",
+            filter: "blur(100px)",
+          }}
         />
       </div>
 
@@ -206,11 +254,19 @@ export function LoginPage() {
         >
           <div
             className="flex h-9 w-9 items-center justify-center rounded-lg"
-            style={{ background: "rgba(145,170,157,0.1)", border: "1px solid rgba(145,170,157,0.2)" }}
+            style={{
+              background: "rgba(145,170,157,0.1)",
+              border: "1px solid rgba(145,170,157,0.2)",
+            }}
           >
-            <span className="text-xs font-bold" style={{ color: "#91AA9D" }}>AS</span>
+            <span className="text-xs font-bold" style={{ color: "#91AA9D" }}>
+              AS
+            </span>
           </div>
-          <span className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: "rgba(145,170,157,0.55)" }}>
+          <span
+            className="text-xs font-semibold uppercase tracking-[0.2em]"
+            style={{ color: "rgba(145,170,157,0.55)" }}
+          >
             Acquire Tax Credits
           </span>
         </motion.div>
@@ -233,9 +289,12 @@ export function LoginPage() {
             className="font-black uppercase leading-[1.0] tracking-tight"
             style={{ color: "#FCFFF5", fontSize: "clamp(2.6rem,4.5vw,4.2rem)" }}
           >
-            THE NEW<br />
-            STANDARD<br />
-            IN&nbsp;&nbsp;R&amp;D TAX<br />
+            THE NEW
+            <br />
+            STANDARD
+            <br />
+            IN&nbsp;&nbsp;R&amp;D TAX
+            <br />
             BILLING.
           </motion.h1>
 
@@ -246,8 +305,8 @@ export function LoginPage() {
             className="mt-6 max-w-sm text-sm leading-relaxed"
             style={{ color: "rgba(209,219,189,0.5)" }}
           >
-            Streamline multi-entity R&D tax credit calculations, client billing,
-            and engagement tracking in one secure workspace.
+            Streamline multi-entity R&D tax credit calculations, client billing, and engagement
+            tracking in one secure workspace.
           </motion.p>
 
           <motion.div
@@ -359,5 +418,3 @@ export function LoginPage() {
     </div>
   );
 }
-
-

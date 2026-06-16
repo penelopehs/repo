@@ -50,7 +50,9 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +63,7 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
     // only when the lead has no rep yet.
     if (lead.rep && lead.rep !== "Unassigned") setAssignedRep(lead.rep);
     else if (me) setAssignedRep(userFullName(me) || me.email);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, me, lead]);
 
   const schedule = async () => {
@@ -128,7 +130,9 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
                 {users.map((u) => {
                   const name = userFullName(u) || u.email;
                   return (
-                    <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
+                    <SelectItem key={u.iduser} value={name}>
+                      {name}
+                    </SelectItem>
                   );
                 })}
               </SelectContent>
@@ -160,7 +164,12 @@ export function IntroCallPromptDialog({ lead, open, onOpenChange }: Props) {
         </div>
 
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="link" className="h-auto p-0 text-muted-foreground" onClick={skip} disabled={saving}>
+          <Button
+            variant="link"
+            className="h-auto p-0 text-muted-foreground"
+            onClick={skip}
+            disabled={saving}
+          >
             Skip for now
           </Button>
           <div className="flex gap-2">

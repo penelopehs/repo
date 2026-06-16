@@ -40,11 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,13 +66,7 @@ import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
 import { pipelineStageIndex, PIPELINE_STAGES, EMPTY_CALCULATIONS } from "@/types/crm";
-import type {
-
-  FollowUpCall,
-  ProfileNote,
-  TaxYearRecord,
-  TaxYearStatus,
-} from "@/types/crm";
+import type { FollowUpCall, ProfileNote, TaxYearRecord, TaxYearStatus } from "@/types/crm";
 import { useUsersStore } from "@/store/usersStore";
 
 // The four scheduled calls a lead works through after "New Lead". Their order
@@ -351,7 +341,13 @@ export function ProfilePage({ id }: { id: string }) {
     window.setTimeout(() => setContactSaved(false), 2500);
   };
 
-  const startEditEntity = (e: { id: string; name: string; ein?: string; city?: string; state?: string }) => {
+  const startEditEntity = (e: {
+    id: string;
+    name: string;
+    ein?: string;
+    city?: string;
+    state?: string;
+  }) => {
     setEditingEntityId(e.id);
     setEntityDraft({ name: e.name, ein: e.ein ?? "", city: e.city ?? "", state: e.state ?? "" });
   };
@@ -361,7 +357,13 @@ export function ProfilePage({ id }: { id: string }) {
     setEntitySaving(true);
     const updatedEntities = (lead.data.entities ?? []).map((e) =>
       e.id === editingEntityId
-        ? { ...e, name: entityDraft.name.trim(), ein: entityDraft.ein.trim(), city: entityDraft.city.trim(), state: entityDraft.state.trim() }
+        ? {
+            ...e,
+            name: entityDraft.name.trim(),
+            ein: entityDraft.ein.trim(),
+            city: entityDraft.city.trim(),
+            state: entityDraft.state.trim(),
+          }
         : e,
     );
     try {
@@ -638,7 +640,8 @@ export function ProfilePage({ id }: { id: string }) {
                           </Button>
                           {state === "pending" && (
                             <p className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-                              <InfoIcon className="h-3 w-3 shrink-0" /> Schedule the Feasibility Call to enable
+                              <InfoIcon className="h-3 w-3 shrink-0" /> Schedule the Feasibility
+                              Call to enable
                             </p>
                           )}
                         </div>
@@ -656,9 +659,15 @@ export function ProfilePage({ id }: { id: string }) {
               <Info label="Lead Source" value={lead.source} />
               <Info
                 label="Client Since"
-                value={lead.engagedSince ? formatDate(lead.engagedSince) : formatLocalDate(lead.addedAt)}
+                value={
+                  lead.engagedSince ? formatDate(lead.engagedSince) : formatLocalDate(lead.addedAt)
+                }
               />
-              <Info label="Phone" value={lead.phone ? formatPhone(lead.phone) : lead.phone} icon={<Phone className="h-3 w-3" />} />
+              <Info
+                label="Phone"
+                value={lead.phone ? formatPhone(lead.phone) : lead.phone}
+                icon={<Phone className="h-3 w-3" />}
+              />
               <Info label="Email" value={lead.email} icon={<Mail className="h-3 w-3" />} />
             </div>
             <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
@@ -740,7 +749,11 @@ export function ProfilePage({ id }: { id: string }) {
                             </span>
                             {!editing && (
                               <div className="flex items-center gap-2">
-                                <Button size="sm" variant="outline" onClick={() => startEditNote(note)}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => startEditNote(note)}
+                                >
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
@@ -773,11 +786,7 @@ export function ProfilePage({ id }: { id: string }) {
                               rows={3}
                             />
                             <div className="flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={cancelEditNote}
-                              >
+                              <Button size="sm" variant="outline" onClick={cancelEditNote}>
                                 Cancel
                               </Button>
                               <Button
@@ -834,16 +843,26 @@ export function ProfilePage({ id }: { id: string }) {
                           const linked = people.filter((p) => linkedIds.includes(p.id));
                           const isEditing = editingEntityId === e.id;
                           return (
-                            <tr key={e.id} className={cn("border-b border-border last:border-0", isEditing && "bg-accent/40")}>
+                            <tr
+                              key={e.id}
+                              className={cn(
+                                "border-b border-border last:border-0",
+                                isEditing && "bg-accent/40",
+                              )}
+                            >
                               <td className="px-4 py-3 font-medium text-navy">
                                 {isEditing ? (
                                   <Input
                                     className="h-7 text-xs"
                                     value={entityDraft.name}
-                                    onChange={(ev) => setEntityDraft((d) => ({ ...d, name: ev.target.value }))}
+                                    onChange={(ev) =>
+                                      setEntityDraft((d) => ({ ...d, name: ev.target.value }))
+                                    }
                                     autoFocus
                                   />
-                                ) : e.name}
+                                ) : (
+                                  e.name
+                                )}
                               </td>
                               <td className="px-4 py-3 tabular-nums text-muted-foreground whitespace-nowrap">
                                 {isEditing ? (
@@ -851,9 +870,13 @@ export function ProfilePage({ id }: { id: string }) {
                                     className="h-7 text-xs w-32"
                                     placeholder="XX-XXXXXXX"
                                     value={entityDraft.ein}
-                                    onChange={(ev) => setEntityDraft((d) => ({ ...d, ein: ev.target.value }))}
+                                    onChange={(ev) =>
+                                      setEntityDraft((d) => ({ ...d, ein: ev.target.value }))
+                                    }
                                   />
-                                ) : (e.ein || "—")}
+                                ) : (
+                                  e.ein || "—"
+                                )}
                               </td>
                               <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                                 {isEditing ? (
@@ -862,17 +885,26 @@ export function ProfilePage({ id }: { id: string }) {
                                       className="h-7 text-xs w-24"
                                       placeholder="City"
                                       value={entityDraft.city}
-                                      onChange={(ev) => setEntityDraft((d) => ({ ...d, city: ev.target.value }))}
+                                      onChange={(ev) =>
+                                        setEntityDraft((d) => ({ ...d, city: ev.target.value }))
+                                      }
                                     />
                                     <Input
                                       className="h-7 text-xs w-14"
                                       placeholder="ST"
                                       maxLength={2}
                                       value={entityDraft.state}
-                                      onChange={(ev) => setEntityDraft((d) => ({ ...d, state: ev.target.value.toUpperCase() }))}
+                                      onChange={(ev) =>
+                                        setEntityDraft((d) => ({
+                                          ...d,
+                                          state: ev.target.value.toUpperCase(),
+                                        }))
+                                      }
                                     />
                                   </div>
-                                ) : ([e.city, e.state].filter(Boolean).join(", ") || "—")}
+                                ) : (
+                                  [e.city, e.state].filter(Boolean).join(", ") || "—"
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -899,7 +931,11 @@ export function ProfilePage({ id }: { id: string }) {
                                       onClick={() => void saveEntity()}
                                       className="flex h-6 w-6 items-center justify-center rounded-md bg-navy text-white hover:bg-navy/80 disabled:opacity-50"
                                     >
-                                      {entitySaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                      {entitySaving ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Check className="h-3 w-3" />
+                                      )}
                                     </button>
                                     <button
                                       type="button"
@@ -935,21 +971,23 @@ export function ProfilePage({ id }: { id: string }) {
         {/* Right sidebar */}
         <div className="space-y-6">
           {/* Sales Rep — hidden when the signed-in user is this lead's own rep. */}
-          {me?.iduser !== lead.repId && <Card title="Assigned Sales Representative">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 text-cyan text-sm font-bold ring-1 ring-cyan/25">
-                {lead.rep
-                  .split(" ")
-                  .map((s) => s[0])
-                  .join("")
-                  .slice(0, 2)}
+          {me?.iduser !== lead.repId && (
+            <Card title="Assigned Sales Representative">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan/15 text-cyan text-sm font-bold ring-1 ring-cyan/25">
+                  {lead.rep
+                    .split(" ")
+                    .map((s) => s[0])
+                    .join("")
+                    .slice(0, 2)}
+                </div>
+                <div>
+                  <p className="font-semibold text-navy">{lead.rep}</p>
+                  <p className="text-xs text-muted-foreground">Senior Sales Representative</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-navy">{lead.rep}</p>
-                <p className="text-xs text-muted-foreground">Senior Sales Representative</p>
-              </div>
-            </div>
-          </Card>}
+            </Card>
+          )}
 
           {/* People & Contacts */}
           <Card
@@ -1132,7 +1170,11 @@ export function ProfilePage({ id }: { id: string }) {
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <Layers className="h-3 w-3 text-muted-foreground" />
                           {linkedEntities.map((e) => (
-                            <Badge key={e.id} variant="outline" className="border-navy/20 text-navy">
+                            <Badge
+                              key={e.id}
+                              variant="outline"
+                              className="border-navy/20 text-navy"
+                            >
                               {e.name}
                             </Badge>
                           ))}
@@ -1165,7 +1207,6 @@ export function ProfilePage({ id }: { id: string }) {
             </ul>
           </Card>
 
-          
           {/* Follow-up Calls */}
           <Card
             id="section-calls"
@@ -1235,7 +1276,9 @@ export function ProfilePage({ id }: { id: string }) {
                             )}
                             <p className="mt-2 text-[11px] uppercase tracking-wider text-muted-foreground">
                               Status:{" "}
-                              <span className={c.completed ? "text-green" : "text-muted-foreground"}>
+                              <span
+                                className={c.completed ? "text-green" : "text-muted-foreground"}
+                              >
                                 {c.completed ? "Completed" : "Pending"}
                               </span>
                             </p>
@@ -1275,7 +1318,8 @@ export function ProfilePage({ id }: { id: string }) {
           <div className="rounded-2xl border border-border bg-card p-6 shadow-card">
             <h2 className="mb-1.5 text-xl font-bold text-foreground">Feasibility Call</h2>
             <p className="mb-5 text-sm leading-relaxed text-muted-foreground">
-              Capture notes, map business components, and generate a preparer-ready summary — all in one guided workflow.
+              Capture notes, map business components, and generate a preparer-ready summary — all in
+              one guided workflow.
             </p>
             <div className="flex flex-col gap-2.5">
               <Button
@@ -1348,46 +1392,49 @@ export function ProfilePage({ id }: { id: string }) {
                     </li>
                   ))}
                 </ul>
-                {engagements.length > 0 && <div className="rounded-lg border border-border bg-card p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-cyan">
-                    R&amp;D Tax Credit — {engagementYears.length ? engagementYears.join(", ") : "—"}
-                  </p>
-                  <div className="mt-2 h-44">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={chartData}
-                        layout="vertical"
-                        margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.012 230)" />
-                        <XAxis
-                          type="number"
-                          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                          fontSize={11}
-                          stroke="oklch(0.50 0.03 245)"
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="year"
-                          fontSize={11}
-                          stroke="oklch(0.50 0.03 245)"
-                          width={42}
-                        />
-                        <RTooltip
-                          formatter={(v: number) => formatCurrency(v)}
-                          cursor={{ fill: "oklch(0.94 0.02 220 / 0.5)" }}
-                        />
-                        <Bar dataKey="amount" fill="var(--orange)" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                {engagements.length > 0 && (
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-cyan">
+                      R&amp;D Tax Credit —{" "}
+                      {engagementYears.length ? engagementYears.join(", ") : "—"}
+                    </p>
+                    <div className="mt-2 h-44">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={chartData}
+                          layout="vertical"
+                          margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.012 230)" />
+                          <XAxis
+                            type="number"
+                            tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                            fontSize={11}
+                            stroke="oklch(0.50 0.03 245)"
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="year"
+                            fontSize={11}
+                            stroke="oklch(0.50 0.03 245)"
+                            width={42}
+                          />
+                          <RTooltip
+                            formatter={(v: number) => formatCurrency(v)}
+                            cursor={{ fill: "oklch(0.94 0.02 220 / 0.5)" }}
+                          />
+                          <Bar dataKey="amount" fill="var(--orange)" radius={[0, 4, 4, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Total engagement value</span>
+                      <span className="font-bold text-navy tabular-nums">
+                        {formatCurrency(grandTotal)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Total engagement value</span>
-                    <span className="font-bold text-navy tabular-nums">
-                      {formatCurrency(grandTotal)}
-                    </span>
-                  </div>
-                </div>}
+                )}
               </>
             )}
           </Card>
@@ -1407,9 +1454,7 @@ export function ProfilePage({ id }: { id: string }) {
         clientId={id}
         call={editingCall}
         defaultCallType={
-          !editingCall && !calls.some((c) => c.callType === "intro_call")
-            ? "Intro Call"
-            : undefined
+          !editingCall && !calls.some((c) => c.callType === "intro_call") ? "Intro Call" : undefined
         }
         open={openCall}
         onOpenChange={(o) => {
@@ -1421,7 +1466,6 @@ export function ProfilePage({ id }: { id: string }) {
     </div>
   );
 }
-
 
 // An editable list of free-text values (emails or phones) — a person has
 // one-to-many of each, with no labels. Always keeps at least one row.
@@ -1568,7 +1612,10 @@ function TaxHistoryPanel({
   const saved = lead.data?.yearStatuses ?? {};
 
   const [activeYear, setActiveYear] = useState<number | null>(null);
-  const [pendingChange, setPendingChange] = useState<{ year: number; status: TaxYearStatus } | null>(null);
+  const [pendingChange, setPendingChange] = useState<{
+    year: number;
+    status: TaxYearStatus;
+  } | null>(null);
   const [reasonDraft, setReasonDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1579,13 +1626,14 @@ function TaxHistoryPanel({
       return { status: isEngaged ? "current_engaged" : "current" };
     }
     // Any year listed in the client's Engagement Years is Engaged
-    if (lead.taxYears.includes(year as import("@/types/crm").TaxYear))
-      return { status: "engaged" };
+    if (lead.taxYears.includes(year as import("@/types/crm").TaxYear)) return { status: "engaged" };
     return { status: "eligible_not_engaged" };
   }
 
   const records = years.map((y) => ({ year: y, record: effectiveRecord(y) }));
-  const engagedCount = records.filter((r) => r.record.status === "engaged" || r.record.status === "current_engaged").length;
+  const engagedCount = records.filter(
+    (r) => r.record.status === "engaged" || r.record.status === "current_engaged",
+  ).length;
   const openCount = records.filter((r) => r.record.status === "eligible_not_engaged").length;
   const notEligibleCount = records.filter((r) => r.record.status === "not_eligible").length;
 
@@ -1652,8 +1700,8 @@ function TaxHistoryPanel({
                   record.status === "not_eligible" && record.notEligibleReason
                     ? `Reason: ${record.notEligibleReason}\nBy: ${record.notEligibleBy} · ${record.notEligibleAt ? new Date(record.notEligibleAt).toLocaleString() : ""}`
                     : record.changeNote
-                    ? `Note: ${record.changeNote}\nBy: ${record.changedBy} · ${record.changedAt ? new Date(record.changedAt).toLocaleString() : ""}`
-                    : undefined
+                      ? `Note: ${record.changeNote}\nBy: ${record.changedBy} · ${record.changedAt ? new Date(record.changedAt).toLocaleString() : ""}`
+                      : undefined
                 }
                 onClick={() => setActiveYear(activeYear === year ? null : year)}
                 className={cn(
@@ -1696,7 +1744,10 @@ function TaxHistoryPanel({
                   size="sm"
                   variant="outline"
                   disabled={saving}
-                  onClick={() => { setPendingChange({ year: activeYear, status: "current" }); setReasonDraft(""); }}
+                  onClick={() => {
+                    setPendingChange({ year: activeYear, status: "current" });
+                    setReasonDraft("");
+                  }}
                 >
                   <Star className="mr-1.5 h-3.5 w-3.5" /> Current Year
                 </Button>
@@ -1706,7 +1757,10 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="border-green/50 text-green hover:bg-green/10"
-                onClick={() => { setPendingChange({ year: activeYear, status: "engaged" }); setReasonDraft(""); }}
+                onClick={() => {
+                  setPendingChange({ year: activeYear, status: "engaged" });
+                  setReasonDraft("");
+                }}
               >
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Engaged
               </Button>
@@ -1714,7 +1768,10 @@ function TaxHistoryPanel({
                 size="sm"
                 variant="outline"
                 disabled={saving}
-                onClick={() => { setPendingChange({ year: activeYear, status: "eligible_not_engaged" }); setReasonDraft(""); }}
+                onClick={() => {
+                  setPendingChange({ year: activeYear, status: "eligible_not_engaged" });
+                  setReasonDraft("");
+                }}
               >
                 <Clock className="mr-1.5 h-3.5 w-3.5" /> Eligible – Not Engaged
               </Button>
@@ -1723,7 +1780,10 @@ function TaxHistoryPanel({
                 variant="outline"
                 disabled={saving}
                 className="text-muted-foreground"
-                onClick={() => { setPendingChange({ year: activeYear, status: "not_eligible" }); setReasonDraft(""); }}
+                onClick={() => {
+                  setPendingChange({ year: activeYear, status: "not_eligible" });
+                  setReasonDraft("");
+                }}
               >
                 <Ban className="mr-1.5 h-3.5 w-3.5" /> Not Eligible…
               </Button>
@@ -1733,7 +1793,12 @@ function TaxHistoryPanel({
 
         {/* Legend */}
         <div className="mt-4 flex flex-wrap gap-4 border-t border-border pt-3">
-          {(Object.entries(YEAR_STATUS_META) as [TaxYearStatus, (typeof YEAR_STATUS_META)[TaxYearStatus]][])
+          {(
+            Object.entries(YEAR_STATUS_META) as [
+              TaxYearStatus,
+              (typeof YEAR_STATUS_META)[TaxYearStatus],
+            ][]
+          )
             .filter(([status]) => status !== "current_engaged")
             .map(([status, { label, icon }]) => (
               <div key={status} className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1747,13 +1812,13 @@ function TaxHistoryPanel({
       {/* Status-change reason dialog — shown for every year status change */}
       <Dialog
         open={pendingChange !== null}
-        onOpenChange={(open) => { if (!open) setPendingChange(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingChange(null);
+        }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              Change status for {pendingChange?.year}
-            </DialogTitle>
+            <DialogTitle>Change status for {pendingChange?.year}</DialogTitle>
             <DialogDescription>
               {pendingChange?.status === "not_eligible"
                 ? "Provide a reason below. Your name, date, and time will be automatically recorded."
@@ -1779,7 +1844,11 @@ function TaxHistoryPanel({
               disabled={(pendingChange?.status === "not_eligible" && !reasonDraft.trim()) || saving}
               onClick={async () => {
                 if (pendingChange !== null) {
-                  await applyStatus(pendingChange.year, pendingChange.status, reasonDraft.trim() || undefined);
+                  await applyStatus(
+                    pendingChange.year,
+                    pendingChange.status,
+                    reasonDraft.trim() || undefined,
+                  );
                   setPendingChange(null);
                 }
               }}
@@ -1792,4 +1861,3 @@ function TaxHistoryPanel({
     </motion.section>
   );
 }
-

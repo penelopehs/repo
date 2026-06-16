@@ -8,11 +8,7 @@ import {
   useRouterState,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
-import {
-  useMsal,
-  AuthenticatedTemplate,
-  UnauthenticatedTemplate,
-} from "@azure/msal-react";
+import { useMsal, AuthenticatedTemplate, UnauthenticatedTemplate } from "@azure/msal-react";
 import { InteractionStatus } from "@azure/msal-browser";
 import { Loader2 } from "lucide-react";
 
@@ -113,7 +109,7 @@ function RootComponent() {
 
   return (
     <AuthProvider>
-    <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
         <AuthGate />
         <Toaster richColors position="top-right" />
       </QueryClientProvider>
@@ -126,10 +122,7 @@ function AuthGate() {
 
   // While MSAL initializes / handles a redirect, avoid flashing the login
   // screen to users who are in fact already signed in.
-  if (
-    inProgress === InteractionStatus.Startup ||
-    inProgress === InteractionStatus.HandleRedirect
-  ) {
+  if (inProgress === InteractionStatus.Startup || inProgress === InteractionStatus.HandleRedirect) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -140,11 +133,11 @@ function AuthGate() {
   return (
     <>
       <AuthenticatedTemplate>
-      <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background">
           <AppHeader />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
-      </div>
+          <Outlet />
+        </div>
       </AuthenticatedTemplate>
       <UnauthenticatedTemplate>
         <LoginPage />
@@ -152,4 +145,3 @@ function AuthGate() {
     </>
   );
 }
-

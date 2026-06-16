@@ -203,7 +203,9 @@ export function PipelinePage() {
               >
                 <option value="">All representatives</option>
                 {repOptions.map((rep) => (
-                  <option key={rep} value={rep}>{rep}</option>
+                  <option key={rep} value={rep}>
+                    {rep}
+                  </option>
                 ))}
               </select>
             </div>
@@ -223,7 +225,10 @@ export function PipelinePage() {
                 <Users className="h-3 w-3" />
                 Showing: {repFilter}
                 <button
-                  onClick={() => { setRepFilter(""); setPage(1); }}
+                  onClick={() => {
+                    setRepFilter("");
+                    setPage(1);
+                  }}
                   className="ml-1 rounded-full hover:text-green-500"
                   aria-label="Clear rep filter"
                 >
@@ -251,7 +256,13 @@ export function PipelinePage() {
           <KpiCard label="New Lead" value={kpis.new_lead} icon={Users} accent="cyan" mini />
         </KpiButton>
         <KpiButton active={kpiFilter === "intro_call"} onClick={() => onKpiClick("intro_call")}>
-          <KpiCard label="Intro Call" value={kpis.intro_call} icon={FileText} accent="orange" mini />
+          <KpiCard
+            label="Intro Call"
+            value={kpis.intro_call}
+            icon={FileText}
+            accent="orange"
+            mini
+          />
         </KpiButton>
         <KpiButton
           active={kpiFilter === "feasibility_call"}
@@ -303,7 +314,9 @@ export function PipelinePage() {
         {error && (
           <div className="flex items-center justify-between gap-3 border-b border-border bg-destructive/10 px-5 py-3 text-sm text-destructive">
             <span>Couldn't load leads: {error}</span>
-            <Button size="sm" variant="outline" onClick={() => void fetchLeads()}>Retry</Button>
+            <Button size="sm" variant="outline" onClick={() => void fetchLeads()}>
+              Retry
+            </Button>
           </div>
         )}
 
@@ -316,8 +329,14 @@ export function PipelinePage() {
           onCalc={goCalc}
           onEdit={(l) => setEditing(l)}
           onClose={async (l) => {
-            try { await setStatus(l.id, "closed"); toast.success("Lead closed", { description: l.company }); }
-            catch (e) { toast.error("Couldn't close lead", { description: e instanceof Error ? e.message : undefined }); }
+            try {
+              await setStatus(l.id, "closed");
+              toast.success("Lead closed", { description: l.company });
+            } catch (e) {
+              toast.error("Couldn't close lead", {
+                description: e instanceof Error ? e.message : undefined,
+              });
+            }
           }}
           onDelete={(l) => setPendingDelete(l.id)}
           emptyText={loading ? "Loading leads…" : "No leads match your filters."}
@@ -367,8 +386,14 @@ export function PipelinePage() {
                 const id = pendingDelete;
                 setPendingDelete(null);
                 if (!id) return;
-                try { await deleteLead(id); toast.success("Lead deleted"); }
-                catch (e) { toast.error("Couldn't delete lead", { description: e instanceof Error ? e.message : undefined }); }
+                try {
+                  await deleteLead(id);
+                  toast.success("Lead deleted");
+                } catch (e) {
+                  toast.error("Couldn't delete lead", {
+                    description: e instanceof Error ? e.message : undefined,
+                  });
+                }
               }}
             >
               Delete

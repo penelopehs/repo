@@ -29,7 +29,7 @@ def test_create_with_epr_resolves_company(client, db_session):
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["pipeline_status"] == "Lead"
+    assert body["pipeline_status"] == "New Lead"
     assert body["company"] == "Cedar Labs"
     # Contact info is carried directly on the lead.
     assert body["full_name"] == "Dana Cedar"
@@ -184,14 +184,14 @@ def test_create_without_caller_user_403(client, claims):
 # ── List ──────────────────────────────────────────────────────────────────────
 
 def test_list_filter_by_status(client):
-    client.post("/leads", json={"first_name": "Lead", "last_name": "Co"})  # stays Lead
-    b = client.post("/leads", json={"first_name": "Signed", "last_name": "Co"}).json()
-    client.patch(f"/leads/{b['id']}", json={"pipeline_status": "SOW Signed"})
+    client.post("/leads", json={"first_name": "Lead", "last_name": "Co"})  # stays New Lead
+    b = client.post("/leads", json={"first_name": "Closed", "last_name": "Co"}).json()
+    client.patch(f"/leads/{b['id']}", json={"pipeline_status": "Closed"})
 
-    resp = client.get("/leads", params={"status": "Lead"})
+    resp = client.get("/leads", params={"status": "New Lead"})
     assert resp.status_code == 200
     statuses = {o["pipeline_status"] for o in resp.json()}
-    assert statuses == {"Lead"}
+    assert statuses == {"New Lead"}
 
 
 def test_list_resolves_company_from_client_people(client, db_session):
@@ -201,7 +201,7 @@ def test_list_resolves_company_from_client_people(client, db_session):
     epr_id = db_session.query(models.EntityPeopleRole).first().identity_people_roles
 
     client.post("/leads", json={"epr_id": epr_id, "first_name": "Dana", "last_name": "Reed"})
-    resp = client.get("/leads", params={"status": "Lead"})
+    resp = client.get("/leads", params={"status": "New Lead"})
     item = next(o for o in resp.json() if o["full_name"] == "Dana Reed")
     assert item["company"] == "Acme Labs"
 
@@ -255,10 +255,10 @@ def test_detail_returns_data_blob(client, db_session):
 
 # ── Update / status transitions ─────────────────────────────────────────────────
 
-def test_patch_sow_signed_sets_timestamp_idempotently(client):
+def test_patch_closed_stamps_sow_signed_at_idempotently(client):
     lead = client.post("/leads", json={"first_name": "Transition", "last_name": "Co"}).json()
 
-    r1 = client.patch(f"/leads/{lead['id']}", json={"pipeline_status": "SOW Signed"})
+    r1 = client.patch(f"/leads/{lead['id']}", json={"pipeline_status": "Closed"})
     assert r1.status_code == 200
     first_ts = r1.json()["sow_signed_at"]
     assert first_ts is not None
@@ -342,7 +342,7 @@ def test_delete_lead_keeps_client(client, db_session):
 
 def test_save_calculations_stores_blob_and_advances_status(client):
     lead = client.post("/leads", json={"first_name": "Calc", "last_name": "Co"}).json()
-    assert lead["pipeline_status"] == "Lead"
+    assert lead["pipeline_status"] == "New Lead"
 
     blob = {
         "entities": [{"name": "Calc Co, PC"}, {"name": "Calc Co Holdings"}],
@@ -361,8 +361,8 @@ def test_save_calculations_stores_blob_and_advances_status(client):
     assert body["tax_years"] == [2023, 2024]
     assert body["entities_count"] == 2
     assert body["latest_calc_date"] == 1710000000.0
-    # A fresh Lead is moved to "Calculation Sent".
-    assert body["pipeline_status"] == "Calculation Sent"
+    # Saving calculations on a fresh lead advances it to Intro Call.
+    assert body["pipeline_status"] == "Intro Call"
 
 
 def test_clear_calculations(client):

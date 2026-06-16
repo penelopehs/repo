@@ -49,12 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { feasibilityApi } from "@/services/feasibility";
 import { useLeadsStore } from "@/store/leadsStore";
@@ -227,9 +222,7 @@ function makeNewDraft(
 ): FeasibilityCallDraft {
   const now = new Date().toISOString();
   const defaultTaxYear =
-    taxYears && taxYears.length > 0
-      ? String(taxYears[0])
-      : String(new Date().getFullYear() - 1);
+    taxYears && taxYears.length > 0 ? String(taxYears[0]) : String(new Date().getFullYear() - 1);
   return {
     id: crypto.randomUUID(),
     leadId,
@@ -375,13 +368,7 @@ const BCM_ROWS: {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export function FeasibilityCallPage({
-  leadId,
-  callId,
-}: {
-  leadId: string;
-  callId?: string;
-}) {
+export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId?: string }) {
   const navigate = useNavigate();
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === leadId));
   const [draft, setDraft] = useState<FeasibilityCallDraft | null>(null);
@@ -401,7 +388,16 @@ export function FeasibilityCallPage({
     if (callId === "new" || drafts.length === 0) {
       // Create a fresh draft and immediately replace the URL with its UUID so
       // that refreshing the page resumes this draft instead of spawning another.
-      active = saveDraft(makeNewDraft(leadId, lead?.fullName ?? "", lead?.company ?? "", lead?.taxYears, lead?.source, lead?.rep));
+      active = saveDraft(
+        makeNewDraft(
+          leadId,
+          lead?.fullName ?? "",
+          lead?.company ?? "",
+          lead?.taxYears,
+          lead?.source,
+          lead?.rep,
+        ),
+      );
       navigate({
         to: "/clients/$id/feasibility-call",
         params: { id: leadId },
@@ -418,10 +414,13 @@ export function FeasibilityCallPage({
     setAllDrafts(loadDraftsForLead(leadId));
   }, [leadId, callId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => {
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    if (flashTimer.current) window.clearTimeout(flashTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+    },
+    [],
+  );
 
   const persist = useCallback((d: FeasibilityCallDraft) => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -485,7 +484,16 @@ export function FeasibilityCallPage({
 
   const startNewCall = () => {
     if (!window.confirm("Start a new feasibility call for this client?")) return;
-    const fresh = saveDraft(makeNewDraft(leadId, lead?.fullName ?? "", lead?.company ?? "", lead?.taxYears, lead?.source, lead?.rep));
+    const fresh = saveDraft(
+      makeNewDraft(
+        leadId,
+        lead?.fullName ?? "",
+        lead?.company ?? "",
+        lead?.taxYears,
+        lead?.source,
+        lead?.rep,
+      ),
+    );
     setDraft(fresh);
     setAllDrafts(loadDraftsForLead(leadId));
     setOutputReady(false);
@@ -533,9 +541,7 @@ export function FeasibilityCallPage({
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              onClick={() =>
-                navigate({ to: "/clients/$id", params: { id: leadId } })
-              }
+              onClick={() => navigate({ to: "/clients/$id", params: { id: leadId } })}
               className="flex shrink-0 items-center gap-1.5 text-xs text-white/55 transition-colors hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
@@ -544,9 +550,7 @@ export function FeasibilityCallPage({
             <span className="text-white/20">|</span>
             <span className="truncate text-sm font-medium text-white/80">
               Feasibility Call
-              {lead?.fullName && (
-                <span className="text-white/40"> · {lead.fullName}</span>
-              )}
+              {lead?.fullName && <span className="text-white/40"> · {lead.fullName}</span>}
             </span>
           </div>
 
@@ -564,18 +568,22 @@ export function FeasibilityCallPage({
             {/* Draft picker */}
             <div className="relative">
               <button
-                onClick={() => { setShowDraftList((p) => !p); setManageMode(false); }}
+                onClick={() => {
+                  setShowDraftList((p) => !p);
+                  setManageMode(false);
+                }}
                 className="flex items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.07] px-3 py-1.5 text-xs text-white/65 transition-colors hover:bg-white/15 hover:text-white"
               >
                 <FileText className="h-3 w-3" />
-                {allDrafts.length > 1
-                  ? `${allDrafts.length} drafts`
-                  : "Drafts"}
+                {allDrafts.length > 1 ? `${allDrafts.length} drafts` : "Drafts"}
                 <ChevronDown className="h-3 w-3" />
               </button>
 
               {showDraftList && (
-                <div className="absolute right-0 top-full z-50 mt-1 min-w-64 overflow-hidden rounded-lg border border-border bg-card shadow-elevated" style={{ maxHeight: "70vh" }}>
+                <div
+                  className="absolute right-0 top-full z-50 mt-1 min-w-64 overflow-hidden rounded-lg border border-border bg-card shadow-elevated"
+                  style={{ maxHeight: "70vh" }}
+                >
                   {/* Manage header */}
                   <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
@@ -592,63 +600,73 @@ export function FeasibilityCallPage({
                     </button>
                   </div>
 
-                  <div className="overflow-y-auto" style={{ maxHeight: "calc(70vh - 72px)" }}>{allDrafts.map((d) => (
-                    <div
-                      key={d.id}
-                      className={cn(
-                        "flex items-center border-b border-border last:border-0",
-                        d.id === draft.id && "bg-accent",
-                      )}
-                    >
-                      <button
-                        onClick={() => {
-                          if (manageMode) return;
-                          setDraft(d);
-                          setShowDraftList(false);
-                          setManageMode(false);
-                          setOutputReady(false);
-                        }}
-                        className="flex min-w-0 flex-1 flex-col items-start px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
+                  <div className="overflow-y-auto" style={{ maxHeight: "calc(70vh - 72px)" }}>
+                    {allDrafts.map((d) => (
+                      <div
+                        key={d.id}
+                        className={cn(
+                          "flex items-center border-b border-border last:border-0",
+                          d.id === draft.id && "bg-accent",
+                        )}
                       >
-                        <span className="font-medium text-foreground">
-                          {formatDraftLabel(d)}
-                        </span>
-                        <span className="font-medium text-cyan">
-                          {fmtDateTime(d.updatedAt || d.createdAt)}
-                        </span>
-                        <span className="text-muted-foreground">
-                          Step {d.currentStep} of 3 ·{" "}
-                          {d.components.filter((c) => c.headerName || c.name).length}{" "}
-                          component
-                          {d.components.filter((c) => c.headerName || c.name).length !== 1 ? "s" : ""}
-                        </span>
-                      </button>
-                      {manageMode && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const remaining = deleteDraft(leadId, d.id);
-                            setAllDrafts(remaining);
-                            if (draft && d.id === draft.id) {
-                              if (remaining.length > 0) {
-                                setDraft(remaining[0]);
-                              } else {
-                                const fresh = saveDraft(makeNewDraft(leadId, lead?.fullName ?? "", lead?.company ?? "", lead?.taxYears, lead?.source, lead?.rep));
-                                setDraft(fresh);
-                                setAllDrafts([fresh]);
-                                setShowDraftList(false);
-                                setManageMode(false);
-                              }
-                            }
+                          onClick={() => {
+                            if (manageMode) return;
+                            setDraft(d);
+                            setShowDraftList(false);
+                            setManageMode(false);
+                            setOutputReady(false);
                           }}
-                          className="shrink-0 px-3 py-2 text-muted-foreground transition-colors hover:text-destructive"
-                          title="Delete this draft"
+                          className="flex min-w-0 flex-1 flex-col items-start px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <span className="font-medium text-foreground">{formatDraftLabel(d)}</span>
+                          <span className="font-medium text-cyan">
+                            {fmtDateTime(d.updatedAt || d.createdAt)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            Step {d.currentStep} of 3 ·{" "}
+                            {d.components.filter((c) => c.headerName || c.name).length} component
+                            {d.components.filter((c) => c.headerName || c.name).length !== 1
+                              ? "s"
+                              : ""}
+                          </span>
                         </button>
-                      )}
-                    </div>
-                  ))}</div>
+                        {manageMode && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const remaining = deleteDraft(leadId, d.id);
+                              setAllDrafts(remaining);
+                              if (draft && d.id === draft.id) {
+                                if (remaining.length > 0) {
+                                  setDraft(remaining[0]);
+                                } else {
+                                  const fresh = saveDraft(
+                                    makeNewDraft(
+                                      leadId,
+                                      lead?.fullName ?? "",
+                                      lead?.company ?? "",
+                                      lead?.taxYears,
+                                      lead?.source,
+                                      lead?.rep,
+                                    ),
+                                  );
+                                  setDraft(fresh);
+                                  setAllDrafts([fresh]);
+                                  setShowDraftList(false);
+                                  setManageMode(false);
+                                }
+                              }
+                            }}
+                            className="shrink-0 px-3 py-2 text-muted-foreground transition-colors hover:text-destructive"
+                            title="Delete this draft"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
 
                   {!manageMode && (
                     <button
@@ -666,9 +684,7 @@ export function FeasibilityCallPage({
             <button
               onClick={() => {
                 if (step === 3 && outputReady) return;
-                const hasComponents = draft.components.some(
-                  (c) => (c.headerName || c.name).trim(),
-                );
+                const hasComponents = draft.components.some((c) => (c.headerName || c.name).trim());
                 goTo(3);
                 if (hasComponents) generate();
               }}
@@ -770,12 +786,9 @@ function CallSetupStep({
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Call Setup
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Call Setup</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Capture context before the call. This is{" "}
-            <em>not</em> a technical intake.
+            Capture context before the call. This is <em>not</em> a technical intake.
           </p>
         </div>
         <StepTag>Step 1 of 3</StepTag>
@@ -809,39 +822,37 @@ function CallSetupStep({
             </NativeSelect>
           </MF>
           <MF label="Tax Year Being Evaluated">
-            {taxYears && taxYears.length > 0 ? (() => {
-              const allYearsValue = taxYears.map(String).join(", ");
-              const isAllSelected = setup.taxYear === allYearsValue;
-              return isAllSelected ? (
-                <div className="relative">
-                  <Input
-                    readOnly
-                    value={allYearsValue}
-                    className="cursor-default pr-8"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onUpdate("taxYear", String(taxYears[0]))}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    title="Change year"
+            {taxYears && taxYears.length > 0 ? (
+              (() => {
+                const allYearsValue = taxYears.map(String).join(", ");
+                const isAllSelected = setup.taxYear === allYearsValue;
+                return isAllSelected ? (
+                  <div className="relative">
+                    <Input readOnly value={allYearsValue} className="cursor-default pr-8" />
+                    <button
+                      type="button"
+                      onClick={() => onUpdate("taxYear", String(taxYears[0]))}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      title="Change year"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <NativeSelect
+                    value={setup.taxYear}
+                    onChange={(e) => onUpdate("taxYear", e.target.value)}
                   >
-                    ✕
-                  </button>
-                </div>
-              ) : (
-                <NativeSelect
-                  value={setup.taxYear}
-                  onChange={(e) => onUpdate("taxYear", e.target.value)}
-                >
-                  <option value={allYearsValue}>All years of engagement</option>
-                  {taxYears.map((y) => (
-                    <option key={y} value={String(y)}>
-                      {y}
-                    </option>
-                  ))}
-                </NativeSelect>
-              );
-            })() : (
+                    <option value={allYearsValue}>All years of engagement</option>
+                    {taxYears.map((y) => (
+                      <option key={y} value={String(y)}>
+                        {y}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                );
+              })()
+            ) : (
               <Input
                 placeholder="2023"
                 value={setup.taxYear}
@@ -999,9 +1010,7 @@ function BCMEntityPicker({
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return leadEntities.filter(
-      (e) =>
-        !selected.some((s) => s.id === e.id) &&
-        (!q || e.name.toLowerCase().includes(q)),
+      (e) => !selected.some((s) => s.id === e.id) && (!q || e.name.toLowerCase().includes(q)),
     );
   }, [query, leadEntities, selected]);
 
@@ -1179,18 +1188,28 @@ function BCMEntityModal({
             <NativeSelect value={entityType} onChange={(e) => setEntityType(e.target.value)}>
               <option value="">Select…</option>
               {ENTITY_TYPES.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>
+                  {t}
+                </option>
               ))}
             </NativeSelect>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>State</Label>
-              <Input value={state} onChange={(e) => setState(e.target.value)} placeholder="e.g. MI" />
+              <Input
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                placeholder="e.g. MI"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>City / Location</Label>
-              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Ann Arbor" />
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Ann Arbor"
+              />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -1199,7 +1218,9 @@ function BCMEntityModal({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
           <Button onClick={() => void handleSave()} disabled={saving} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Entity
@@ -1261,7 +1282,6 @@ function BCMAreaPills({
           className="w-32 rounded-full border border-cyan px-2.5 py-0.5 text-[11px] outline-none"
           placeholder="New area…"
           value={custom}
-          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => {
@@ -1420,10 +1440,7 @@ function BCMBuilderStep({
                 const filled = countFilledRows(col);
                 const total = BCM_ROWS.length;
                 return (
-                  <td
-                    key={col.id}
-                    className="min-w-[220px] border-l border-white/10 p-3 align-top"
-                  >
+                  <td key={col.id} className="min-w-[220px] border-l border-white/10 p-3 align-top">
                     {/* Reorder + delete controls */}
                     <div className="mb-1 flex items-center justify-between">
                       <div className="flex gap-0.5">
@@ -1734,9 +1751,7 @@ function FeasibilityOutputStep({
     }
   }
 
-  const namedComponents = components.filter(
-    (c) => (c.headerName || c.name).trim(),
-  );
+  const namedComponents = components.filter((c) => (c.headerName || c.name).trim());
 
   const docName = setup.doctorName || "the physician";
   const practice = setup.practiceName || "their practice";
@@ -1871,9 +1886,7 @@ function FeasibilityOutputStep({
     <div>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Feasibility Output
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Feasibility Output</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Review and share with your team and tax preparer.
           </p>
@@ -1907,190 +1920,181 @@ function FeasibilityOutputStep({
       </div>
 
       <div ref={outputRef} id="fc-output-section">
-      {!outputReady && (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-14 text-center">
-          <FileBarChart2 className="mb-3 h-9 w-9 text-muted-foreground/25" />
-          <p className="text-sm text-muted-foreground">
-            Click &ldquo;Generate Analysis&rdquo; to compile your feasibility
-            output from the BCM v1 data.
-          </p>
-        </div>
-      )}
-
-      {outputReady && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {/* Entity map */}
-          <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-            <h2 className="mb-4 text-lg font-bold text-foreground">
-              Entity Map
-            </h2>
-            {allEntities.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No entities assigned yet.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {allEntities.map((ent) => (
-                  <li
-                    key={ent.id}
-                    className="flex items-center gap-2.5 border-b border-border pb-2 text-sm last:border-0 last:pb-0"
-                  >
-                    <span
-                      className="h-2 w-2 shrink-0 rounded-full"
-                      style={{ background: ent.color }}
-                    />
-                    <span>
-                      <strong>{ent.name}</strong>{" "}
-                      <span className="text-[11px] text-muted-foreground">
-                        {ent.type ? `${ent.type} · ` : ""}
-                        {[ent.city, ent.state].filter(Boolean).join(", ")}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {!outputReady && (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-14 text-center">
+            <FileBarChart2 className="mb-3 h-9 w-9 text-muted-foreground/25" />
+            <p className="text-sm text-muted-foreground">
+              Click &ldquo;Generate Analysis&rdquo; to compile your feasibility output from the BCM
+              v1 data.
+            </p>
           </div>
+        )}
 
-          {/* Preparer-Ready Summary */}
-          <div className="rounded-xl border border-border bg-card p-6 shadow-card">
-            <div className="mb-4 flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold text-foreground">
-                Preparer-Ready Summary
-              </h2>
-              <button
-                type="button"
-                onClick={handleCopySummary}
-                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
-                title="Copy summary to clipboard"
-              >
-                {copied ? (
-                  <><Check className="h-3.5 w-3.5 text-green" /> Copied</>
-                ) : (
-                  <><Copy className="h-3.5 w-3.5" /> Copy</>
-                )}
-              </button>
-            </div>
-            <div className="space-y-2.5 text-sm leading-relaxed text-foreground">
-              <p>
-                The following summary was prepared following a feasibility call
-                with <strong>{docName}</strong> of{" "}
-                <strong>{practice}</strong>, conducted by {rep}
-                {setup.callDate ? ` on ${(() => { const [y,m,d] = setup.callDate.split("-").map(Number); return new Date(y, m-1, d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }); })()}` : ""}, for tax year{" "}
-                <strong>{taxYear}</strong>.
-              </p>
-              <p>
-                This is a {pType} practice
-                {setup.numLocations
-                  ? ` operating across ${setup.numLocations} location(s)`
-                  : ""}
-                {setup.numEmployees
-                  ? ` with approximately ${setup.numEmployees} employees`
-                  : ""}
-                . The discovery conversation surfaced indicators of qualifying
-                R&D activity during the evaluation period.
-              </p>
-              {namedComponents.length > 0 && (
-                <p>
-                  A total of{" "}
-                  <strong>{namedComponents.length} business component(s)</strong>{" "}
-                  were identified during this call and are detailed in the BCM
-                  v1 below. These components represent initial areas of
-                  potential qualification and should be validated by the
-                  Discovery team.
-                </p>
-              )}
-              <p>
-                A technical intake with the Discovery department is recommended
-                as the next step to validate, quantify, and document qualifying
-                activities. The BCM v1 components above serve as the initial
-                brief for that handoff.
-              </p>
-            </div>
-          </div>
-
-          {/* BCM Summary — full width */}
-          <div className="rounded-xl border border-border bg-card p-6 shadow-card sm:col-span-2">
-            <h2 className="mb-4 text-lg font-bold text-foreground">
-              BCM v1 — Component Summary
-            </h2>
-            {namedComponents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No business components defined yet.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {namedComponents.map((comp) => {
-                  const name = (comp.headerName || comp.name).trim();
-                  const qs = comp.qualificationStatus;
-                  return (
-                    <div
-                      key={comp.id}
-                      className="rounded-lg border border-border bg-background p-4"
+        {outputReady && (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {/* Entity map */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+              <h2 className="mb-4 text-lg font-bold text-foreground">Entity Map</h2>
+              {allEntities.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No entities assigned yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {allEntities.map((ent) => (
+                    <li
+                      key={ent.id}
+                      className="flex items-center gap-2.5 border-b border-border pb-2 text-sm last:border-0 last:pb-0"
                     >
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <strong className="text-sm text-foreground">
-                          {name}
-                        </strong>
-                        {qs && (() => {
-                          const StatusIcon = STATUS_ICON[qs];
-                          return (
-                            <span
-                              className={cn(
-                                "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-                                STATUS_CLS[qs],
-                              )}
-                            >
-                              {StatusIcon && <StatusIcon className="h-3 w-3 shrink-0" />}
-                              {STATUS_LABEL[qs]}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                        {comp.description && (
-                          <OutField full label="Description">
-                            {comp.description}
-                          </OutField>
-                        )}
-                        {comp.timeframe && (
-                          <OutField label="Timeframe">{comp.timeframe}</OutField>
-                        )}
-                        {comp.entities.length > 0 && (
-                          <OutField label="Entities">
-                            {comp.entities.map((e) => e.name).join(", ")}
-                          </OutField>
-                        )}
-                        {comp.mainContact && (
-                          <OutField label="Main Contact">
-                            {comp.mainContact}
-                          </OutField>
-                        )}
-                        {comp.generalAreas.length > 0 && (
-                          <OutField full label="General Area of Work">
-                            {comp.generalAreas.join(" · ")}
-                          </OutField>
-                        )}
-                        {comp.whatSalesHeard && (
-                          <OutField full label="What Sales Heard">
-                            {comp.whatSalesHeard}
-                          </OutField>
-                        )}
-                        {comp.discoveryShouldExplore && (
-                          <OutField full label="Discovery Should Explore">
-                            {comp.discoveryShouldExplore}
-                          </OutField>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: ent.color }}
+                      />
+                      <span>
+                        <strong>{ent.name}</strong>{" "}
+                        <span className="text-[11px] text-muted-foreground">
+                          {ent.type ? `${ent.type} · ` : ""}
+                          {[ent.city, ent.state].filter(Boolean).join(", ")}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
+            {/* Preparer-Ready Summary */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-card">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-foreground">Preparer-Ready Summary</h2>
+                <button
+                  type="button"
+                  onClick={handleCopySummary}
+                  className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent hover:text-foreground"
+                  title="Copy summary to clipboard"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-green" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" /> Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="space-y-2.5 text-sm leading-relaxed text-foreground">
+                <p>
+                  The following summary was prepared following a feasibility call with{" "}
+                  <strong>{docName}</strong> of <strong>{practice}</strong>, conducted by {rep}
+                  {setup.callDate
+                    ? ` on ${(() => {
+                        const [y, m, d] = setup.callDate.split("-").map(Number);
+                        return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+                          month: "long",
+                          day: "numeric",
+                          year: "numeric",
+                        });
+                      })()}`
+                    : ""}
+                  , for tax year <strong>{taxYear}</strong>.
+                </p>
+                <p>
+                  This is a {pType} practice
+                  {setup.numLocations ? ` operating across ${setup.numLocations} location(s)` : ""}
+                  {setup.numEmployees ? ` with approximately ${setup.numEmployees} employees` : ""}.
+                  The discovery conversation surfaced indicators of qualifying R&D activity during
+                  the evaluation period.
+                </p>
+                {namedComponents.length > 0 && (
+                  <p>
+                    A total of <strong>{namedComponents.length} business component(s)</strong> were
+                    identified during this call and are detailed in the BCM v1 below. These
+                    components represent initial areas of potential qualification and should be
+                    validated by the Discovery team.
+                  </p>
+                )}
+                <p>
+                  A technical intake with the Discovery department is recommended as the next step
+                  to validate, quantify, and document qualifying activities. The BCM v1 components
+                  above serve as the initial brief for that handoff.
+                </p>
+              </div>
+            </div>
+
+            {/* BCM Summary — full width */}
+            <div className="rounded-xl border border-border bg-card p-6 shadow-card sm:col-span-2">
+              <h2 className="mb-4 text-lg font-bold text-foreground">BCM v1 — Component Summary</h2>
+              {namedComponents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No business components defined yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {namedComponents.map((comp) => {
+                    const name = (comp.headerName || comp.name).trim();
+                    const qs = comp.qualificationStatus;
+                    return (
+                      <div
+                        key={comp.id}
+                        className="rounded-lg border border-border bg-background p-4"
+                      >
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <strong className="text-sm text-foreground">{name}</strong>
+                          {qs &&
+                            (() => {
+                              const StatusIcon = STATUS_ICON[qs];
+                              return (
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+                                    STATUS_CLS[qs],
+                                  )}
+                                >
+                                  {StatusIcon && <StatusIcon className="h-3 w-3 shrink-0" />}
+                                  {STATUS_LABEL[qs]}
+                                </span>
+                              );
+                            })()}
+                        </div>
+                        <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                          {comp.description && (
+                            <OutField full label="Description">
+                              {comp.description}
+                            </OutField>
+                          )}
+                          {comp.timeframe && (
+                            <OutField label="Timeframe">{comp.timeframe}</OutField>
+                          )}
+                          {comp.entities.length > 0 && (
+                            <OutField label="Entities">
+                              {comp.entities.map((e) => e.name).join(", ")}
+                            </OutField>
+                          )}
+                          {comp.mainContact && (
+                            <OutField label="Main Contact">{comp.mainContact}</OutField>
+                          )}
+                          {comp.generalAreas.length > 0 && (
+                            <OutField full label="General Area of Work">
+                              {comp.generalAreas.join(" · ")}
+                            </OutField>
+                          )}
+                          {comp.whatSalesHeard && (
+                            <OutField full label="What Sales Heard">
+                              {comp.whatSalesHeard}
+                            </OutField>
+                          )}
+                          {comp.discoveryShouldExplore && (
+                            <OutField full label="Discovery Should Explore">
+                              {comp.discoveryShouldExplore}
+                            </OutField>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex justify-end gap-2">
@@ -2146,13 +2150,7 @@ function SL({ children }: { children: ReactNode }) {
   );
 }
 
-function MF({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function MF({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">

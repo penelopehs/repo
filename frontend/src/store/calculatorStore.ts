@@ -51,7 +51,12 @@ interface CalculatorState {
   updateEntity: <K extends keyof Entity>(id: string, k: K, v: Entity[K]) => void;
   addOwner: (entityId: string) => void;
   removeOwner: (entityId: string, ownerId: string) => void;
-  updateOwner: <K extends keyof EntityOwner>(entityId: string, ownerId: string, k: K, v: EntityOwner[K]) => void;
+  updateOwner: <K extends keyof EntityOwner>(
+    entityId: string,
+    ownerId: string,
+    k: K,
+    v: EntityOwner[K],
+  ) => void;
   setNotes: (s: string) => void;
   hydrateFromLead: (clientName: string, taxYears: TaxYear[]) => void;
   loadLeadEntities: (leadEntities: LeadDataEntity[]) => void;
@@ -95,10 +100,7 @@ export const entitiesFromSaved = (saved: Array<Omit<Entity, "id">>): Entity[] =>
 // Resolve the entity cards for a given tax year: a year's own saved calculation
 // when present, otherwise a seed from the lead's master entity list. Shared by
 // the calculator's per-year hydration and the multi-year PDF export.
-export const entitiesForYear = (
-  lead: Pick<Lead, "data">,
-  year: TaxYear,
-): Entity[] => {
+export const entitiesForYear = (lead: Pick<Lead, "data">, year: TaxYear): Entity[] => {
   const saved = lead.data?.calculations?.[String(year)];
   return Array.isArray(saved) && saved.length > 0
     ? entitiesFromSaved(saved as Array<Omit<Entity, "id">>)
@@ -140,9 +142,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   removeOwner: (entityId, ownerId) =>
     set((s) => ({
       entities: s.entities.map((e) =>
-        e.id === entityId
-          ? { ...e, owners: e.owners.filter((o) => o.id !== ownerId) }
-          : e,
+        e.id === entityId ? { ...e, owners: e.owners.filter((o) => o.id !== ownerId) } : e,
       ),
     })),
   updateOwner: (entityId, ownerId, k, v) =>
@@ -166,6 +166,5 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
       const entities = leadEntities.map(entityFromLead);
       return { entities };
     }),
-  setEntities: (entities) =>
-    set({ entities }),
+  setEntities: (entities) => set({ entities }),
 }));

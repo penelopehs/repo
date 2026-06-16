@@ -38,11 +38,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-navy/20 bg-navy text-white shadow-elevated">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand */}
-        <Link
-          to="/"
-          search={{ leadId: undefined }}
-          className="flex items-center gap-3 group"
-        >
+        <Link to="/" search={{ leadId: undefined }} className="flex items-center gap-3 group">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">
             <span className="text-sm font-bold tracking-tight" style={{ color: "var(--logo)" }}>
               AS
@@ -56,29 +52,30 @@ export function AppHeader() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1">
-          {isAuthenticated && NAV.map((n) => {
-            const active = isActive(n.to);
-            const Icon = n.icon;
-            return (
-              <Link
-                key={n.to}
-                to={n.to}
-                search={{}}
-                className={cn(
-                  "relative inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
-                  active
-                    ? "bg-white/10 text-white"
-                    : "text-white/75 hover:bg-white/5 hover:text-white",
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{n.label}</span>
-                {active && (
-                  <span className="absolute -bottom-1 left-3 right-3 h-0.5 rounded-full bg-orange" />
-                )}
-              </Link>
-            );
-          })}
+          {isAuthenticated &&
+            NAV.map((n) => {
+              const active = isActive(n.to);
+              const Icon = n.icon;
+              return (
+                <Link
+                  key={n.to}
+                  to={n.to}
+                  search={{}}
+                  className={cn(
+                    "relative inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                    active
+                      ? "bg-white/10 text-white"
+                      : "text-white/75 hover:bg-white/5 hover:text-white",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{n.label}</span>
+                  {active && (
+                    <span className="absolute -bottom-1 left-3 right-3 h-0.5 rounded-full bg-orange" />
+                  )}
+                </Link>
+              );
+            })}
           <Button
             type="button"
             variant="ghost"
@@ -118,29 +115,33 @@ export function AppHeader() {
           </SheetTrigger>
           <SheetContent side="right" className="w-72 bg-navy text-white border-navy/30">
             <nav className="mt-8 flex flex-col gap-1">
-              {isAuthenticated && NAV.map((n) => {
-                const Icon = n.icon;
-                return (
-                  <Link
-                    key={n.to}
-                    to={n.to}
-                    search={{}}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-                      isActive(n.to)
-                        ? "bg-white/15 text-white"
-                        : "text-white/75 hover:bg-white/10 hover:text-white",
-                    )}
-                  >
-                    <Icon className="h-4 w-4" /> {n.label}
-                  </Link>
-                );
-              })}
+              {isAuthenticated &&
+                NAV.map((n) => {
+                  const Icon = n.icon;
+                  return (
+                    <Link
+                      key={n.to}
+                      to={n.to}
+                      search={{}}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                        isActive(n.to)
+                          ? "bg-white/15 text-white"
+                          : "text-white/75 hover:bg-white/10 hover:text-white",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" /> {n.label}
+                    </Link>
+                  );
+                })}
               <div className="mt-4 border-t border-white/10 pt-4">
                 {isAuthenticated ? (
                   <button
-                    onClick={() => { setMobileOpen(false); void signOut(); }}
+                    onClick={() => {
+                      setMobileOpen(false);
+                      void signOut();
+                    }}
                     className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/85 hover:bg-white/10"
                   >
                     <LogOut className="h-4 w-4" /> Sign out
@@ -163,5 +164,3 @@ export function AppHeader() {
     </header>
   );
 }
-
-

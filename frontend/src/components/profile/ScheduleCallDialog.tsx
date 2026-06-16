@@ -54,7 +54,9 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
   const [assignedRep, setAssignedRep] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,14 +64,20 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
     setTime((call?.time || "10:00").slice(0, 5));
     setNotes(call?.notes || "");
     setCallType(call?.callType || defaultCallType || "Follow-up Call");
-    setAssignedRep(call?.assignedRepName || (me ? (userFullName(me) || me.email) : ""));
+    setAssignedRep(call?.assignedRepName || (me ? userFullName(me) || me.email : ""));
   }, [open, call, defaultCallType, me]);
 
   const submit = async () => {
     setSaving(true);
     try {
       if (call) {
-        await update(clientId, call.id, { date, time, notes, callType, assignedRepName: assignedRep });
+        await update(clientId, call.id, {
+          date,
+          time,
+          notes,
+          callType,
+          assignedRepName: assignedRep,
+        });
         toast.success("Call updated", { description: `${date} at ${time}` });
       } else {
         await add(clientId, { date, time, notes, callType, assignedRepName: assignedRep });
@@ -109,7 +117,9 @@ export function ScheduleCallDialog({ clientId, call, defaultCallType, open, onOp
                 {users.map((u) => {
                   const name = userFullName(u) || u.email;
                   return (
-                    <SelectItem key={u.iduser} value={name}>{name}</SelectItem>
+                    <SelectItem key={u.iduser} value={name}>
+                      {name}
+                    </SelectItem>
                   );
                 })}
               </SelectContent>

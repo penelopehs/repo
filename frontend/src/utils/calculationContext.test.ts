@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { Lead } from "@/types/crm";
-import { buildCalculationSearch, calculationYears, hasExistingCalculation } from "./calculationContext";
+import {
+  buildCalculationSearch,
+  calculationYears,
+  hasExistingCalculation,
+} from "./calculationContext";
 
 const lead = {
   id: "6",

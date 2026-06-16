@@ -77,8 +77,7 @@ export function entityFormulas(entity: Entity): EntityFormulaResult {
 
   const formula2 = grossRevenue * 0.02;
   const formula3 = grossRevenue * 0.03;
-  const formula50 =
-    ((wagesOfficers + wagesW2 + totalSupplies) * 0.5 + contractWages * 0.64) * 0.1;
+  const formula50 = ((wagesOfficers + wagesW2 + totalSupplies) * 0.5 + contractWages * 0.64) * 0.1;
   const sowEstimate = formula2 + formula3 + formula50;
 
   return { formula2, formula3, formula50, sowEstimate };
@@ -162,9 +161,7 @@ export function getFinalBill(federal: number, tier: string) {
   if (rate == null) return null;
   const computed = federal * rate;
   // Final bill can never be below $6,000 â€” floor to a seeded value in [$6,000, $8,000].
-  const finalBill = computed < 6000
-    ? 6000 + seededRand(federal, 77) * 2000
-    : computed;
+  const finalBill = computed < 6000 ? 6000 + seededRand(federal, 77) * 2000 : computed;
   return { finalBill, billingRate: rate };
 }
 
@@ -175,7 +172,7 @@ function seededRand(seed: number, index: number): number {
 
 export function getPhases(finalBill: number, seed: number = finalBill) {
   // Generate 4 weights in [0.12, 0.42] so no phase is trivially small or dominant.
-  const raw = [0, 1, 2, 3].map((i) => 0.12 + seededRand(seed, i) * 0.30);
+  const raw = [0, 1, 2, 3].map((i) => 0.12 + seededRand(seed, i) * 0.3);
   const sum = raw.reduce((a, b) => a + b, 0);
   const [w1, w2, w3, w4] = raw.map((r) => r / sum);
 
@@ -264,8 +261,7 @@ export function computeTotals(
 ): BillingTotals {
   const totalSOW = completeEntities.reduce((sum, e) => sum + calculateSOW(e), 0);
   const federalCreditEstimate = result?.federal ?? 0;
-  const stateTotal =
-    result?.stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0) ?? 0;
+  const stateTotal = result?.stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0) ?? 0;
   const finalBill = result?.billing?.finalBill ?? 0;
   return {
     totalSOW,
@@ -278,8 +274,7 @@ export function computeTotals(
 
 export function isEntityComplete(e: Entity): boolean {
   const filingOk =
-    !!e.filingStatus &&
-    (e.filingStatus !== "Other" || !!e.customFilingStatus?.trim());
+    !!e.filingStatus && (e.filingStatus !== "Other" || !!e.customFilingStatus?.trim());
   const hasText = !!e.companyName?.trim() && !!e.state && filingOk;
   const numericFields: (keyof Entity)[] = [
     "grossRevenue",
@@ -288,9 +283,5 @@ export function isEntityComplete(e: Entity): boolean {
     "contractWages",
     "totalSupplies",
   ];
-  return (
-    hasText &&
-    numericFields.every((k) => e[k] !== "" && e[k] !== null && e[k] !== undefined)
-  );
+  return hasText && numericFields.every((k) => e[k] !== "" && e[k] !== null && e[k] !== undefined);
 }
-

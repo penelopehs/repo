@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {Check, Loader2, Plus } from "lucide-react";
+import { Check, Loader2, Plus } from "lucide-react";
 import type { Lead, LeadSource, SalesRep, TaxYear } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
@@ -86,8 +86,15 @@ const schema = z
 type FormState = z.infer<typeof schema>;
 
 const initial: FormState = {
-  firstName: "", lastName: "", company: "", email: "", phone: "",
-  source: "Website", rep: "", salesManager: "", trainingManager: "",
+  firstName: "",
+  lastName: "",
+  company: "",
+  email: "",
+  phone: "",
+  source: "Website",
+  rep: "",
+  salesManager: "",
+  trainingManager: "",
 };
 
 // Sentinel SelectItem value for "no assignment" (Radix forbids empty values).
@@ -124,17 +131,24 @@ export function AddLeadDialog() {
   const [phoneOpen, setPhoneOpen] = useState(false);
 
   // Load the user list once, and default the (disabled) rep to the signed-in user.
-  useEffect(() => { void ensureUsers(); }, [ensureUsers]);
+  useEffect(() => {
+    void ensureUsers();
+  }, [ensureUsers]);
   useEffect(() => {
     if (me) setForm((f) => (f.rep ? f : { ...f, rep: String(me.iduser) }));
   }, [me]);
 
   // Debounced client search whenever a name/company field changes.
   useEffect(() => {
-    if (skipNextSearch.current) { skipNextSearch.current = false; return; }
+    if (skipNextSearch.current) {
+      skipNextSearch.current = false;
+      return;
+    }
     const { firstName, lastName, company } = form;
     if (!firstName.trim() && !lastName.trim() && !company.trim()) {
-      setSuggestions([]); setSearchOpen(false); setSearching(false);
+      setSuggestions([]);
+      setSearchOpen(false);
+      setSearching(false);
       return;
     }
     let active = true;
@@ -146,13 +160,19 @@ export function AddLeadDialog() {
         setSuggestions(rows);
         setSearchOpen(true);
       } catch {
-        if (active) { setSuggestions([]); setSearchOpen(false); }
+        if (active) {
+          setSuggestions([]);
+          setSearchOpen(false);
+        }
       } finally {
         if (active) setSearching(false);
       }
     }, 250);
-    return () => { active = false; clearTimeout(t); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      active = false;
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.firstName, form.lastName, form.company]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
@@ -214,7 +234,8 @@ export function AddLeadDialog() {
     if (!parsed.success || noYears) {
       const fe: Partial<Record<keyof FormState, string>> = {};
       if (!parsed.success)
-        for (const issue of parsed.error.issues) fe[issue.path[0] as keyof FormState] = issue.message;
+        for (const issue of parsed.error.issues)
+          fe[issue.path[0] as keyof FormState] = issue.message;
       setErrors(fe);
       setYearsError(noYears ? "Select at least one engagement year" : undefined);
       return;
@@ -237,7 +258,9 @@ export function AddLeadDialog() {
       setOpen(false);
       setIntroPromptLead(newLead);
     } catch (err) {
-      toast.error("Couldn't add lead", { description: err instanceof Error ? err.message : undefined });
+      toast.error("Couldn't add lead", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -245,210 +268,231 @@ export function AddLeadDialog() {
 
   return (
     <>
-    {introPromptLead && (
-      <IntroCallPromptDialog
-        lead={introPromptLead}
-        open={!!introPromptLead}
-        onOpenChange={(o) => { if (!o) setIntroPromptLead(null); }}
-      />
-    )}
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated">
-          <Plus className="mr-1.5 h-4 w-4" /> Add New Lead
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-navy">Add New Lead</DialogTitle>
-          <DialogDescription>
-            {eprId !== null ? "Existing client" : "Create a new lead and assign a representative."}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="grid gap-4">
-          {/* Name + company drive the client-search dropdown (spans full width). */}
-          <div className="relative">
-            <div className="grid grid-cols-3 gap-3">
-              <Field label="First Name" error={errors.firstName}>
-              <Input
-                  value={form.firstName}
-                  onChange={(e) => setSearchField("firstName", e.target.value)}
-                  onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
-                  onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
-                  placeholder="Jane"
-                  autoComplete="off"
-                />
-              </Field>
-              <Field label="Last Name" error={errors.lastName}>
-                <Input
-                  value={form.lastName}
-                  onChange={(e) => setSearchField("lastName", e.target.value)}
-                  onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
-                  onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
-                  placeholder="Doe"
-                  autoComplete="off"
-              />
-            </Field>
-            <Field label="Company / Entity" error={errors.company}>
-              <Input
-                value={form.company}
-                  onChange={(e) => setSearchField("company", e.target.value)}
-                  onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
-                  onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
-                placeholder="Acme Inc."
-                  autoComplete="off"
-              />
-            </Field>
-          </div>
-
-            {searchOpen && (searching || suggestions.length > 0) && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover py-1 shadow-elevated">
-                {searching && suggestions.length === 0 ? (
-                  <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
-                  </div>
-                ) : (
-                  suggestions.map((row) => (
-                    <button
-                      key={row.identity_people_roles}
-                      type="button"
-                      // Keep the input focused so onBlur doesn't close before onClick.
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => pickSuggestion(row)}
-                      className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
-                    >
-                      <span className="font-medium text-navy">
-                        {row.first_name} {row.last_name}
-                      </span>
-                      <span className="truncate text-muted-foreground">{row.entity_name}</span>
-                    </button>
-                  ))
-                )}
+      {introPromptLead && (
+        <IntroCallPromptDialog
+          lead={introPromptLead}
+          open={!!introPromptLead}
+          onOpenChange={(o) => {
+            if (!o) setIntroPromptLead(null);
+          }}
+        />
+      )}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button className="bg-orange hover:bg-orange/90 text-orange-foreground shadow-elevated">
+            <Plus className="mr-1.5 h-4 w-4" /> Add New Lead
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-navy">Add New Lead</DialogTitle>
+            <DialogDescription>
+              {eprId !== null
+                ? "Existing client"
+                : "Create a new lead and assign a representative."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submit} className="grid gap-4">
+            {/* Name + company drive the client-search dropdown (spans full width). */}
+            <div className="relative">
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="First Name" error={errors.firstName}>
+                  <Input
+                    value={form.firstName}
+                    onChange={(e) => setSearchField("firstName", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Jane"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Last Name" error={errors.lastName}>
+                  <Input
+                    value={form.lastName}
+                    onChange={(e) => setSearchField("lastName", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Doe"
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field label="Company / Entity" error={errors.company}>
+                  <Input
+                    value={form.company}
+                    onChange={(e) => setSearchField("company", e.target.value)}
+                    onFocus={() => suggestions.length > 0 && setSearchOpen(true)}
+                    onBlur={() => window.setTimeout(() => setSearchOpen(false), 120)}
+                    placeholder="Acme Inc."
+                    autoComplete="off"
+                  />
+                </Field>
               </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Email" error={errors.email}>
-              <ContactPicker
-                options={emailOptions}
-                open={emailOpen}
-                setOpen={setEmailOpen}
-                selected={form.email}
-                onPick={(v) => set("email", v)}
-              >
-              <Input
-                type="email"
-                value={form.email}
-                onChange={(e) => set("email", e.target.value)}
-                  onFocus={() => emailOptions.length > 1 && setEmailOpen(true)}
-                  onBlur={() => window.setTimeout(() => setEmailOpen(false), 120)}
-                placeholder="jane@acme.com"
-                  autoComplete="off"
+              {searchOpen && (searching || suggestions.length > 0) && (
+                <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover py-1 shadow-elevated">
+                  {searching && suggestions.length === 0 ? (
+                    <div className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching…
+                    </div>
+                  ) : (
+                    suggestions.map((row) => (
+                      <button
+                        key={row.identity_people_roles}
+                        type="button"
+                        // Keep the input focused so onBlur doesn't close before onClick.
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickSuggestion(row)}
+                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-accent"
+                      >
+                        <span className="font-medium text-navy">
+                          {row.first_name} {row.last_name}
+                        </span>
+                        <span className="truncate text-muted-foreground">{row.entity_name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email" error={errors.email}>
+                <ContactPicker
+                  options={emailOptions}
+                  open={emailOpen}
+                  setOpen={setEmailOpen}
+                  selected={form.email}
+                  onPick={(v) => set("email", v)}
+                >
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                    onFocus={() => emailOptions.length > 1 && setEmailOpen(true)}
+                    onBlur={() => window.setTimeout(() => setEmailOpen(false), 120)}
+                    placeholder="jane@acme.com"
+                    autoComplete="off"
+                  />
+                </ContactPicker>
+              </Field>
+              <Field label="Phone" error={errors.phone}>
+                <ContactPicker
+                  options={phoneOptions}
+                  open={phoneOpen}
+                  setOpen={setPhoneOpen}
+                  selected={form.phone}
+                  onPick={(v) => set("phone", v)}
+                >
+                  <PhoneInput
+                    value={form.phone}
+                    onChange={(v) => set("phone", v)}
+                    onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
+                    onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
+                    autoComplete="off"
+                  />
+                </ContactPicker>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Lead Source">
+                <Select value={form.source} onValueChange={(v) => set("source", v as LeadSource)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Assigned Sales Representative">
+                <Select value={form.rep} onValueChange={(v) => set("rep", v)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Loading…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+            <Field label="Engagement Years" error={yearsError}>
+              <MultiYearSelect
+                value={years}
+                onToggle={toggleYear}
+                onSelectAll={() => setYears([...ALL_TAX_YEARS])}
+                onClear={() => setYears([])}
               />
-              </ContactPicker>
             </Field>
-            <Field label="Phone" error={errors.phone}>
-              <ContactPicker
-                options={phoneOptions}
-                open={phoneOpen}
-                setOpen={setPhoneOpen}
-                selected={form.phone}
-                onPick={(v) => set("phone", v)}
-              >
-              <PhoneInput
-                value={form.phone}
-                onChange={(v) => set("phone", v)}
-                onFocus={() => phoneOptions.length > 1 && setPhoneOpen(true)}
-                onBlur={() => window.setTimeout(() => setPhoneOpen(false), 120)}
-                autoComplete="off"
-              />
-              </ContactPicker>
-            </Field>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Lead Source">
-              <Select value={form.source} onValueChange={(v) => set("source", v as LeadSource)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SOURCES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Assigned Sales Representative">
-              <Select value={form.rep} onValueChange={(v) => set("rep", v)}>
-                <SelectTrigger><SelectValue placeholder="Loading…" /></SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Engagement Years" error={yearsError}>
-            <MultiYearSelect
-              value={years}
-              onToggle={toggleYear}
-              onSelectAll={() => setYears([...ALL_TAX_YEARS])}
-              onClear={() => setYears([])}
-            />
-          </Field>
-          
-          <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
-          <div className="text-gray-500 font-normal flex">
-            <div className="whitespace-nowrap">Optional Assignments</div>
-            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field optional label="Sales Manager">
-              <Select
-                value={form.salesManager || UNASSIGNED}
-                onValueChange={(v) => set("salesManager", v === UNASSIGNED ? "" : v)}
-              >
-                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field optional label="Training Manager">
-              <Select
-                value={form.trainingManager || UNASSIGNED}
-                onValueChange={(v) => set("trainingManager", v === UNASSIGNED ? "" : v)}
-              >
-                <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.iduser} value={String(u.iduser)}>{userFullName(u) || u.email}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
+            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
+            <div className="text-gray-500 font-normal flex">
+              <div className="whitespace-nowrap">Optional Assignments</div>
+              <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
+            </div>
 
-          <DialogFooter className="mt-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-              Cancel
-            </Button>
-            <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
-              Add Lead
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="grid grid-cols-2 gap-3">
+              <Field optional label="Sales Manager">
+                <Select
+                  value={form.salesManager || UNASSIGNED}
+                  onValueChange={(v) => set("salesManager", v === UNASSIGNED ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field optional label="Training Manager">
+                <Select
+                  value={form.trainingManager || UNASSIGNED}
+                  onValueChange={(v) => set("trainingManager", v === UNASSIGNED ? "" : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.iduser} value={String(u.iduser)}>
+                        {userFullName(u) || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            <DialogFooter className="mt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-orange text-white hover:bg-orange/90">
+                Add Lead
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -479,7 +523,10 @@ function ContactPicker({
               type="button"
               // Keep the input focused so onBlur doesn't close before onClick.
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onPick(opt); setOpen(false); }}
+              onClick={() => {
+                onPick(opt);
+                setOpen(false);
+              }}
               className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent"
             >
               <span className="truncate">{opt}</span>
@@ -492,10 +539,23 @@ function ContactPicker({
   );
 }
 
-function Field({ optional = false, label, error, children }: { optional?: boolean; label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  optional = false,
+  label,
+  error,
+  children,
+}: {
+  optional?: boolean;
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
-      <Label className="mb-1.5 block">{label}{optional && (<span className="text-gray-500 ml-2 text-xs font-normal">optional</span>)}</Label>
+      <Label className="mb-1.5 block">
+        {label}
+        {optional && <span className="text-gray-500 ml-2 text-xs font-normal">optional</span>}
+      </Label>
       {children}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>

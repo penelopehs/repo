@@ -19,9 +19,7 @@ export interface FeasibilityCallRecord {
 
 export const feasibilityApi = {
   async searchEntities(query: string): Promise<FeasibilityEntity[]> {
-    return api.get<FeasibilityEntity[]>(
-      `/feasibility/entities?q=${encodeURIComponent(query)}`,
-    );
+    return api.get<FeasibilityEntity[]>(`/feasibility/entities?q=${encodeURIComponent(query)}`);
   },
 
   async createEntity(
@@ -34,19 +32,13 @@ export const feasibilityApi = {
       ein?: string;
     },
   ): Promise<FeasibilityEntity> {
-    return api.post<FeasibilityEntity>(
-      `/leads/${leadId}/feasibility/entities`,
-      data,
-    );
+    return api.post<FeasibilityEntity>(`/leads/${leadId}/feasibility/entities`, data);
   },
 
   async saveFeasibilityCall(
     leadId: string,
     data: FeasibilityCallPayload,
   ): Promise<FeasibilityCallRecord> {
-    return api.post<FeasibilityCallRecord>(
-      `/leads/${leadId}/feasibility-calls`,
-      data,
-    );
+    return api.post<FeasibilityCallRecord>(`/leads/${leadId}/feasibility-calls`, data);
   },
 };

@@ -41,8 +41,18 @@ export function BillingYearReport({ clientName, year, entities, result, totals, 
   })();
 
   const kpis = [
-    { label: "Federal Total", value: formatCurrency(totals.federalCreditEstimate), message: null, color: "text-violet" },
-    { label: "State Total", value: formatCurrency(totals.stateTotal), message: null, color: "text-green" },
+    {
+      label: "Federal Total",
+      value: formatCurrency(totals.federalCreditEstimate),
+      message: null,
+      color: "text-violet",
+    },
+    {
+      label: "State Total",
+      value: formatCurrency(totals.stateTotal),
+      message: null,
+      color: "text-green",
+    },
     {
       label: "Final Bill",
       value: finalBill.value ?? (finalBill.message ? null : formatCurrency(totals.finalBill)),
@@ -53,9 +63,7 @@ export function BillingYearReport({ clientName, year, entities, result, totals, 
 
   return (
     <div className="bg-card p-6">
-      <h2 className="mb-5 text-base font-semibold text-navy">
-        Billing Overview Summary — {year}
-      </h2>
+      <h2 className="mb-5 text-base font-semibold text-navy">Billing Overview Summary — {year}</h2>
 
       <div className="flex flex-col gap-6 rounded-xl border border-border bg-gradient-frost p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
@@ -78,7 +86,9 @@ export function BillingYearReport({ clientName, year, entities, result, totals, 
         <div className="grid w-full gap-x-8 gap-y-4 sm:grid-cols-2 lg:w-auto lg:grid-cols-4">
           {kpis.map((kpi) => (
             <div key={kpi.label} className="min-w-0">
-              <p className={`text-xs font-semibold uppercase tracking-wider ${kpi.color}`}>{kpi.label}</p>
+              <p className={`text-xs font-semibold uppercase tracking-wider ${kpi.color}`}>
+                {kpi.label}
+              </p>
               {kpi.value && (
                 <p className={`mt-1 text-2xl font-bold tabular-nums ${kpi.color}`}>{kpi.value}</p>
               )}
@@ -135,7 +145,9 @@ export function BillingYearReport({ clientName, year, entities, result, totals, 
                             <div className="min-w-0">
                               <p className="truncate text-xs font-medium text-navy">{name}</p>
                               {o.role && (
-                                <p className="truncate text-[10px] text-muted-foreground">{o.role}</p>
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {o.role}
+                                </p>
                               )}
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
@@ -153,7 +165,9 @@ export function BillingYearReport({ clientName, year, entities, result, totals, 
                         );
                       })}
                     </div>
-                    <div className={`mt-3 flex items-center justify-between border-t border-border pt-2 text-xs font-semibold ${total > 100 ? "text-destructive" : total === 100 ? "text-green" : "text-navy"}`}>
+                    <div
+                      className={`mt-3 flex items-center justify-between border-t border-border pt-2 text-xs font-semibold ${total > 100 ? "text-destructive" : total === 100 ? "text-green" : "text-navy"}`}
+                    >
                       <span>Total</span>
                       <span className="tabular-nums">{total}%</span>
                     </div>

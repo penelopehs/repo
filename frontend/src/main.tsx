@@ -1,11 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
-import {
-  EventType,
-  type AuthenticationResult,
-  type EventMessage,
-} from "@azure/msal-browser";
+import { EventType, type AuthenticationResult, type EventMessage } from "@azure/msal-browser";
 
 import { getRouter } from "./router";
 import { msalInstance } from "@/lib/auth/authConfig";
@@ -43,15 +39,15 @@ async function bootstrap() {
       const payload = event.payload as AuthenticationResult;
       if (payload.account) {
         msalInstance.setActiveAccount(payload.account);
-}
+      }
     }
   });
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <RouterProvider router={router} />
-  </StrictMode>
-);
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <RouterProvider router={router} />
+    </StrictMode>,
+  );
 }
 
 void bootstrap();

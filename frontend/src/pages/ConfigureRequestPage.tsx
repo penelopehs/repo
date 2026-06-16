@@ -45,10 +45,7 @@ export function ConfigureRequestPage() {
   const addRequest = useDocumentsStore((s) => s.addRequest);
 
   // Document requests are for closed (won) leads — the terminal pipeline stage.
-  const activeLeads = useMemo(
-    () => leads.filter((l) => l.status === "closed"),
-    [leads],
-  );
+  const activeLeads = useMemo(() => leads.filter((l) => l.status === "closed"), [leads]);
 
   const [clientId, setClientId] = useState<string>("");
   const [engagementId, setEngagementId] = useState<string>("");

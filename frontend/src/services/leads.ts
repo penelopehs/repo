@@ -89,9 +89,7 @@ const STATUS_TO_API: Record<LeadStatus, string> = {
 const TAX_YEARS = new Set<number>(ALL_TAX_YEARS);
 
 const toTaxYears = (years: number[] | null | undefined): TaxYear[] =>
-  [...new Set(years ?? [])]
-    .filter((y) => TAX_YEARS.has(y))
-    .sort((a, b) => a - b) as TaxYear[];
+  [...new Set(years ?? [])].filter((y) => TAX_YEARS.has(y)).sort((a, b) => a - b) as TaxYear[];
 
 const toClientType = (v: string | null | undefined): ClientType =>
   v === "Returning" ? "Returning" : "New";
@@ -102,7 +100,11 @@ const isoDate = (v: string | null | undefined): string => (v ? v.slice(0, 10) : 
 // stored entity predates ids. Deterministic across loads, so an unsaved entity
 // keeps the same id until associations are persisted (which fixes the id).
 const entitySlug = (name: string): string =>
-  name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "entity";
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "entity";
 
 // Ensure every entity carries a stable `id` (LeadDataEntity.id). Existing ids
 // are kept; missing ones are derived deterministically (db id or name slug) and
@@ -116,7 +118,12 @@ function withEntityIds(entities: LeadDataEntity[]): LeadDataEntity[] {
     return id;
   };
   return entities.map((e) =>
-    e.id ? e : { ...e, id: uniquify(e.entityId != null ? `e_db_${e.entityId}` : `e_${entitySlug(e.name)}`) },
+    e.id
+      ? e
+      : {
+          ...e,
+          id: uniquify(e.entityId != null ? `e_db_${e.entityId}` : `e_${entitySlug(e.name)}`),
+        },
   );
 }
 
@@ -171,7 +178,6 @@ function mapEngagement(leadId: string, e: ApiEngagementRead): Engagement {
     createdAt: e.start_date ?? "",
   };
 }
-
 
 // The backend `data` column is free-form JSON and can be null or (when cleared)
 // an array. Normalise it to a well-formed LeadData so consumers can rely on it.
@@ -237,10 +243,15 @@ function mapListItem(i: ApiLeadListItem): Lead {
       i.latest_calc_date != null
         ? new Date(i.latest_calc_date * 1000).toISOString().slice(0, 10)
         : "—",
-    addedAt: i.created_at.endsWith('Z') || i.created_at.includes('+') ? i.created_at : i.created_at + 'Z',
+    addedAt:
+      i.created_at.endsWith("Z") || i.created_at.includes("+") ? i.created_at : i.created_at + "Z",
     notes: i.notes ?? undefined,
     nextCall: i.next_call
-      ? ({ date: i.next_call.date, time: i.next_call.time ?? undefined, callType: i.next_call.call_type } as NextCallInfo)
+      ? ({
+          date: i.next_call.date,
+          time: i.next_call.time ?? undefined,
+          callType: i.next_call.call_type,
+        } as NextCallInfo)
       : null,
     engagements: (i.engagements ?? []).map((e) => mapEngagement(String(i.id), e)),
   };
@@ -324,7 +335,8 @@ export const leadsApi = {
     if (patch.status !== undefined) body.pipeline_status = STATUS_TO_API[patch.status];
     if (patch.repId !== undefined) body.salesperson_iduser = patch.repId;
     if (patch.salesManagerId !== undefined) body.sales_manager_iduser = patch.salesManagerId;
-    if (patch.trainingManagerId !== undefined) body.training_manager_iduser = patch.trainingManagerId;
+    if (patch.trainingManagerId !== undefined)
+      body.training_manager_iduser = patch.trainingManagerId;
     if (patch.notes !== undefined) body.notes = patch.notes;
     if (patch.data !== undefined) body.data = patch.data;
 

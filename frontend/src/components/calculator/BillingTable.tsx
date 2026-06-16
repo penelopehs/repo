@@ -217,7 +217,11 @@ export function BillingTable({
                   {formatCurrency(r.federalShare)}
                 </td>
                 <td className="px-4 py-3 text-center tabular-nums font-semibold text-orange">
-                  {r.stateBill > 0 ? formatCurrency(r.stateBill) : <span className="text-muted-foreground text-xs">No state credit</span>}
+                  {r.stateBill > 0 ? (
+                    formatCurrency(r.stateBill)
+                  ) : (
+                    <span className="text-muted-foreground text-xs">No state credit</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums font-semibold text-green">
                   {formatCurrency(finalBill)}

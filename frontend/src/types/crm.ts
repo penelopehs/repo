@@ -72,7 +72,10 @@ export const PIPELINE_STAGES: { value: LeadStatus; label: string }[] = [
 
 /** Progress index of a status within the pipeline (0 = New Lead). */
 export const pipelineStageIndex = (status: LeadStatus): number =>
-  Math.max(0, PIPELINE_STAGES.findIndex((s) => s.value === status));
+  Math.max(
+    0,
+    PIPELINE_STAGES.findIndex((s) => s.value === status),
+  );
 
 export type LeadSource =
   | "Referral"
@@ -128,7 +131,12 @@ export interface LeadDataPerson {
   phones: string[];
 }
 
-export type TaxYearStatus = "current" | "current_engaged" | "engaged" | "eligible_not_engaged" | "not_eligible";
+export type TaxYearStatus =
+  | "current"
+  | "current_engaged"
+  | "engaged"
+  | "eligible_not_engaged"
+  | "not_eligible";
 
 export interface TaxYearRecord {
   status: TaxYearStatus;

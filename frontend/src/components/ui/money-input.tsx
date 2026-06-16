@@ -48,9 +48,7 @@ export function MoneyInput({ value, onChange, placeholder = "0", className }: Mo
   const nextCursor = useRef<number | null>(null);
   const focused = useRef(false);
 
-  const [display, setDisplay] = useState(() =>
-    value === "" ? "" : formatFull(value as number),
-  );
+  const [display, setDisplay] = useState(() => (value === "" ? "" : formatFull(value as number)));
 
   // Sync when the value is updated externally (e.g. lead hydration) while not editing.
   useEffect(() => {
