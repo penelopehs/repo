@@ -17,10 +17,31 @@ jobs:
       contents: read #This is required for actions/checkout
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+
+      - name: Verify required secrets are set
+        env:
+          VITE_AZURE_CLIENT_ID: ${{ secrets.VITE_AZURE_CLIENT_ID }}
+          VITE_AZURE_TENANT_ID: ${{ secrets.VITE_AZURE_TENANT_ID }}
+          VITE_API_SCOPE: ${{ secrets.VITE_API_SCOPE }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          MYSQL_SSL: ${{ secrets.MYSQL_SSL }}
+        run: |
+          missing=0
+          for var in VITE_AZURE_CLIENT_ID VITE_AZURE_TENANT_ID VITE_API_SCOPE VITE_API_BASE_URL MYSQL_SSL; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Required secret '$var' is missing or empty"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "One or more required secrets are not set. Aborting."
+            exit 1
+          fi
+          echo "All required secrets are present."
 
       - name: Set up Python version
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.14'
 
@@ -30,7 +51,7 @@ jobs:
           bun-version: latest
 
       - name: Cache Bun dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-${{ hashFiles('frontend/bun.lock', 'frontend/package.json') }}
@@ -61,7 +82,7 @@ jobs:
           echo "${{ secrets.MYSQL_SSL }}" > backend/certs/DigiCertGlobalRootG2.crt.pem
 
       - name: Upload artifact for deployment jobs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: python-app
           path: backend
@@ -70,22 +91,22 @@ jobs:
       # If you prefer to disable the Oryx build process during deployment, follow these steps:
       # 1. Remove the SCM_DO_BUILD_DURING_DEPLOYMENT app setting from your Azure App Service Environment variables.
       # 2. Refer to sample workflows for alternative deployment strategies: https://github.com/Azure/actions-workflow-samples/tree/master/AppService
-      
+
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    
+
     steps:
       - name: Download artifact from build job
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: python-app
-      
+
       - name: 'Deploy to Azure Web App'
         uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
         with:
           app-name: 'Sales-App'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_24C082DB678C40BEAF2EC8D8FDEC3DE0 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_880B1FBD8EEF4988B466E7B5FDAD9365 }}
