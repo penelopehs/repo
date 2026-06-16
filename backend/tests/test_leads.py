@@ -13,8 +13,8 @@ from tests.conftest import make_assignment
 # ── Create ──────────────────────────────────────────────────────────────────────
 
 def test_create_with_epr_resolves_company(client, db_session):
-    # company is resolved through the EPR assignment (epr -> entity -> client
-    # people firm) when none is seeded in the data blob.
+    # company comes from the entity name seeded into data["entities"][0]["name"]
+    # via _related_graph when an epr_id is supplied.
     _, _, epr_id = make_assignment(db_session, firm="Cedar Labs")
     resp = client.post(
         "/leads",
@@ -30,7 +30,7 @@ def test_create_with_epr_resolves_company(client, db_session):
     assert resp.status_code == 201
     body = resp.json()
     assert body["pipeline_status"] == "New Lead"
-    assert body["company"] == "Cedar Labs"
+    assert body["company"] == "Acme Health, PC"
     # Contact info is carried directly on the lead.
     assert body["full_name"] == "Dana Cedar"
     assert body["email"] == "dr@cedar.test"
@@ -194,16 +194,16 @@ def test_list_filter_by_status(client):
     assert statuses == {"New Lead"}
 
 
-def test_list_resolves_company_from_client_people(client, db_session):
-    # With no company seeded in the JSON, company falls back to the firm of the
-    # people behind the lead's client (resolved via epr -> entity -> client).
+def test_list_resolves_company_from_epr_entity(client, db_session):
+    # company comes from the entity name seeded into data["entities"][0]["name"]
+    # by _related_graph; the person's firm is not used when an entity name exists.
     make_assignment(db_session, firm="Acme Labs")
     epr_id = db_session.query(models.EntityPeopleRole).first().identity_people_roles
 
     client.post("/leads", json={"epr_id": epr_id, "first_name": "Dana", "last_name": "Reed"})
     resp = client.get("/leads", params={"status": "New Lead"})
     item = next(o for o in resp.json() if o["full_name"] == "Dana Reed")
-    assert item["company"] == "Acme Labs"
+    assert item["company"] == "Acme Health, PC"
 
 
 # ── Detail ──────────────────────────────────────────────────────────────────────
