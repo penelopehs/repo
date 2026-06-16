@@ -350,10 +350,9 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
             />
           </Item>
 
-          <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
-          <div className="text-gray-500 font-normal flex">
-            <div className="whitespace-nowrap">Optional Assignments</div>
-            <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
+          <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Optional Assignments
+            <div className="h-px flex-1 bg-border" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

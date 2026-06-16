@@ -390,7 +390,9 @@ export function FeasibilityCallPage({
   const [manageMode, setManageMode] = useState(false);
   const [outputReady, setOutputReady] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const saveTimer = useRef<number | null>(null);
+  const flashTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const drafts = loadDraftsForLead(leadId);
@@ -416,13 +418,19 @@ export function FeasibilityCallPage({
     setAllDrafts(loadDraftsForLead(leadId));
   }, [leadId, callId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }, []);
+  useEffect(() => () => {
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    if (flashTimer.current) window.clearTimeout(flashTimer.current);
+  }, []);
 
   const persist = useCallback((d: FeasibilityCallDraft) => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       saveDraft(d);
       setAllDrafts(loadDraftsForLead(d.leadId));
+      setSavedFlash(true);
+      if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flashTimer.current = window.setTimeout(() => setSavedFlash(false), 2000);
     }, 400);
   }, []);
 
@@ -543,6 +551,16 @@ export function FeasibilityCallPage({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
+            {/* Autosave flash */}
+            <span
+              className={cn(
+                "text-xs font-medium text-green transition-opacity duration-500",
+                savedFlash ? "opacity-100" : "opacity-0",
+              )}
+            >
+              Saved ✓
+            </span>
+
             {/* Draft picker */}
             <div className="relative">
               <button
@@ -595,7 +613,7 @@ export function FeasibilityCallPage({
                         <span className="font-medium text-foreground">
                           {formatDraftLabel(d)}
                         </span>
-                        <span className="text-teal-800 font-medium">
+                        <span className="font-medium text-cyan">
                           {fmtDateTime(d.updatedAt || d.createdAt)}
                         </span>
                         <span className="text-muted-foreground">
@@ -646,7 +664,14 @@ export function FeasibilityCallPage({
             </div>
 
             <button
-              onClick={() => goTo(3)}
+              onClick={() => {
+                if (step === 3 && outputReady) return;
+                const hasComponents = draft.components.some(
+                  (c) => (c.headerName || c.name).trim(),
+                );
+                goTo(3);
+                if (hasComponents) generate();
+              }}
               className="flex items-center gap-1.5 rounded-md border border-cyan/30 bg-cyan/[0.12] px-3 py-1.5 text-xs font-medium text-cyan transition-colors hover:bg-cyan/20"
             >
               <FileText className="h-3 w-3" />
@@ -1298,6 +1323,7 @@ function BCMBuilderStep({
   onNext: () => void;
 }) {
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === leadId));
+  const fetchLead = useLeadsStore((s) => s.fetchLead);
   const leadEntities: FCEntity[] = useMemo(
     () =>
       (lead?.data?.entities ?? []).map((e, i) => ({
@@ -1365,6 +1391,7 @@ function BCMBuilderStep({
     const comp = components[idx];
     if (!comp) return;
     updateComponent(idx, { entities: [...comp.entities, entity] });
+    void fetchLead(leadId);
   };
 
   return (
@@ -1854,23 +1881,30 @@ function FeasibilityOutputStep({
         <StepTag>Step 3 of 3</StepTag>
       </div>
 
-      <Button
-        onClick={onGenerate}
-        disabled={generating}
-        className="mb-6 gap-2"
-      >
-        {generating ? (
-          <>
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
-            Building…
-          </>
-        ) : (
-          <>
-            <BarChart2 className="h-4 w-4" />
-            {outputReady ? "Regenerate" : "Generate Analysis"}
-          </>
+      <div className="mb-6">
+        <Button
+          onClick={onGenerate}
+          disabled={generating || namedComponents.length === 0}
+          className="gap-2"
+        >
+          {generating ? (
+            <>
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+              Building…
+            </>
+          ) : (
+            <>
+              <BarChart2 className="h-4 w-4" />
+              {outputReady ? "Regenerate" : "Generate Analysis"}
+            </>
+          )}
+        </Button>
+        {namedComponents.length === 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Name at least one component in Step 2 to enable.
+          </p>
         )}
-      </Button>
+      </div>
 
       <div ref={outputRef} id="fc-output-section">
       {!outputReady && (
