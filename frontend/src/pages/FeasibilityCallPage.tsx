@@ -12,12 +12,15 @@ import {
 } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   BarChart2,
   Building2,
   Check,
+  CheckCircle2,
   ChevronDown,
+  CircleDashed,
   Copy,
   Download,
   FileBarChart2,
@@ -46,6 +49,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { feasibilityApi } from "@/services/feasibility";
 import { useLeadsStore } from "@/store/leadsStore";
@@ -458,6 +467,14 @@ export function FeasibilityCallPage({
     patchDraft({ currentStep: step });
   };
 
+  const resetAfterSubmit = useCallback(() => {
+    setOutputReady(false);
+    patchDraft({
+      components: [makeEmptyComponent(), makeEmptyComponent(), makeEmptyComponent()],
+      currentStep: 1,
+    });
+  }, [patchDraft]);
+
   const startNewCall = () => {
     if (!window.confirm("Start a new feasibility call for this client?")) return;
     const fresh = saveDraft(makeNewDraft(leadId, lead?.fullName ?? "", lead?.company ?? "", lead?.taxYears, lead?.source, lead?.rep));
@@ -703,7 +720,7 @@ export function FeasibilityCallPage({
             generating={generating}
             onGenerate={generate}
             onBack={() => goTo(2)}
-            onSubmit={() => goTo(1)}
+            onSubmit={resetAfterSubmit}
           />
         )}
       </div>
@@ -1327,12 +1344,7 @@ function BCMBuilderStep({
   );
 
   const syncHeaderName = (index: number, header: string) => {
-    const comp = components[index];
-    if (!comp.name.trim()) {
-      updateComponent(index, { headerName: header, name: header });
-    } else {
-      updateComponent(index, { headerName: header });
-    }
+    updateComponent(index, { headerName: header });
   };
 
   const addColumn = () => {
@@ -1528,29 +1540,10 @@ function BCMBuilderStep({
                         }}
                       />
                     ) : row.type === "status" ? (
-                      <select
-                        className={cn(
-                          "w-full rounded-md border px-2.5 py-1.5 text-xs outline-none",
-                          col.qualificationStatus === "possible" &&
-                            "border-green/30 bg-green/10 font-medium text-green",
-                          col.qualificationStatus === "strong" &&
-                            "border-primary/30 bg-primary/10 font-medium text-primary",
-                          col.qualificationStatus === "clarify" &&
-                            "border-orange/30 bg-orange/10 font-medium text-foreground",
-                          !col.qualificationStatus && "border-input bg-background",
-                        )}
+                      <QualStatusSelect
                         value={col.qualificationStatus}
-                        onChange={(e) =>
-                          updateComponent(ci, {
-                            qualificationStatus: e.target.value as QualStatus,
-                          })
-                        }
-                      >
-                        <option value="">— select —</option>
-                        <option value="possible">… Possible</option>
-                        <option value="strong">… Strong</option>
-                        <option value="clarify">? Needs Clarification</option>
-                      </select>
+                        onChange={(v) => updateComponent(ci, { qualificationStatus: v })}
+                      />
                     ) : (
                       <Textarea
                         className={cn(
@@ -1603,6 +1596,79 @@ function BCMBuilderStep({
   );
 }
 
+// ── Qualification Status Select ───────────────────────────────────────────────
+
+const QUAL_OPTIONS = [
+  {
+    value: "possible" as const,
+    label: "Possible",
+    Icon: CircleDashed,
+    triggerCls: "border-amber-950 bg-amber-900 text-amber-100 font-medium",
+    itemCls: "text-amber-900 focus:bg-amber-50 focus:text-amber-950",
+    iconCls: "text-amber-900",
+    badgeCls: "bg-amber-900 text-amber-100 border-amber-950",
+  },
+  {
+    value: "strong" as const,
+    label: "Strong",
+    Icon: CheckCircle2,
+    triggerCls: "border-emerald-950 bg-emerald-900 text-emerald-100 font-medium",
+    itemCls: "text-emerald-900 focus:bg-emerald-50 focus:text-emerald-950",
+    iconCls: "text-emerald-900",
+    badgeCls: "bg-emerald-900 text-emerald-100 border-emerald-950",
+  },
+  {
+    value: "clarify" as const,
+    label: "Needs Clarification",
+    Icon: AlertCircle,
+    triggerCls: "border-rose-950 bg-rose-900 text-rose-100 font-medium",
+    itemCls: "text-rose-900 focus:bg-rose-50 focus:text-rose-950",
+    iconCls: "text-rose-900",
+    badgeCls: "bg-rose-900 text-rose-100 border-rose-950",
+  },
+] as const;
+
+function QualStatusSelect({
+  value,
+  onChange,
+}: {
+  value: QualStatus;
+  onChange: (v: QualStatus) => void;
+}) {
+  const selected = QUAL_OPTIONS.find((o) => o.value === value);
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as QualStatus)}>
+      <SelectTrigger
+        className={cn(
+          "h-auto w-full rounded-md border px-2.5 py-1.5 text-xs outline-none",
+          selected ? selected.triggerCls : "border-input bg-background text-muted-foreground",
+        )}
+      >
+        <span className="flex items-center gap-1.5">
+          {selected ? (
+            <>
+              <selected.Icon className="h-3 w-3 shrink-0" />
+              {selected.label}
+            </>
+          ) : (
+            "— select —"
+          )}
+        </span>
+      </SelectTrigger>
+      <SelectContent>
+        {QUAL_OPTIONS.map((opt) => (
+          <SelectItem key={opt.value} value={opt.value} className={opt.itemCls}>
+            <span className="flex items-center gap-1.5">
+              <opt.Icon className={cn("h-3.5 w-3.5 shrink-0", opt.iconCls)} />
+              {opt.label}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 // ── Step 3: Feasibility Output ────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<string, string> = {
@@ -1611,9 +1677,14 @@ const STATUS_LABEL: Record<string, string> = {
   clarify: "Needs Clarification",
 };
 const STATUS_CLS: Record<string, string> = {
-  possible: "bg-green/10 text-green",
-  strong: "bg-primary/10 text-primary",
-  clarify: "bg-orange/10 text-orange-foreground",
+  possible: "bg-amber-900 text-amber-100 border-amber-950",
+  strong: "bg-emerald-900 text-emerald-100 border-emerald-950",
+  clarify: "bg-rose-900 text-rose-100 border-rose-950",
+};
+const STATUS_ICON: Record<string, typeof CircleDashed> = {
+  possible: CircleDashed,
+  strong: CheckCircle2,
+  clarify: AlertCircle,
 };
 
 function FeasibilityOutputStep({
@@ -1647,7 +1718,7 @@ function FeasibilityOutputStep({
   }
 
   const namedComponents = components.filter(
-    (c) => (c.name || c.headerName).trim(),
+    (c) => (c.headerName || c.name).trim(),
   );
 
   const docName = setup.doctorName || "the physician";
@@ -1926,7 +1997,7 @@ function FeasibilityOutputStep({
             ) : (
               <div className="space-y-3">
                 {namedComponents.map((comp) => {
-                  const name = (comp.name || comp.headerName).trim();
+                  const name = (comp.headerName || comp.name).trim();
                   const qs = comp.qualificationStatus;
                   return (
                     <div
@@ -1937,16 +2008,20 @@ function FeasibilityOutputStep({
                         <strong className="text-sm text-foreground">
                           {name}
                         </strong>
-                        {qs && (
-                          <span
-                            className={cn(
-                              "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
-                              STATUS_CLS[qs],
-                            )}
-                          >
-                            {STATUS_LABEL[qs]}
-                          </span>
-                        )}
+                        {qs && (() => {
+                          const StatusIcon = STATUS_ICON[qs];
+                          return (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+                                STATUS_CLS[qs],
+                              )}
+                            >
+                              {StatusIcon && <StatusIcon className="h-3 w-3 shrink-0" />}
+                              {STATUS_LABEL[qs]}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
                         {comp.description && (

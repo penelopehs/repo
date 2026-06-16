@@ -461,7 +461,7 @@ export function CalculatorPage() {
       );
       toast.success("Calculation submitted successfully");
     } catch {
-      toast.success("Calculation submitted successfully");
+      toast.error("Submission failed — please try again.");
     } finally {
       setSubmitting(false);
     }

@@ -1027,7 +1027,7 @@ export function ProfilePage({ id }: { id: string }) {
                       {c.phones.map((phone) => (
                         <p key={phone} className="flex items-center gap-1.5 text-xs">
                           <Phone className="h-3 w-3 text-cyan" />
-                          {phone}
+                          {formatPhone(phone)}
                         </p>
                       ))}
                     </div>
