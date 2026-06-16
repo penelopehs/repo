@@ -958,45 +958,27 @@ function CallSetupStep({
 function BCMEntityPicker({
   selected,
   onChange,
+  leadEntities,
   onAddNew,
 }: {
   selected: FCEntity[];
   onChange: (entities: FCEntity[]) => void;
+  leadEntities: FCEntity[];
   onAddNew: (prefill?: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<FCEntity[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [backendError, setBackendError] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    setBackendError(false);
-    const timer = window.setTimeout(async () => {
-      setLoading(true);
-      try {
-        const rows = await feasibilityApi.searchEntities(query);
-        if (!cancelled) {
-          setResults(rows.filter((r) => !selected.some((s) => s.id === r.id)));
-        }
-      } catch {
-        if (!cancelled) {
-          setResults([]);
-          setBackendError(true);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }, 200);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query, open, selected]);
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return leadEntities.filter(
+      (e) =>
+        !selected.some((s) => s.id === e.id) &&
+        (!q || e.name.toLowerCase().includes(q)),
+    );
+  }, [query, leadEntities, selected]);
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -1050,16 +1032,10 @@ function BCMEntityPicker({
       />
       {open && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-elevated">
-          {loading && <p className="px-3 py-2 text-xs text-muted-foreground">Searching…</p>}
-          {!loading && backendError && (
-            <p className="px-3 py-2 text-xs text-muted-foreground">
-              Entity search unavailable — add manually below.
-            </p>
-          )}
-          {!loading && !backendError && results.length > 0 && (
+          {results.length > 0 && (
             <>
               <p className="bg-muted/40 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Entities in Database
+                Client Entities
               </p>
               {results.map((e) => (
                 <button
@@ -1075,13 +1051,15 @@ function BCMEntityPicker({
                   <span>
                     {e.name}{" "}
                     <span className="text-[10px] text-muted-foreground">
-                      {e.type ? `${e.type} · ` : ""}
                       {[e.city, e.state].filter(Boolean).join(", ")}
                     </span>
                   </span>
                 </button>
               ))}
             </>
+          )}
+          {results.length === 0 && query.trim() && (
+            <p className="px-3 py-2 text-xs text-muted-foreground">No matching client entities.</p>
           )}
           <button
             type="button"
@@ -1319,6 +1297,17 @@ function BCMBuilderStep({
   onBack: () => void;
   onNext: () => void;
 }) {
+  const lead = useLeadsStore((s) => s.leads.find((l) => l.id === leadId));
+  const leadEntities: FCEntity[] = useMemo(
+    () =>
+      (lead?.data?.entities ?? []).map((e, i) => ({
+        id: e.entityId ?? -(i + 1),
+        name: e.name,
+        city: e.city,
+        state: e.state,
+      })),
+    [lead],
+  );
   const [entityModal, setEntityModal] = useState<{
     open: boolean;
     colIndex: number;
@@ -1515,6 +1504,7 @@ function BCMBuilderStep({
                       <BCMEntityPicker
                         selected={col.entities}
                         onChange={(entities) => updateComponent(ci, { entities })}
+                        leadEntities={leadEntities}
                         onAddNew={(prefill) =>
                           setEntityModal({ open: true, colIndex: ci, prefill })
                         }

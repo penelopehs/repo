@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Briefcase,
+  Check,
   Mail,
   Phone,
   Plus,
@@ -145,6 +146,9 @@ export function ProfilePage({ id }: { id: string }) {
   const [contactError, setContactError] = useState("");
   const [contactSaved, setContactSaved] = useState(false);
   const [noteSaved, setNoteSaved] = useState(false);
+  const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  const [entityDraft, setEntityDraft] = useState({ name: "", ein: "", city: "", state: "" });
+  const [entitySaving, setEntitySaving] = useState(false);
   const saveTimerRef = useRef<number | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   useEffect(() => {
@@ -315,6 +319,8 @@ export function ProfilePage({ id }: { id: string }) {
   const currentCall = calls.find((c) => c.callType === lead.status);
   const currentOpen = !!currentCall && !currentCall.completed;
   const activeStep = stageIndex < CALL_STEPS.length ? CALL_STEPS[stageIndex] : null;
+  const introCallCompleted =
+    calls.some((c) => c.callType === "intro_call" && c.completed) || stageIndex >= 2;
   // Warn when the in-progress call has no upcoming follow-up scheduled yet.
   const needsCall = !!activeStep && upcomingCalls === 0;
 
@@ -343,6 +349,30 @@ export function ProfilePage({ id }: { id: string }) {
   const flashSaved = () => {
     setContactSaved(true);
     window.setTimeout(() => setContactSaved(false), 2500);
+  };
+
+  const startEditEntity = (e: { id: string; name: string; ein?: string; city?: string; state?: string }) => {
+    setEditingEntityId(e.id);
+    setEntityDraft({ name: e.name, ein: e.ein ?? "", city: e.city ?? "", state: e.state ?? "" });
+  };
+
+  const saveEntity = async () => {
+    if (!editingEntityId || !lead.data) return;
+    setEntitySaving(true);
+    const updatedEntities = (lead.data.entities ?? []).map((e) =>
+      e.id === editingEntityId
+        ? { ...e, name: entityDraft.name.trim(), ein: entityDraft.ein.trim(), city: entityDraft.city.trim(), state: entityDraft.state.trim() }
+        : e,
+    );
+    try {
+      await updateLead(id, { data: { ...lead.data, entities: updatedEntities } });
+      setEditingEntityId(null);
+      toast.success("Entity updated.");
+    } catch {
+      toast.error("Failed to save entity.");
+    } finally {
+      setEntitySaving(false);
+    }
   };
 
   const saveContact = async () => {
@@ -785,13 +815,14 @@ export function ProfilePage({ id }: { id: string }) {
                         <th className="px-4 py-3">EIN</th>
                         <th className="px-4 py-3">Location</th>
                         <th className="px-4 py-3">Associated Contacts</th>
+                        <th className="px-4 py-3 w-10" />
                       </tr>
                     </thead>
                     <tbody>
                       {entities.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={4}
+                            colSpan={5}
                             className="px-4 py-6 text-center text-sm text-muted-foreground"
                           >
                             No entities recorded.
@@ -801,14 +832,47 @@ export function ProfilePage({ id }: { id: string }) {
                         entities.map((e) => {
                           const linkedIds = entityPeople[e.id] ?? [];
                           const linked = people.filter((p) => linkedIds.includes(p.id));
+                          const isEditing = editingEntityId === e.id;
                           return (
-                            <tr key={e.id} className="border-b border-border last:border-0">
-                              <td className="px-4 py-3 font-medium text-navy">{e.name}</td>
+                            <tr key={e.id} className={cn("border-b border-border last:border-0", isEditing && "bg-accent/40")}>
+                              <td className="px-4 py-3 font-medium text-navy">
+                                {isEditing ? (
+                                  <Input
+                                    className="h-7 text-xs"
+                                    value={entityDraft.name}
+                                    onChange={(ev) => setEntityDraft((d) => ({ ...d, name: ev.target.value }))}
+                                    autoFocus
+                                  />
+                                ) : e.name}
+                              </td>
                               <td className="px-4 py-3 tabular-nums text-muted-foreground whitespace-nowrap">
-                                {e.ein || "—"}
+                                {isEditing ? (
+                                  <Input
+                                    className="h-7 text-xs w-32"
+                                    placeholder="XX-XXXXXXX"
+                                    value={entityDraft.ein}
+                                    onChange={(ev) => setEntityDraft((d) => ({ ...d, ein: ev.target.value }))}
+                                  />
+                                ) : (e.ein || "—")}
                               </td>
                               <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                                {[e.city, e.state].filter(Boolean).join(", ") || "—"}
+                                {isEditing ? (
+                                  <div className="flex gap-1.5">
+                                    <Input
+                                      className="h-7 text-xs w-24"
+                                      placeholder="City"
+                                      value={entityDraft.city}
+                                      onChange={(ev) => setEntityDraft((d) => ({ ...d, city: ev.target.value }))}
+                                    />
+                                    <Input
+                                      className="h-7 text-xs w-14"
+                                      placeholder="ST"
+                                      maxLength={2}
+                                      value={entityDraft.state}
+                                      onChange={(ev) => setEntityDraft((d) => ({ ...d, state: ev.target.value.toUpperCase() }))}
+                                    />
+                                  </div>
+                                ) : ([e.city, e.state].filter(Boolean).join(", ") || "—")}
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -825,6 +889,36 @@ export function ProfilePage({ id }: { id: string }) {
                                     </Badge>
                                   ))}
                                 </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      disabled={entitySaving}
+                                      onClick={() => void saveEntity()}
+                                      className="flex h-6 w-6 items-center justify-center rounded-md bg-navy text-white hover:bg-navy/80 disabled:opacity-50"
+                                    >
+                                      {entitySaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={entitySaving}
+                                      onClick={() => setEditingEntityId(null)}
+                                      className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-accent"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditEntity(e)}
+                                    className="flex h-6 w-6 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-cyan hover:bg-cyan/10 hover:text-cyan"
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           );
@@ -1186,6 +1280,7 @@ export function ProfilePage({ id }: { id: string }) {
             <div className="flex flex-col gap-2.5">
               <Button
                 className="w-full"
+                disabled={!introCallCompleted}
                 onClick={() =>
                   navigate({
                     to: "/clients/$id/feasibility-call",
@@ -1196,9 +1291,16 @@ export function ProfilePage({ id }: { id: string }) {
               >
                 Start Feasibility Call
               </Button>
+              {!introCallCompleted && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <InfoIcon className="h-3 w-3 shrink-0" />
+                  Complete the Intro Call to enable
+                </p>
+              )}
               <Button
                 variant="outline"
                 className="w-full"
+                disabled={!introCallCompleted}
                 onClick={() =>
                   navigate({
                     to: "/clients/$id/feasibility-call",
