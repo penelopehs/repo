@@ -1,4 +1,4 @@
-// Premium collapsible entity card — entity + financials with eligibility logic.
+﻿// Premium collapsible entity card â€” entity + financials with eligibility logic.
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,7 +35,7 @@ import { STATE_DATA, isEntityComplete } from "@/utils/calculatorEngine";
 interface Props {
   entity: Entity;
   index: number;
-  taxYear: number;
+  taxYear?: number;
 }
 
 const FINANCIAL_FIELDS: { k: keyof Entity; label: string }[] = [
@@ -97,10 +97,10 @@ export function EntityCard({ entity, index, taxYear }: Props) {
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {entity.state || "State not selected"}
-              {stateEligible && " · State Credit Eligible"}
+              {stateEligible && " Â· State Credit Eligible"}
             </p>
           </div>
-          <div className="ml-3 flex items-center gap-2 font-medium text-navy">{taxYear}</div>
+          <div className="ml-3 flex items-center gap-2 font-medium text-navy">{taxYear ?? "—"}</div>
         </div>
         <div className="flex items-center gap-2">
           {complete && stateEligible ? (
@@ -151,7 +151,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
             transition={{ duration: 0.25, ease: "easeInOut" }}
           >
             <div className="grid gap-6 p-5 md:grid-cols-2 [&>*:last-child]:md:col-span-2">
-              {/* Column 1 — Entity Information */}
+              {/* Column 1 â€” Entity Information */}
               <div>
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
                   <Building2 className="h-4 w-4 text-cyan" /> Entity Information
@@ -252,7 +252,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                 </div>
               </div>
 
-              {/* Column 2 — Financial Inputs */}
+              {/* Column 2 â€” Financial Inputs */}
               <div>
                 <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-navy">
                   <DollarSign className="h-4 w-4 text-orange" /> Financial Inputs
@@ -285,7 +285,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   ) : complete && !stateEligible ? (
                     <div className="rounded-lg border border-cyan/30 bg-cyan/5 p-3 text-sm text-cyan">
                       <span className="inline-flex items-center gap-2 font-semibold">
-                        <BadgeCheck className="h-4 w-4" /> Federal credit only — no state credit for
+                        <BadgeCheck className="h-4 w-4" /> Federal credit only â€” no state credit for
                         this state
                       </span>
                     </div>
@@ -310,7 +310,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                 </div>
               </div>
 
-              {/* Ownership Breakdown — full width */}
+              {/* Ownership Breakdown â€” full width */}
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm font-semibold text-navy">
@@ -449,7 +449,7 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                       >
                         <span>Total Ownership</span>
                         <span className="tabular-nums">
-                          {total}%{over ? " — exceeds 100%" : total === 100 ? " ✓" : ""}
+                          {total}%{over ? " â€” exceeds 100%" : total === 100 ? " âœ“" : ""}
                         </span>
                       </div>
                     );
@@ -462,3 +462,5 @@ export function EntityCard({ entity, index, taxYear }: Props) {
     </motion.div>
   );
 }
+
+

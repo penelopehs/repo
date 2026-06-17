@@ -1077,10 +1077,23 @@ def save_calculations(
     return _build_detail(db, lead)
 
 
+@router.post("/leads/{lead_id}/calculations/submit", response_model=schemas.LeadDetail)
+def submit_calculation(
+    lead_id: int, body: schemas.CalculationSubmitBody, db: Session = Depends(get_db)
+):
+    lead = _get_lead(db, lead_id)
+    data = lead.data if isinstance(lead.data, dict) else {}
+    data = {**data, "billingSubmission": body.model_dump()}
+    lead.data = data
+    db.commit()
+    db.refresh(lead)
+    return _build_detail(db, lead)
+
+
 @router.delete("/leads/{lead_id}/calculations", status_code=204)
 def clear_calculations(lead_id: int, db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id)
-    lead.data = []
+    lead.data = {}
     db.commit()
 
 

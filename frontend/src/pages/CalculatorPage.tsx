@@ -247,6 +247,8 @@ export function CalculatorPage() {
   // effects, where a single-use flag would be consumed by the first run and let
   // the second run save stale entities onto the newly selected lead.
   const savesArmed = useRef(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushSave = useCallback(() => {
     if (saveTimer.current) {
@@ -275,6 +277,9 @@ export function CalculatorPage() {
       calculations: { ...calcs, [String(p.year)]: stripEntityIds(p.entities) },
     };
     void updateLead(String(p.leadId), { data }).catch(() => {});
+    setSavedFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setSavedFlash(false), 2000);
   }, [getLead, updateLead]);
 
   // Per-year hydration: each tax year has its own entities list. Load the saved
@@ -322,8 +327,14 @@ export function CalculatorPage() {
     };
   }, [entities, leadId, flushSave]);
 
-  // Flush any pending edit when leaving the page.
-  useEffect(() => () => flushSave(), [flushSave]);
+  // Flush any pending edit when leaving the page; cancel the flash timer.
+  useEffect(
+    () => () => {
+      flushSave();
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    [flushSave],
+  );
 
   const yearsLabel =
     client.taxYears.length === 7
@@ -455,6 +466,10 @@ export function CalculatorPage() {
 
   const handleSubmit = async () => {
     if (!result) return;
+    if (leadId == null) {
+      toast.error("Link a client from the pipeline to submit.");
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -467,8 +482,11 @@ export function CalculatorPage() {
         notes,
         submittedAt: new Date().toISOString(),
       };
-      await import("@/services/api").then(({ api }) => api.post("/calculations/submit", payload));
+      await import("@/services/api").then(({ api }) =>
+        api.post(`/leads/${leadId}/calculations/submit`, payload),
+      );
       toast.success("Calculation submitted successfully");
+      void navigate({ to: "/clients/$id", params: { id: String(leadId) } });
     } catch {
       toast.error("Submission failed — please try again.");
     } finally {
@@ -595,9 +613,16 @@ export function CalculatorPage() {
           note={null}
           action={
             entities.length > 0 && (
-              <Button variant="outline" onClick={addEntity}>
-                <Plus className="mr-1.5 h-4 w-4" /> Add Entity
-              </Button>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs text-muted-foreground transition-opacity duration-500 ${savedFlash ? "opacity-100" : "opacity-0"}`}
+                >
+                  Saved ✓
+                </span>
+                <Button variant="outline" onClick={addEntity}>
+                  <Plus className="mr-1.5 h-4 w-4" /> Add Entity
+                </Button>
+              </div>
             )
           }
         >

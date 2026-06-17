@@ -1,4 +1,4 @@
-// Edit Client modal — full client fields, writes back through leadsStore.
+﻿// Edit Client modal â€” full client fields, writes back through leadsStore.
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
@@ -57,7 +57,7 @@ const schema = z
     lastName: z.string().trim().min(1).max(60),
     company: z.string().trim().min(1).max(160),
     // Email and phone are each optional on their own, but at least one is
-    // required — enforced in the superRefine below.
+    // required â€” enforced in the superRefine below.
     email: z.string().trim().max(255),
     phone: z.string().trim().max(40),
     source: z.enum([
@@ -79,7 +79,7 @@ const schema = z
     taxYears: z.array(z.number().int()).min(1, "Select at least one engagement year"),
     entityNames: z.string().max(2000).optional(),
     notes: z.string().max(2000).optional(),
-    // Optional assignments — users.iduser as a string ("" = unassigned).
+    // Optional assignments â€” users.iduser as a string ("" = unassigned).
     salesManager: z.string().optional(),
     trainingManager: z.string().optional(),
   })
@@ -130,7 +130,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
     phone: lead.phone,
     source: lead.source,
     // Track the assigned rep by users.iduser (as a string) so it can be changed
-    // and round-tripped through the update endpoint (repId → salesperson_iduser).
+    // and round-tripped through the update endpoint (repId â†’ salesperson_iduser).
     rep: lead.repId != null ? String(lead.repId) : "",
     status: lead.status,
     taxYears: lead.taxYears ?? [],
@@ -194,7 +194,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       const calculations: Record<string, unknown> = {};
       const yearStatuses: Record<string, TaxYearRecord> = {};
       for (const y of form.taxYears) {
-        calculations[String(y)] = base.calculations[String(y)] ?? [];
+        calculations[String(y)] = base.calculations[String(y)] ?? {};
         // Carry over an existing per-year status; years without one are left
         // unset (consumers fall back to a default), and statuses for tax years
         // removed in this edit are dropped.
@@ -442,9 +442,10 @@ function Item({
     <div>
       <Label className="mb-1.5 block">
         {label}
-        {optional && <span className="text-gray-500 ml-2 text-xs font-normal">optional</span>}
+        {optional && <span className="text-muted-foreground ml-2 text-xs font-normal">optional</span>}
       </Label>
       {children}
     </div>
   );
 }
+

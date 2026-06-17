@@ -270,6 +270,17 @@ class CalculationsUpdate(BaseModel):
     data: Any
 
 
+class CalculationSubmitBody(BaseModel):
+    clientName: Optional[str] = None
+    taxYears: Optional[List[Any]] = None
+    federal: Optional[Any] = None
+    tier: Optional[str] = None
+    billing: Optional[Any] = None
+    stateCredits: Optional[Any] = None
+    notes: Optional[str] = None
+    submittedAt: Optional[str] = None
+
+
 # ── Feasibility calls ──────────────────────────────────────────────────────────
 
 class FeasibilityEntityRead(BaseModel):

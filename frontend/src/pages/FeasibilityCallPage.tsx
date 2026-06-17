@@ -140,7 +140,7 @@ function normalizeEntity(raw: unknown, index: number): FCEntity | null {
   }
   if (raw && typeof raw === "object" && "name" in raw) {
     const e = raw as Partial<FCEntity>;
-    const name = (e.name ?? "").trim();
+    const name = (typeof e.name === "string" ? e.name : "").trim();
     if (!name) return null;
     return {
       id: typeof e.id === "number" ? e.id : -(index + 1),

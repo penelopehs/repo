@@ -1,4 +1,4 @@
-"""Tests for the lead-centric CRM router.
+﻿"""Tests for the lead-centric CRM router.
 
 Covers the high-risk logic: clientless leads, contact resolution (from the
 client's people), status-transition timestamps, the Lead->Calculation Sent
@@ -10,7 +10,7 @@ from app import models
 from tests.conftest import make_assignment
 
 
-# ── Create ──────────────────────────────────────────────────────────────────────
+# â”€â”€ Create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_create_with_epr_resolves_company(client, db_session):
     # company comes from the entity name seeded into data["entities"][0]["name"]
@@ -181,7 +181,7 @@ def test_create_without_caller_user_403(client, claims):
     assert resp.status_code == 403
 
 
-# ── List ──────────────────────────────────────────────────────────────────────
+# â”€â”€ List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_list_filter_by_status(client):
     client.post("/leads", json={"first_name": "Lead", "last_name": "Co"})  # stays New Lead
@@ -206,7 +206,7 @@ def test_list_resolves_company_from_epr_entity(client, db_session):
     assert item["company"] == "Acme Health, PC"
 
 
-# ── Detail ──────────────────────────────────────────────────────────────────────
+# â”€â”€ Detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_get_detail_404(client):
     assert client.get("/leads/424242").status_code == 404
@@ -242,7 +242,7 @@ def test_detail_returns_data_blob(client, db_session):
     assert len(data["people"]) == 1
     person = data["people"][0]
     assert person["personId"] == int(person["id"])
-    # The entity↔people link is seeded keyed by entity id → [person id].
+    # The entityâ†”people link is seeded keyed by entity id â†’ [person id].
     assert data["entityPeople"] == {f"e_db_{entity_id}": [person["id"]]}
     # Emails/phones are one-to-many lists (this seed person has none).
     assert {k: person[k] for k in (
@@ -253,7 +253,7 @@ def test_detail_returns_data_blob(client, db_session):
     }
 
 
-# ── Update / status transitions ─────────────────────────────────────────────────
+# â”€â”€ Update / status transitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_patch_closed_stamps_sow_signed_at_idempotently(client):
     lead = client.post("/leads", json={"first_name": "Transition", "last_name": "Co"}).json()
@@ -321,7 +321,7 @@ def test_patch_unknown_epr_404(client):
     assert resp.status_code == 404
 
 
-# ── Delete ──────────────────────────────────────────────────────────────────────
+# â”€â”€ Delete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_delete_lead_keeps_client(client, db_session):
     client_id, _, epr_id = make_assignment(db_session, client_name="Keep Me Co")
@@ -338,7 +338,7 @@ def test_delete_lead_keeps_client(client, db_session):
     ).first() is not None
 
 
-# ── Calculations ────────────────────────────────────────────────────────────────
+# â”€â”€ Calculations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_save_calculations_stores_blob_and_advances_status(client):
     lead = client.post("/leads", json={"first_name": "Calc", "last_name": "Co"}).json()
@@ -372,10 +372,10 @@ def test_clear_calculations(client):
     ).json()
     assert client.delete(f"/leads/{lead['id']}/calculations").status_code == 204
     detail = client.get(f"/leads/{lead['id']}").json()
-    assert detail["data"] == []
+    assert detail["data"] == {}
 
 
-# ── Engagements ─────────────────────────────────────────────────────────────────
+# â”€â”€ Engagements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_create_engagement_requires_client_entity(client):
     # Clientless lead -> cannot create an engagement (no entity to attach).
@@ -415,7 +415,7 @@ def test_patch_engagement(client, db_session):
     assert resp.json()["phase"] == "Fieldwork"
 
 
-# ── Follow-up calls ─────────────────────────────────────────────────────────────
+# â”€â”€ Follow-up calls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def test_follow_up_call_crud(client):
     lead = client.post("/leads", json={"first_name": "Calls", "last_name": "Lead"}).json()
@@ -563,3 +563,4 @@ def test_intake_note_crud(client):
 def test_intake_note_on_missing_lead_404(client):
     resp = client.post("/leads/999999/intake-notes", json={"note": "x"})
     assert resp.status_code == 404
+
