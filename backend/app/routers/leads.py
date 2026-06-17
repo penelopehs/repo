@@ -286,7 +286,7 @@ def _initial_data(company: Optional[str], tax_years) -> dict:
         "entities": (
             [{"id": f"e_{_entity_slug(company)}", "name": company}] if company else []
         ),
-        "calculations": {str(year): [] for year in tax_years} if tax_years else [],
+        "calculations": {str(year): {} for year in (tax_years or [])},
         "people": [],
         "entityPeople": {},
     }

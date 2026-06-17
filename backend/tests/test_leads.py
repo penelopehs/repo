@@ -99,7 +99,7 @@ def test_create_saves_all_fields_and_seeds_calculations_blob(client, db_session)
     ).first()
     assert lead.data == {
         "entities": [{"id": "e_pike-diagnostics", "name": "Pike Diagnostics"}],
-        "calculations": {"2025": [], "2026": []},
+        "calculations": {"2025": {}, "2026": {}},
         "people": [],
         "entityPeople": {},
     }
@@ -228,7 +228,7 @@ def test_detail_returns_data_blob(client, db_session):
     data = client.get(f"/leads/{lead['id']}").json()["data"]
     # Tax-year buckets come from the seed; the entity/people graph is pulled
     # from the EPR's client (replacing the seed "Detail Co" company name).
-    assert data["calculations"] == {"2024": []}
+    assert data["calculations"] == {"2024": {}}
     assert data["entities"] == [
         {
             "id": f"e_db_{entity_id}",

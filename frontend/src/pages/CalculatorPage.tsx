@@ -263,10 +263,16 @@ export function CalculatorPage() {
       entities: [],
       calculations: EMPTY_CALCULATIONS,
     };
+    const calcs =
+      existing.calculations &&
+      typeof existing.calculations === "object" &&
+      !Array.isArray(existing.calculations)
+        ? existing.calculations
+        : EMPTY_CALCULATIONS;
     const data: LeadData = {
       ...existing,
       // Entity ids live on the master list, not inside the calculation.
-      calculations: { ...existing.calculations, [String(p.year)]: stripEntityIds(p.entities) },
+      calculations: { ...calcs, [String(p.year)]: stripEntityIds(p.entities) },
     };
     void updateLead(String(p.leadId), { data }).catch(() => {});
   }, [getLead, updateLead]);
