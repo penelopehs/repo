@@ -372,7 +372,8 @@ def test_clear_calculations(client):
     ).json()
     assert client.delete(f"/leads/{lead['id']}/calculations").status_code == 204
     detail = client.get(f"/leads/{lead['id']}").json()
-    assert detail["data"] == {}
+    assert detail["data"]["calculations"] == {}
+    assert detail["data"]["total"] == 10
 
 
 # â”€â”€ Engagements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -563,4 +564,6 @@ def test_intake_note_crud(client):
 def test_intake_note_on_missing_lead_404(client):
     resp = client.post("/leads/999999/intake-notes", json={"note": "x"})
     assert resp.status_code == 404
+
+
 

@@ -222,9 +222,16 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       const renamedCalculations = companyRenamed
         ? renameEntityInCalculations(calculations, oldCompany, company)
         : calculations;
+      // Keep initialEntities in sync: add new entities, apply renames, drop
+      // removed ones — so the calculator always sees the current entity list.
+      const initialById = new Map((base.initialEntities ?? []).map((e) => [e.id, e]));
+      const initialEntities = entities.map((e) =>
+        initialById.has(e.id) ? { ...initialById.get(e.id)!, name: e.name } : e,
+      );
       const data = {
         ...base,
         entities,
+        initialEntities,
         calculations: renamedCalculations,
         entityPeople,
         yearStatuses,
