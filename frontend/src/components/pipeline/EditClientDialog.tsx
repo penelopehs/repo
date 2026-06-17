@@ -339,18 +339,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
             />
           </Item>
-          <Item label="Entity / Entities (comma separated, one per line)">
-            <Textarea
-              rows={Math.max(3, form.entityNames.split("\n").length + 1)}
-              value={form.entityNames}
-              onChange={(e) => {
-                const val = e.target.value;
-                const first = val.split(/[,\n]/)[0]?.trim() ?? "";
-                setForm({ ...form, entityNames: val, company: first || form.company });
-              }}
-              placeholder={"Acme LLC,\nNorthwind Holdings"}
-            />
-          </Item>
+
           <Item label="Existing Notes">
             <Textarea
               rows={3}
