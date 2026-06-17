@@ -136,6 +136,20 @@ describe("recalcMasterEntities", () => {
     );
     expect(second.initialEntities).toBe(snapshot);
   });
+
+  test("creates initialEntities as a copy, decoupled from entities", () => {
+    const source = [master("e_acme", "Acme", { state: "TX" })];
+    const { initialEntities } = recalcMasterEntities(
+      data({ entities: source, calculations: { "2023": [card("Acme")] } }),
+    );
+    // Same data, but a distinct array and distinct objects (a true snapshot).
+    expect(initialEntities).toEqual(source);
+    expect(initialEntities).not.toBe(source);
+    expect(initialEntities?.[0]).not.toBe(source[0]);
+    // Mutating the original master must not reach the snapshot.
+    source[0].state = "CA";
+    expect(initialEntities?.[0].state).toBe("TX");
+  });
 });
 
 describe("renameEntityInCalculations", () => {

@@ -146,7 +146,9 @@ const entityNameSlug = (name: string): string =>
 export const recalcMasterEntities = (
   data: LeadData,
 ): Pick<LeadData, "entities" | "initialEntities"> => {
-  const initialEntities = data.initialEntities ?? data.entities ?? [];
+  // initialEntities is an immutable, one-time snapshot: created here as a copy of
+  // data.entities the first time, then always preserved as-is (never edited).
+  const initialEntities = data.initialEntities ?? (data.entities ?? []).map((e) => ({ ...e }));
   const calculations = data.calculations ?? {};
   const years = Object.keys(calculations)
     .map(Number)

@@ -159,9 +159,10 @@ export interface LeadData {
    *  Recomputed from the per-year calculations by the calculator (see
    *  recalcMasterEntities) so it always reflects every entity the client has. */
   entities: LeadDataEntity[];
-  /** One-time snapshot of the original master entity list, captured the first
-   *  time the calculator recomputes `entities`. Re-seeded into `entities` for any
-   *  year whose calculation is empty so originally-seeded entities aren't lost. */
+  /** Immutable one-time snapshot of the original master entity list, created as a
+   *  copy of `entities` the first time the calculator recomputes them and never
+   *  edited afterwards. Re-seeded into `entities` for any year whose calculation
+   *  is empty so originally-seeded entities aren't lost. */
   initialEntities?: LeadDataEntity[];
   /** Keyed by tax year (e.g. "2021"). Each year holds its own calculation —
    *  an array of the calculator's entity cards (Entity[]) once saved, or an
