@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as CalculatorRouteImport } from './routes/calculator'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocumentsConfigureRouteImport } from './routes/documents.configure'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
@@ -32,6 +33,11 @@ const LoginRoute = LoginRouteImport.update({
 const DocumentsRoute = DocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalculatorRoute = CalculatorRouteImport.update({
+  id: '/calculator',
+  path: '/calculator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -70,6 +76,7 @@ const ClientsIdFeasibilityCallRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
   '/pipeline': typeof PipelineRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
   '/pipeline': typeof PipelineRoute
@@ -93,6 +101,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
   '/pipeline': typeof PipelineRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
     | '/pipeline'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
     | '/pipeline'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
     | '/pipeline'
@@ -140,6 +152,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalculatorRoute: typeof CalculatorRoute
   DocumentsRoute: typeof DocumentsRouteWithChildren
   LoginRoute: typeof LoginRoute
   PipelineRoute: typeof PipelineRoute
@@ -167,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calculator': {
+      id: '/calculator'
+      path: '/calculator'
+      fullPath: '/calculator'
+      preLoaderRoute: typeof CalculatorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -244,6 +264,7 @@ const ClientsIdRouteWithChildren = ClientsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalculatorRoute: CalculatorRoute,
   DocumentsRoute: DocumentsRouteWithChildren,
   LoginRoute: LoginRoute,
   PipelineRoute: PipelineRoute,

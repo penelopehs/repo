@@ -1,7 +1,7 @@
 ﻿// Sticky enterprise header — Deep Navy bar with active route states and mobile sheet nav.
 
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Calculator, Users, LogIn, LogOut, FileText, Menu, Sun, Moon } from "lucide-react";
+import { Users, LogIn, LogOut, FileText, Menu, Sun, Moon } from "lucide-react";
 import { useState } from "react";
 import { useMsal, useIsAuthenticated } from "@azure/msal-react";
 import { cn } from "@/lib/utils";
@@ -9,10 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useThemeStore } from "@/store/themeStore";
 
-const NAV = [
-  { to: "/", label: "Sales Billing Calculator", icon: Calculator },
-  { to: "/pipeline", label: "Client Dashboard", icon: Users },
-] as const;
+const NAV = [{ to: "/pipeline", label: "Client Dashboard", icon: Users }] as const;
 
 export function AppHeader() {
   const { location } = useRouterState();
@@ -38,7 +35,7 @@ export function AppHeader() {
     <header className="sticky top-0 z-40 w-full border-b border-navy/20 bg-navy text-white shadow-elevated">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand */}
-        <Link to="/" search={{ leadId: undefined }} className="flex items-center gap-3 group">
+        <Link to="/" className="flex items-center gap-3 group">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 backdrop-blur ring-1 ring-white/20 transition-transform group-hover:scale-105">
             <span className="text-sm font-bold tracking-tight" style={{ color: "var(--logo)" }}>
               AS

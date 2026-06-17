@@ -54,7 +54,7 @@ import {
 
 export { calculateSOW, calculateFederal, calculateState };
 
-const routeApi = getRouteApi("/");
+const routeApi = getRouteApi("/calculator");
 
 export function CalculatorPage() {
   const {
@@ -104,7 +104,7 @@ export function CalculatorPage() {
     // Fill the input immediately so re-selecting the already-loaded client (a
     // no-op navigation that won't re-run hydration) still shows its name.
     setClientField("clientName", l.fullName);
-    navigate({ to: "/", search: buildCalculationSearch(l) as never });
+    navigate({ to: "/calculator", search: buildCalculationSearch(l) as never });
   };
 
   const lead = useMemo(

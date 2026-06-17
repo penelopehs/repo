@@ -1458,7 +1458,9 @@ export function ProfilePage({ id }: { id: string }) {
           <Button
             variant="outline"
             className="w-full border-cyan text-cyan hover:bg-cyan/10"
-            onClick={() => navigate({ to: "/", search: buildCalculationSearch(lead) as never })}
+            onClick={() =>
+              navigate({ to: "/calculator", search: buildCalculationSearch(lead) as never })
+            }
           >
             <CalcIcon className="mr-1.5 h-4 w-4" /> Open Calculator
           </Button>
