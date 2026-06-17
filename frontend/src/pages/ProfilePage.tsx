@@ -57,7 +57,11 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
-import { entitiesFromLead, stripEntityIds } from "@/store/calculatorStore";
+import {
+  entitiesFromLead,
+  stripEntityIds,
+  renameEntityInCalculations,
+} from "@/store/calculatorStore";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
@@ -290,7 +294,7 @@ export function ProfilePage({ id }: { id: string }) {
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-navy">Client not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">This client no longer exists.</p>
-        <Button className="mt-6" onClick={() => navigate({ to: "/pipeline" })}>
+        <Button className="mt-6" onClick={() => navigate({ to: "/" })}>
           Back to Pipeline
         </Button>
       </div>
@@ -355,19 +359,30 @@ export function ProfilePage({ id }: { id: string }) {
   const saveEntity = async () => {
     if (!editingEntityId || !lead.data) return;
     setEntitySaving(true);
+    const oldName = (lead.data.entities ?? []).find((e) => e.id === editingEntityId)?.name ?? "";
+    const newName = entityDraft.name.trim();
     const updatedEntities = (lead.data.entities ?? []).map((e) =>
       e.id === editingEntityId
         ? {
             ...e,
-            name: entityDraft.name.trim(),
+            name: newName,
             ein: entityDraft.ein.trim(),
             city: entityDraft.city.trim(),
             state: entityDraft.state.trim(),
           }
         : e,
     );
+    // Calculations key entities by companyName, so a rename must propagate into
+    // every year's saved calculation or the master list and calcs drift apart.
+    const updatedCalculations = renameEntityInCalculations(
+      lead.data.calculations ?? {},
+      oldName,
+      newName,
+    );
     try {
-      await updateLead(id, { data: { ...lead.data, entities: updatedEntities } });
+      await updateLead(id, {
+        data: { ...lead.data, entities: updatedEntities, calculations: updatedCalculations },
+      });
       setEditingEntityId(null);
       toast.success("Entity updated.");
     } catch {
@@ -442,7 +457,7 @@ export function ProfilePage({ id }: { id: string }) {
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       {/* Top actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/pipeline" })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/" })}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Button variant="outline" onClick={() => setOpenEdit(true)}>
@@ -1443,7 +1458,9 @@ export function ProfilePage({ id }: { id: string }) {
           <Button
             variant="outline"
             className="w-full border-cyan text-cyan hover:bg-cyan/10"
-            onClick={() => navigate({ to: "/", search: buildCalculationSearch(lead) as never })}
+            onClick={() =>
+              navigate({ to: "/calculator", search: buildCalculationSearch(lead) as never })
+            }
           >
             <CalcIcon className="mr-1.5 h-4 w-4" /> Open Calculator
           </Button>

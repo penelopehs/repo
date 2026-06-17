@@ -39,6 +39,7 @@ import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
+import { renameEntityInCalculations } from "@/store/calculatorStore";
 
 const SOURCES: LeadSource[] = [
   "Referral",
@@ -163,14 +164,23 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
       // preserving people and any existing per-year calculation buckets.
       const base = lead.data ?? { people: [], entities: [], calculations: {}, yearStatuses: {} };
       const company = parsed.data.company.trim();
+      // The "Company / Entity" field edits the first entity in the list (by
+      // position). A rename updates that entity in place — keeping its id and
+      // people links — instead of appending a new one.
+      const firstEntity = (base.entities ?? [])[0];
+      const oldCompany = firstEntity?.name?.trim() ?? "";
+      const companyRenamed = !!oldCompany && !!company && oldCompany !== company;
+      // Additional entities come from the textarea. Exclude the company name —
+      // both its new value and the old one being replaced — so the first entity
+      // is never duplicated back into the list.
       const extraEntities = (parsed.data.entityNames ?? "")
         .split(/[,\n]/)
         .map((s) => s.trim())
         .filter(Boolean)
-        .filter((n) => n !== company);
-      const names = company ? [company, ...extraEntities] : extraEntities;
-      // Rebuild the entity list, preserving each entity's stable id (and thus
-      // its people links) by matching on name. New names get a fresh id.
+        .filter((n) => n !== company && n !== oldCompany);
+      // Rebuild the entity list, preserving each entity's stable id (and thus its
+      // people links) by matching on name; the first entity is matched by
+      // position so renaming it keeps its id. New names get a fresh id.
       const byName = new Map((base.entities ?? []).map((e) => [e.name, e] as const));
       const usedIds = new Set((base.entities ?? []).map((e) => e.id));
       const newEntityId = () => {
@@ -179,10 +189,16 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         usedIds.add(id);
         return id;
       };
-      const entities: LeadDataEntity[] = names.map((name) => {
+      const entities: LeadDataEntity[] = [];
+      if (company) {
+        entities.push(
+          firstEntity ? { ...firstEntity, name: company } : { id: newEntityId(), name: company },
+        );
+      }
+      for (const name of extraEntities) {
         const existing = byName.get(name);
-        return existing ? { ...existing, name } : { id: newEntityId(), name };
-      });
+        entities.push(existing ? { ...existing, name } : { id: newEntityId(), name });
+      }
       // Drop people-links for entities that were removed in this edit.
       const keptIds = new Set(entities.map((e) => e.id));
       const entityPeople = Object.fromEntries(
@@ -201,7 +217,18 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
         const existing = base.yearStatuses?.[String(y)];
         if (existing) yearStatuses[String(y)] = existing;
       }
-      const data = { ...base, entities, calculations, entityPeople, yearStatuses };
+      // Propagate a company rename into every year's saved calculation, which
+      // keys entities by companyName (not id).
+      const renamedCalculations = companyRenamed
+        ? renameEntityInCalculations(calculations, oldCompany, company)
+        : calculations;
+      const data = {
+        ...base,
+        entities,
+        calculations: renamedCalculations,
+        entityPeople,
+        yearStatuses,
+      };
 
       await update(lead.id, {
         firstName: parsed.data.firstName,
@@ -339,18 +366,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
               onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
             />
           </Item>
-          <Item label="Entity / Entities (comma separated, one per line)">
-            <Textarea
-              rows={Math.max(3, form.entityNames.split("\n").length + 1)}
-              value={form.entityNames}
-              onChange={(e) => {
-                const val = e.target.value;
-                const first = val.split(/[,\n]/)[0]?.trim() ?? "";
-                setForm({ ...form, entityNames: val, company: first || form.company });
-              }}
-              placeholder={"Acme LLC,\nNorthwind Holdings"}
-            />
-          </Item>
+
           <Item label="Existing Notes">
             <Textarea
               rows={3}

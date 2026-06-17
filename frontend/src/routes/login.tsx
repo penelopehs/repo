@@ -5,7 +5,7 @@ import { isAuthenticated } from "@/lib/auth/authConfig";
 export const Route = createFileRoute("/login")({
   // Already signed in with Microsoft? Skip the login page.
   beforeLoad: () => {
-    if (isAuthenticated()) throw redirect({ to: "/pipeline" });
+    if (isAuthenticated()) throw redirect({ to: "/" });
   },
   head: () => ({
     meta: [

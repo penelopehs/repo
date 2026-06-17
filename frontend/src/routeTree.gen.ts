@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PipelineRouteImport } from './routes/pipeline'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DocumentsRouteImport } from './routes/documents'
+import { Route as CalculatorRouteImport } from './routes/calculator'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocumentsConfigureRouteImport } from './routes/documents.configure'
 import { Route as ClientsIdRouteImport } from './routes/clients.$id'
@@ -19,11 +19,6 @@ import { Route as DocumentsReviewEngagementIdRouteImport } from './routes/docume
 import { Route as DocumentsEditEngagementIdRouteImport } from './routes/documents.edit.$engagementId'
 import { Route as ClientsIdFeasibilityCallRouteImport } from './routes/clients.$id.feasibility-call'
 
-const PipelineRoute = PipelineRouteImport.update({
-  id: '/pipeline',
-  path: '/pipeline',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -32,6 +27,11 @@ const LoginRoute = LoginRouteImport.update({
 const DocumentsRoute = DocumentsRouteImport.update({
   id: '/documents',
   path: '/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalculatorRoute = CalculatorRouteImport.update({
+  id: '/calculator',
+  path: '/calculator',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -70,9 +70,9 @@ const ClientsIdFeasibilityCallRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
-  '/pipeline': typeof PipelineRoute
   '/clients/$id': typeof ClientsIdRouteWithChildren
   '/documents/configure': typeof DocumentsConfigureRoute
   '/clients/$id/feasibility-call': typeof ClientsIdFeasibilityCallRoute
@@ -81,9 +81,9 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
-  '/pipeline': typeof PipelineRoute
   '/clients/$id': typeof ClientsIdRouteWithChildren
   '/documents/configure': typeof DocumentsConfigureRoute
   '/clients/$id/feasibility-call': typeof ClientsIdFeasibilityCallRoute
@@ -93,9 +93,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/calculator': typeof CalculatorRoute
   '/documents': typeof DocumentsRouteWithChildren
   '/login': typeof LoginRoute
-  '/pipeline': typeof PipelineRoute
   '/clients/$id': typeof ClientsIdRouteWithChildren
   '/documents/configure': typeof DocumentsConfigureRoute
   '/clients/$id/feasibility-call': typeof ClientsIdFeasibilityCallRoute
@@ -106,9 +106,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
-    | '/pipeline'
     | '/clients/$id'
     | '/documents/configure'
     | '/clients/$id/feasibility-call'
@@ -117,9 +117,9 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
-    | '/pipeline'
     | '/clients/$id'
     | '/documents/configure'
     | '/clients/$id/feasibility-call'
@@ -128,9 +128,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/calculator'
     | '/documents'
     | '/login'
-    | '/pipeline'
     | '/clients/$id'
     | '/documents/configure'
     | '/clients/$id/feasibility-call'
@@ -140,21 +140,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CalculatorRoute: typeof CalculatorRoute
   DocumentsRoute: typeof DocumentsRouteWithChildren
   LoginRoute: typeof LoginRoute
-  PipelineRoute: typeof PipelineRoute
   ClientsIdRoute: typeof ClientsIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/pipeline': {
-      id: '/pipeline'
-      path: '/pipeline'
-      fullPath: '/pipeline'
-      preLoaderRoute: typeof PipelineRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -167,6 +160,13 @@ declare module '@tanstack/react-router' {
       path: '/documents'
       fullPath: '/documents'
       preLoaderRoute: typeof DocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calculator': {
+      id: '/calculator'
+      path: '/calculator'
+      fullPath: '/calculator'
+      preLoaderRoute: typeof CalculatorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -244,9 +244,9 @@ const ClientsIdRouteWithChildren = ClientsIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CalculatorRoute: CalculatorRoute,
   DocumentsRoute: DocumentsRouteWithChildren,
   LoginRoute: LoginRoute,
-  PipelineRoute: PipelineRoute,
   ClientsIdRoute: ClientsIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport

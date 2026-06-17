@@ -1,22 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalculatorPage } from "@/pages/CalculatorPage";
+import { PipelinePage } from "@/pages/PipelinePage";
 
+// The client dashboard is the app's home page.
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => {
-    const raw = search.leadId;
-    const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
-    return { leadId: Number.isFinite(n) ? n : undefined };
-  },
   head: () => ({
     meta: [
-      { title: "R&D Billing Calculator — AcquireIQ" },
+      { title: "Client Pipeline — AcquireIQ" },
       {
         name: "description",
-        content: "Enterprise R&D tax credit and billing calculator for multi-entity clients.",
+        content: "Manage leads, send proposals, and track active client engagements.",
       },
-      { property: "og:title", content: "R&D Billing Calculator" },
-      { property: "og:description", content: "Enterprise R&D tax credit and billing calculator." },
+      { property: "og:title", content: "Client Pipeline" },
+      {
+        property: "og:description",
+        content: "Manage leads, send proposals, and track active engagements.",
+      },
     ],
   }),
-  component: CalculatorPage,
+  component: PipelinePage,
 });

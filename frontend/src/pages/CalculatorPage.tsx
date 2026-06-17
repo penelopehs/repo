@@ -25,7 +25,12 @@ import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
 import { PhaseDonutChart } from "@/components/calculator/PhaseDonutChart";
 import { BillingYearReport } from "@/components/calculator/BillingYearReport";
-import { useCalculatorStore, entitiesForYear, stripEntityIds } from "@/store/calculatorStore";
+import {
+  useCalculatorStore,
+  entitiesForYear,
+  stripEntityIds,
+  recalcMasterEntities,
+} from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { buildCalculationSearch, calculationYears } from "@/utils/calculationContext";
@@ -49,7 +54,7 @@ import {
 
 export { calculateSOW, calculateFederal, calculateState };
 
-const routeApi = getRouteApi("/");
+const routeApi = getRouteApi("/calculator");
 
 export function CalculatorPage() {
   const {
@@ -90,17 +95,16 @@ export function CalculatorPage() {
     const q = client.clientName.trim().toLowerCase();
     if (!q) return [];
     return leads
-      .filter(
-        (l) =>
-          String(l.id) !== String(leadId) &&
-          (l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q)),
-      )
+      .filter((l) => l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q))
       .slice(0, 8);
-  }, [leads, client.clientName, leadId]);
+  }, [leads, client.clientName]);
 
   const selectClient = (l: Lead) => {
     setNameFocused(false);
-    navigate({ to: "/", search: buildCalculationSearch(l) as never });
+    // Fill the input immediately so re-selecting the already-loaded client (a
+    // no-op navigation that won't re-run hydration) still shows its name.
+    setClientField("clientName", l.fullName);
+    navigate({ to: "/calculator", search: buildCalculationSearch(l) as never });
   };
 
   const lead = useMemo(
@@ -271,11 +275,15 @@ export function CalculatorPage() {
       !Array.isArray(existing.calculations)
         ? existing.calculations
         : EMPTY_CALCULATIONS;
-    const data: LeadData = {
-      ...existing,
-      // Entity ids live on the master list, not inside the calculation.
-      calculations: { ...calcs, [String(p.year)]: stripEntityIds(p.entities) },
+    // Entity ids live on the master list, not inside the calculation.
+    const calculations = {
+      ...calcs,
+      [String(p.year)]: stripEntityIds(p.entities),
     };
+    // Rebuild the master entity list from every year's calculation so entities
+    // added/renamed in the calculator propagate back to data.entities.
+    const { entities, initialEntities } = recalcMasterEntities({ ...existing, calculations });
+    const data: LeadData = { ...existing, calculations, entities, initialEntities };
     void updateLead(String(p.leadId), { data }).catch(() => {});
     setSavedFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
