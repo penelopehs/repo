@@ -223,9 +223,7 @@ export function BillingTable({
                     <span className="text-muted-foreground text-xs">No state credit</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                  —
-                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">—</td>
               </tr>
             ))}
           </tbody>

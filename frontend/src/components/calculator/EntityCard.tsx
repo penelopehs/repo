@@ -285,8 +285,8 @@ export function EntityCard({ entity, index, taxYear }: Props) {
                   ) : complete && !stateEligible ? (
                     <div className="rounded-lg border border-cyan/30 bg-cyan/5 p-3 text-sm text-cyan">
                       <span className="inline-flex items-center gap-2 font-semibold">
-                        <BadgeCheck className="h-4 w-4" /> Federal credit only â€” no state credit for
-                        this state
+                        <BadgeCheck className="h-4 w-4" /> Federal credit only â€” no state credit
+                        for this state
                       </span>
                     </div>
                   ) : (
@@ -462,5 +462,3 @@ export function EntityCard({ entity, index, taxYear }: Props) {
     </motion.div>
   );
 }
-
-

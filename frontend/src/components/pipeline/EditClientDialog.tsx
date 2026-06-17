@@ -458,10 +458,11 @@ function Item({
     <div>
       <Label className="mb-1.5 block">
         {label}
-        {optional && <span className="text-muted-foreground ml-2 text-xs font-normal">optional</span>}
+        {optional && (
+          <span className="text-muted-foreground ml-2 text-xs font-normal">optional</span>
+        )}
       </Label>
       {children}
     </div>
   );
 }
-
