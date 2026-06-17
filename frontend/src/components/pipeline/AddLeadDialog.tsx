@@ -1,4 +1,4 @@
-// "Add New Lead" modal — validated with zod, dispatches to leads store.
+﻿// "Add New Lead" modal — validated with zod, dispatches to leads store.
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
@@ -433,7 +433,7 @@ export function AddLeadDialog() {
             </Field>
 
             <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors"></div>
-            <div className="text-gray-500 font-normal flex">
+            <div className="text-muted-foreground font-normal flex">
               <div className="whitespace-nowrap">Optional Assignments</div>
               <div className="flex h-0 w-full rounded-md border bg-transparent shadow-sm transition-colors my-3 ml-3"></div>
             </div>
@@ -554,7 +554,9 @@ function Field({
     <div>
       <Label className="mb-1.5 block">
         {label}
-        {optional && <span className="text-gray-500 ml-2 text-xs font-normal">optional</span>}
+        {optional && (
+          <span className="text-muted-foreground ml-2 text-xs font-normal">optional</span>
+        )}
       </Label>
       {children}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}

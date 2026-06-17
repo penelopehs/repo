@@ -379,9 +379,17 @@ export function ProfilePage({ id }: { id: string }) {
       oldName,
       newName,
     );
+    const updatedInitialEntities = (lead.data.initialEntities ?? []).map((e) =>
+      e.id === editingEntityId ? { ...e, name: newName } : e,
+    );
     try {
       await updateLead(id, {
-        data: { ...lead.data, entities: updatedEntities, calculations: updatedCalculations },
+        data: {
+          ...lead.data,
+          entities: updatedEntities,
+          initialEntities: updatedInitialEntities,
+          calculations: updatedCalculations,
+        },
       });
       setEditingEntityId(null);
       toast.success("Entity updated.");
@@ -873,6 +881,7 @@ export function ProfilePage({ id }: { id: string }) {
                                     onChange={(ev) =>
                                       setEntityDraft((d) => ({ ...d, name: ev.target.value }))
                                     }
+                                    disabled={entitySaving}
                                     autoFocus
                                   />
                                 ) : (
@@ -888,6 +897,7 @@ export function ProfilePage({ id }: { id: string }) {
                                     onChange={(ev) =>
                                       setEntityDraft((d) => ({ ...d, ein: ev.target.value }))
                                     }
+                                    disabled={entitySaving}
                                   />
                                 ) : (
                                   e.ein || "—"
@@ -903,6 +913,7 @@ export function ProfilePage({ id }: { id: string }) {
                                       onChange={(ev) =>
                                         setEntityDraft((d) => ({ ...d, city: ev.target.value }))
                                       }
+                                      disabled={entitySaving}
                                     />
                                     <Input
                                       className="h-7 text-xs w-14"
@@ -915,6 +926,7 @@ export function ProfilePage({ id }: { id: string }) {
                                           state: ev.target.value.toUpperCase(),
                                         }))
                                       }
+                                      disabled={entitySaving}
                                     />
                                   </div>
                                 ) : (

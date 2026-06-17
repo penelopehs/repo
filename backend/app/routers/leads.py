@@ -1093,7 +1093,8 @@ def submit_calculation(
 @router.delete("/leads/{lead_id}/calculations", status_code=204)
 def clear_calculations(lead_id: int, db: Session = Depends(get_db)):
     lead = _get_lead(db, lead_id)
-    lead.data = {}
+    data = lead.data if isinstance(lead.data, dict) else {}
+    lead.data = {**data, "calculations": {}}
     db.commit()
 
 

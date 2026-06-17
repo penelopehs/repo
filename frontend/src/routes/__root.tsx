@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+﻿import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -133,6 +133,13 @@ function AuthGate() {
       <AuthenticatedTemplate>
         <div className="min-h-screen bg-background">
           <AppHeader />
+          <div className="w-full border-b border-orange/30 bg-orange/10 px-4 py-2 text-center text-sm">
+            <span className="font-semibold text-orange">R&amp;D Credit Deadline</span>
+            <span className="mx-2 text-muted-foreground">·</span>
+            <span className="text-foreground">
+              File by <strong>July 6, 2026</strong> to claim 2022.
+            </span>
+          </div>
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
         </div>
