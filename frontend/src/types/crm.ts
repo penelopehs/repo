@@ -173,6 +173,9 @@ export interface LeadData {
    *  view (a person's entities) is derived from this single source of truth. */
   entityPeople?: Record<string, string[]>;
   filingStatus?: FilingStatus;
+  /** Free-form calculator notes for the client, autosaved from the calculator
+   *  page's Notes field (per-lead, shared across all tax years). */
+  notes?: string;
   /** Per-year R&D eligibility status overrides. Keyed by year as a string. */
   yearStatuses?: Record<string, TaxYearRecord>;
 }
