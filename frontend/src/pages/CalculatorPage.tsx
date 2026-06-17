@@ -91,15 +91,16 @@ export function CalculatorPage() {
     if (!q) return [];
     return leads
       .filter(
-        (l) =>
-          String(l.id) !== String(leadId) &&
-          (l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q)),
+        (l) => l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q),
       )
       .slice(0, 8);
-  }, [leads, client.clientName, leadId]);
+  }, [leads, client.clientName]);
 
   const selectClient = (l: Lead) => {
     setNameFocused(false);
+    // Fill the input immediately so re-selecting the already-loaded client (a
+    // no-op navigation that won't re-run hydration) still shows its name.
+    setClientField("clientName", l.fullName);
     navigate({ to: "/", search: buildCalculationSearch(l) as never });
   };
 
