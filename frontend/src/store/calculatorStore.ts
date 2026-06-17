@@ -217,6 +217,30 @@ export const recalcMasterEntities = (
   return { entities, initialEntities };
 };
 
+// Rename an entity across every year's saved calculation. Calculations key
+// entities by companyName (no id), so renaming a master entity must also rewrite
+// the matching cards or the two lists drift apart. Matches by normalized name;
+// returns a new calculations object (non-array year values are passed through).
+export const renameEntityInCalculations = (
+  calculations: Record<string, Entity[] | unknown>,
+  oldName: string,
+  newName: string,
+): Record<string, Entity[] | unknown> => {
+  const target = normalizeEntityName(oldName);
+  if (!target || normalizeEntityName(newName) === target) return calculations;
+  const next: Record<string, Entity[] | unknown> = {};
+  for (const [year, calc] of Object.entries(calculations)) {
+    next[year] = Array.isArray(calc)
+      ? (calc as Array<Omit<Entity, "id">>).map((card) =>
+          normalizeEntityName(card.companyName) === target
+            ? { ...card, companyName: newName }
+            : card,
+        )
+      : calc;
+  }
+  return next;
+};
+
 export const useCalculatorStore = create<CalculatorState>((set) => ({
   client: {
     clientName: "",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Entity, LeadData, LeadDataEntity } from "@/types/crm";
-import { recalcMasterEntities } from "./calculatorStore";
+import { recalcMasterEntities, renameEntityInCalculations } from "./calculatorStore";
 
 // A minimal saved calculation card (calculations hold Omit<Entity, "id">).
 const card = (companyName: string, over: Partial<Entity> = {}): Omit<Entity, "id"> => ({
@@ -135,5 +135,40 @@ describe("recalcMasterEntities", () => {
       }),
     );
     expect(second.initialEntities).toBe(snapshot);
+  });
+});
+
+describe("renameEntityInCalculations", () => {
+  test("renames matching cards across every year, by normalized name", () => {
+    const next = renameEntityInCalculations(
+      {
+        "2023": [card("Acme"), card("Beta LLC")],
+        "2024": [card(" acme ")],
+      },
+      "Acme",
+      "Acme Holdings",
+    );
+    expect((next["2023"] as Array<Omit<Entity, "id">>).map((c) => c.companyName)).toEqual([
+      "Acme Holdings",
+      "Beta LLC",
+    ]);
+    expect((next["2024"] as Array<Omit<Entity, "id">>).map((c) => c.companyName)).toEqual([
+      "Acme Holdings",
+    ]);
+  });
+
+  test("is a no-op when the name is unchanged or blank", () => {
+    const calcs = { "2023": [card("Acme")] };
+    expect(renameEntityInCalculations(calcs, "Acme", " acme ")).toBe(calcs);
+    expect(renameEntityInCalculations(calcs, "", "Whatever")).toBe(calcs);
+  });
+
+  test("passes through non-array year values untouched", () => {
+    const next = renameEntityInCalculations(
+      { "2023": [card("Acme")], "2024": {} },
+      "Acme",
+      "Acme Holdings",
+    );
+    expect(next["2024"]).toEqual({});
   });
 });

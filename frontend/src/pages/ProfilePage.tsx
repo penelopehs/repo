@@ -57,7 +57,11 @@ import { KpiCard } from "@/components/KpiCard";
 import { YearChips } from "@/components/MultiYearSelect";
 import { StatusBadge } from "@/components/pipeline/StatusBadge";
 import { useLeadsStore } from "@/store/leadsStore";
-import { entitiesFromLead, stripEntityIds } from "@/store/calculatorStore";
+import {
+  entitiesFromLead,
+  stripEntityIds,
+  renameEntityInCalculations,
+} from "@/store/calculatorStore";
 import { useFollowUpCallsStore } from "@/store/followUpCallsStore";
 import { useIntakeNotesStore } from "@/store/intakeNotesStore";
 import { ScheduleCallDialog } from "@/components/profile/ScheduleCallDialog";
@@ -355,19 +359,30 @@ export function ProfilePage({ id }: { id: string }) {
   const saveEntity = async () => {
     if (!editingEntityId || !lead.data) return;
     setEntitySaving(true);
+    const oldName = (lead.data.entities ?? []).find((e) => e.id === editingEntityId)?.name ?? "";
+    const newName = entityDraft.name.trim();
     const updatedEntities = (lead.data.entities ?? []).map((e) =>
       e.id === editingEntityId
         ? {
             ...e,
-            name: entityDraft.name.trim(),
+            name: newName,
             ein: entityDraft.ein.trim(),
             city: entityDraft.city.trim(),
             state: entityDraft.state.trim(),
           }
         : e,
     );
+    // Calculations key entities by companyName, so a rename must propagate into
+    // every year's saved calculation or the master list and calcs drift apart.
+    const updatedCalculations = renameEntityInCalculations(
+      lead.data.calculations ?? {},
+      oldName,
+      newName,
+    );
     try {
-      await updateLead(id, { data: { ...lead.data, entities: updatedEntities } });
+      await updateLead(id, {
+        data: { ...lead.data, entities: updatedEntities, calculations: updatedCalculations },
+      });
       setEditingEntityId(null);
       toast.success("Entity updated.");
     } catch {
