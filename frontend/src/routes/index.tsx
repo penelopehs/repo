@@ -1,9 +1,21 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { PipelinePage } from "@/pages/PipelinePage";
 
-// The root path no longer hosts the calculator (now at /calculator). Send it to
-// the client dashboard, the app's primary landing surface.
+// The client dashboard is the app's home page.
 export const Route = createFileRoute("/")({
-  beforeLoad: () => {
-    throw redirect({ to: "/pipeline" });
-  },
+  head: () => ({
+    meta: [
+      { title: "Client Pipeline — AcquireIQ" },
+      {
+        name: "description",
+        content: "Manage leads, send proposals, and track active client engagements.",
+      },
+      { property: "og:title", content: "Client Pipeline" },
+      {
+        property: "og:description",
+        content: "Manage leads, send proposals, and track active engagements.",
+      },
+    ],
+  }),
+  component: PipelinePage,
 });

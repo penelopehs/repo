@@ -294,7 +294,7 @@ export function ProfilePage({ id }: { id: string }) {
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
         <h1 className="text-2xl font-bold text-navy">Client not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">This client no longer exists.</p>
-        <Button className="mt-6" onClick={() => navigate({ to: "/pipeline" })}>
+        <Button className="mt-6" onClick={() => navigate({ to: "/" })}>
           Back to Pipeline
         </Button>
       </div>
@@ -457,7 +457,7 @@ export function ProfilePage({ id }: { id: string }) {
     <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       {/* Top actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/pipeline" })}>
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/" })}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <Button variant="outline" onClick={() => setOpenEdit(true)}>

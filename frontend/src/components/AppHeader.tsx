@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useThemeStore } from "@/store/themeStore";
 
-const NAV = [{ to: "/pipeline", label: "Client Dashboard", icon: Users }] as const;
+const NAV = [{ to: "/", label: "Client Dashboard", icon: Users }] as const;
 
 export function AppHeader() {
   const { location } = useRouterState();
