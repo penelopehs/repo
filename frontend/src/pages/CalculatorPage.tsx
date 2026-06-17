@@ -25,7 +25,12 @@ import { EntityCard } from "@/components/calculator/EntityCard";
 import { BillingTable } from "@/components/calculator/BillingTable";
 import { PhaseDonutChart } from "@/components/calculator/PhaseDonutChart";
 import { BillingYearReport } from "@/components/calculator/BillingYearReport";
-import { useCalculatorStore, entitiesForYear, stripEntityIds } from "@/store/calculatorStore";
+import {
+  useCalculatorStore,
+  entitiesForYear,
+  stripEntityIds,
+  recalcMasterEntities,
+} from "@/store/calculatorStore";
 import { useLeadsStore } from "@/store/leadsStore";
 import { formatCurrency } from "@/utils/format";
 import { buildCalculationSearch, calculationYears } from "@/utils/calculationContext";
@@ -90,9 +95,7 @@ export function CalculatorPage() {
     const q = client.clientName.trim().toLowerCase();
     if (!q) return [];
     return leads
-      .filter(
-        (l) => l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q),
-      )
+      .filter((l) => l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q))
       .slice(0, 8);
   }, [leads, client.clientName]);
 
@@ -264,11 +267,15 @@ export function CalculatorPage() {
       entities: [],
       calculations: EMPTY_CALCULATIONS,
     };
-    const data: LeadData = {
-      ...existing,
-      // Entity ids live on the master list, not inside the calculation.
-      calculations: { ...existing.calculations, [String(p.year)]: stripEntityIds(p.entities) },
+    // Entity ids live on the master list, not inside the calculation.
+    const calculations = {
+      ...existing.calculations,
+      [String(p.year)]: stripEntityIds(p.entities),
     };
+    // Rebuild the master entity list from every year's calculation so entities
+    // added/renamed in the calculator propagate back to data.entities.
+    const { entities, initialEntities } = recalcMasterEntities({ ...existing, calculations });
+    const data: LeadData = { ...existing, calculations, entities, initialEntities };
     void updateLead(String(p.leadId), { data }).catch(() => {});
   }, [getLead, updateLead]);
 

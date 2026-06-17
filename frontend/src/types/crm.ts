@@ -155,8 +155,14 @@ export interface TaxYearRecord {
  *  echoed by GET/POST/PATCH /leads. */
 export interface LeadData {
   people: LeadDataPerson[];
-  /** Master entity list (names) for the client; seeds each year's calculation. */
+  /** Master entity list (names) for the client; seeds each year's calculation.
+   *  Recomputed from the per-year calculations by the calculator (see
+   *  recalcMasterEntities) so it always reflects every entity the client has. */
   entities: LeadDataEntity[];
+  /** One-time snapshot of the original master entity list, captured the first
+   *  time the calculator recomputes `entities`. Re-seeded into `entities` for any
+   *  year whose calculation is empty so originally-seeded entities aren't lost. */
+  initialEntities?: LeadDataEntity[];
   /** Keyed by tax year (e.g. "2021"). Each year holds its own calculation —
    *  an array of the calculator's entity cards (Entity[]) once saved, or an
    *  empty array before the calculator has been opened for that year. */

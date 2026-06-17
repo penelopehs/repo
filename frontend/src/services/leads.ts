@@ -188,6 +188,9 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
   return {
     people: Array.isArray(data.people) ? data.people.map((p) => normalizePerson(p)) : [],
     entities: withEntityIds(Array.isArray(data.entities) ? data.entities : []),
+    ...(Array.isArray(data.initialEntities) && {
+      initialEntities: withEntityIds(data.initialEntities),
+    }),
     calculations:
       data.calculations && typeof data.calculations === "object"
         ? data.calculations
