@@ -128,7 +128,12 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
   clearTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [] } })),
   setEntityCountInput: (n) => set({ entityCountInput: Math.max(1, Math.min(50, n)) }),
   generateEntities: (n) =>
-    set(() => ({ entities: Array.from({ length: n }, (_, i) => newEntity(i)) })),
+    set((s) => ({
+      entities: [
+        ...s.entities,
+        ...Array.from({ length: n }, (_, i) => newEntity(s.entities.length + i)),
+      ],
+    })),
   addEntity: () => set((s) => ({ entities: [...s.entities, newEntity(s.entities.length)] })),
   removeEntity: (id) => set((s) => ({ entities: s.entities.filter((e) => e.id !== id) })),
   updateEntity: (id, k, v) =>
