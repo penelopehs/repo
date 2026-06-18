@@ -825,7 +825,10 @@ function CallSetupStep({
             {taxYears && taxYears.length > 0 ? (
               (() => {
                 const selectedYears = setup.taxYear
-                  ? setup.taxYear.split(",").map((y) => y.trim()).filter(Boolean)
+                  ? setup.taxYear
+                      .split(",")
+                      .map((y) => y.trim())
+                      .filter(Boolean)
                   : [];
                 const toggle = (year: string) => {
                   const isSelected = selectedYears.includes(year);
