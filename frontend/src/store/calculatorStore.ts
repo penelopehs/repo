@@ -108,17 +108,31 @@ export const entitiesForYear = (lead: Pick<Lead, "data">, year: TaxYear): Entity
     : entitiesFromLead(lead.data?.entities ?? []);
 };
 
+// Per-year financial fields belong on the calculation (lead.data.calculations),
+// not on the shared master entity. The calculator must never write them to
+// lead.data.entities, so they're dropped from both the card→master mapping and
+// the merged output below.
+const MASTER_EXCLUDED_FIELDS = [
+  "w2Wages",
+  "contractResearch",
+  "supplies",
+  "notes",
+  "employeeCount",
+] as const;
+
+const stripMasterExcludedFields = (entity: LeadDataEntity): LeadDataEntity => {
+  const copy = { ...entity } as Record<string, unknown>;
+  for (const k of MASTER_EXCLUDED_FIELDS) delete copy[k];
+  return copy as unknown as LeadDataEntity;
+};
+
 // Reverse of entityFromLead: project a calculator card back onto a master entity
-// (id-less). Only the fields a card carries are mapped; the rest (ein, city, …)
-// stay with the existing master entity during the merge below.
+// (id-less). Only the identity fields a card carries are mapped; per-year
+// financials are excluded, and the rest (ein, city, …) stay with the existing
+// master entity during the merge below.
 const leadEntityFromCard = (card: Omit<Entity, "id">): Omit<LeadDataEntity, "id"> => ({
   name: card.companyName ?? "",
   state: card.state ?? "",
-  employeeCount: card.employeeCount ?? "",
-  w2Wages: card.wagesW2 ?? "",
-  contractResearch: card.contractWages ?? "",
-  supplies: card.totalSupplies ?? "",
-  notes: card.notes ?? "",
 });
 
 // Entity identity for de-duplication: the name, trimmed and lower-cased.
@@ -208,11 +222,13 @@ export const recalcMasterEntities = (
       for (const [k, v] of Object.entries(cand)) {
         if (!isEmptyValue(v)) merged[k] = v;
       }
-      entities.push(merged as unknown as LeadDataEntity);
+      // Strip excluded fields so stale per-year financials on an older master
+      // entity are cleaned up rather than carried forward.
+      entities.push(stripMasterExcludedFields(merged as unknown as LeadDataEntity));
     } else {
       const id = mintId(cand.name);
       usedIds.add(id);
-      entities.push({ ...cand, id });
+      entities.push(stripMasterExcludedFields({ ...cand, id }));
     }
   }
 
