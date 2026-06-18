@@ -24,13 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, Loader2, Plus } from "lucide-react";
-import type { Lead, LeadSource, SalesRep, TaxYear } from "@/types/crm";
+import type { Lead, LeadSource, LeadStatus, SalesRep, TaxYear } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import { clientsApi, type ClientContactRow } from "@/services/clients";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
 import { IntroCallPromptDialog } from "@/components/pipeline/IntroCallPromptDialog";
 
 const SOURCES: LeadSource[] = [
@@ -60,6 +60,13 @@ const schema = z
       "LinkedIn",
       "Partner",
       "Other",
+    ]),
+    status: z.enum([
+      "new_lead",
+      "intro_call",
+      "feasibility_call",
+      "tax_preparer_coordination",
+      "closed",
     ]),
     rep: z.string().trim().min(1, "Required"),
     // Optional assignments — users.iduser as a string ("" = unassigned).
@@ -92,6 +99,7 @@ const initial: FormState = {
   email: "",
   phone: "",
   source: "Website",
+  status: "new_lead",
   rep: "",
   salesManager: "",
   trainingManager: "",
@@ -393,6 +401,23 @@ export function AddLeadDialog() {
                 </ContactPicker>
               </Field>
             </div>
+            <Field label="Pipeline Status">
+              <Select
+                value={form.status}
+                onValueChange={(v) => set("status", v as LeadStatus)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PIPELINE_STAGES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Lead Source">
                 <Select value={form.source} onValueChange={(v) => set("source", v as LeadSource)}>

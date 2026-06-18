@@ -520,7 +520,11 @@ def create_lead(
         last_name=body.last_name,
         email=body.email,
         phone=body.phone,
-        pipeline_status=PipelineStatus.new_lead.value,
+        pipeline_status=(
+            body.pipeline_status.value
+            if body.pipeline_status is not None
+            else PipelineStatus.new_lead.value
+        ),
         lead_source=body.lead_source,
         salesperson_iduser=body.assigned_sales_rep or caller.iduser,
         sales_manager_iduser=body.sales_manager_iduser,
@@ -528,6 +532,12 @@ def create_lead(
         notes=body.notes,
         data=data,
     )
+    # Creating a lead straight into the terminal "Closed" stage starts the
+    # engagement and SOW clocks, mirroring update_lead.
+    if lead.pipeline_status == PipelineStatus.closed.value:
+        now = datetime.now(timezone.utc)
+        lead.engagement_started_at = now
+        lead.sow_signed_at = now
     db.add(lead)
     db.commit()
     db.refresh(lead)

@@ -275,6 +275,8 @@ export interface LeadCreateInput {
   email: string;
   phone: string;
   source: LeadSource;
+  /** Initial pipeline stage; omitted lets the backend default to "New Lead". */
+  status?: LeadStatus;
   /** The assigned sales rep (users.iduser); null lets the backend default it. */
   repId: number | null;
   /** epr id (identity_people_roles) of a picked existing client, if any. */
@@ -322,6 +324,7 @@ export const leadsApi = {
       email: input.email,
       phone: input.phone,
       lead_source: input.source,
+      pipeline_status: input.status ? STATUS_TO_API[input.status] : undefined,
       epr_id: input.eprId ?? null,
       assigned_sales_rep: input.repId,
       tax_years: input.taxYears ?? [],

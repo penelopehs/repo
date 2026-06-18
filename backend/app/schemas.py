@@ -78,6 +78,8 @@ class LeadCreate(BaseModel):
     # The company / entity name — seeded into the calculations JSON as an entity.
     company: Optional[str] = None
     lead_source: Optional[str] = None
+    # Initial pipeline stage; defaults to "New Lead" when omitted.
+    pipeline_status: Optional[PipelineStatus] = None
     # The assigned sales rep (users.iduser); defaults to the calling user.
     assigned_sales_rep: Optional[int] = None
     # Optional assignments (users.iduser).
