@@ -149,9 +149,6 @@ export function CalculatorPage() {
     entities.forEach((e) => {
       if (!e.companyName?.trim()) missing.add(FIELD_LABELS.companyName);
       if (!e.state) missing.add(FIELD_LABELS.state);
-      if (!e.filingStatus) missing.add(FIELD_LABELS.filingStatus);
-      else if (e.filingStatus === "Other" && !e.customFilingStatus?.trim())
-        missing.add(FIELD_LABELS.customFilingStatus);
       (
         ["grossRevenue", "wagesOfficers", "wagesW2", "contractWages", "totalSupplies"] as const
       ).forEach((k) => {
