@@ -715,6 +715,15 @@ export function CalculatorPage() {
             </div>
           )}
 
+          {finalBill.message && (
+            <div
+              role="alert"
+              className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {finalBill.message}
+            </div>
+          )}
+
           <div
             id="billing-overview-section"
             className="flex flex-col gap-6 rounded-xl border border-border bg-gradient-frost p-5 lg:flex-row lg:items-start lg:justify-between"
