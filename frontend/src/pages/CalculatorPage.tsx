@@ -149,9 +149,6 @@ export function CalculatorPage() {
     entities.forEach((e) => {
       if (!e.companyName?.trim()) missing.add(FIELD_LABELS.companyName);
       if (!e.state) missing.add(FIELD_LABELS.state);
-      if (!e.filingStatus) missing.add(FIELD_LABELS.filingStatus);
-      else if (e.filingStatus === "Other" && !e.customFilingStatus?.trim())
-        missing.add(FIELD_LABELS.customFilingStatus);
       (
         ["grossRevenue", "wagesOfficers", "wagesW2", "contractWages", "totalSupplies"] as const
       ).forEach((k) => {
@@ -176,6 +173,9 @@ export function CalculatorPage() {
       hydratedLeadId.current = null;
       setClientField("clientName", "");
       setClientField("taxYears", []);
+      notesBaseline.current = null;
+      notesArmed.current = false;
+      setNotes("");
       return;
     }
     // Already hydrated this lead — leave the user's selection alone.
@@ -184,8 +184,11 @@ export function CalculatorPage() {
       // Switching to a lead that isn't loaded yet (deep link / page refresh, or
       // another client picked from suggestions). Clear the previous client's
       // selected years so they don't linger, then fetch it; the resulting
-      // `leads` update re-runs this effect to hydrate.
+      // `leads` update re-runs this effect to hydrate. Disarm notes saves until
+      // the real value is hydrated below.
       setClientField("taxYears", []);
+      notesBaseline.current = null;
+      notesArmed.current = false;
       void fetchLead(String(leadId)).catch(() => {});
       return;
     }
@@ -193,7 +196,11 @@ export function CalculatorPage() {
     const years = calculationYears(lead);
     setClientField("clientName", lead.fullName);
     setClientField("taxYears", years.slice(-1));
-  }, [leadId, lead, fetchLead, setClientField]);
+    const hydratedNotes = lead.data?.notes ?? "";
+    notesBaseline.current = hydratedNotes;
+    notesArmed.current = false;
+    setNotes(hydratedNotes);
+  }, [leadId, lead, fetchLead, setClientField, setNotes]);
 
   const selectedYear = client.taxYears[0];
 
@@ -254,37 +261,60 @@ export function CalculatorPage() {
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Notes autosave: the calculator's global notes are persisted to
+  // lead.data.notes, debounced through the same flushSave path as entities. A ref
+  // mirrors the latest value so flushSave can read it; baseline + armed mirror the
+  // entities arming so hydration is never echoed straight back to the server.
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const notesBaseline = useRef<string | null>(null);
+  const notesArmed = useRef(false);
+  const pendingNotesLeadId = useRef<number | null>(null);
+
   const flushSave = useCallback(() => {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
       saveTimer.current = null;
     }
     const p = pendingSave.current;
+    const notesLeadId = pendingNotesLeadId.current;
     pendingSave.current = null;
-    if (!p) return;
-    const current = getLead(String(p.leadId));
+    pendingNotesLeadId.current = null;
+    if (!p && notesLeadId == null) return;
+    // Both pending edits target the lead in view; entities lead wins if set.
+    const targetLeadId = p?.leadId ?? notesLeadId!;
+    const current = getLead(String(targetLeadId));
     if (!current) return;
     const existing: LeadData = current.data ?? {
       people: [],
       entities: [],
       calculations: EMPTY_CALCULATIONS,
     };
-    const calcs =
-      existing.calculations &&
-      typeof existing.calculations === "object" &&
-      !Array.isArray(existing.calculations)
-        ? existing.calculations
-        : EMPTY_CALCULATIONS;
-    // Entity ids live on the master list, not inside the calculation.
-    const calculations = {
-      ...calcs,
-      [String(p.year)]: stripEntityIds(p.entities),
-    };
-    // Rebuild the master entity list from every year's calculation so entities
-    // added/renamed in the calculator propagate back to data.entities.
-    const { entities, initialEntities } = recalcMasterEntities({ ...existing, calculations });
-    const data: LeadData = { ...existing, calculations, entities, initialEntities };
-    void updateLead(String(p.leadId), { data }).catch(() => {});
+    let data: LeadData = { ...existing };
+    if (p) {
+      const calcs =
+        existing.calculations &&
+        typeof existing.calculations === "object" &&
+        !Array.isArray(existing.calculations)
+          ? existing.calculations
+          : EMPTY_CALCULATIONS;
+      // Entity ids live on the master list, not inside the calculation.
+      const calculations = {
+        ...calcs,
+        [String(p.year)]: stripEntityIds(p.entities),
+      };
+      // Rebuild the master entity list from every year's calculation so entities
+      // added/renamed in the calculator propagate back to data.entities.
+      const { entities, initialEntities } = recalcMasterEntities({ ...existing, calculations });
+      data = { ...data, calculations, entities, initialEntities };
+    }
+    if (notesLeadId != null && notesLeadId === targetLeadId) {
+      data.notes = notesRef.current;
+      // Baseline now matches what's persisted, so the autosave effect won't
+      // immediately re-fire for the value it just saved.
+      notesBaseline.current = notesRef.current;
+    }
+    void updateLead(String(targetLeadId), { data }).catch(() => {});
     setSavedFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setSavedFlash(false), 2000);
@@ -334,6 +364,25 @@ export function CalculatorPage() {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [entities, leadId, flushSave]);
+
+  // Notes autosave: mirrors the entities autosave. The notes start disarmed after
+  // hydration; once the live `notes` catch up to the hydrated baseline we arm, so
+  // only a genuine edit (notes diverging from baseline) schedules a debounced save
+  // to lead.data.notes — never the hydrated value echoing back.
+  useEffect(() => {
+    if (leadId == null || notesBaseline.current === null) return;
+    if (notes === notesBaseline.current) {
+      notesArmed.current = true;
+      return;
+    }
+    if (!notesArmed.current) return;
+    pendingNotesLeadId.current = leadId;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(flushSave, 800);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [notes, leadId, flushSave]);
 
   // Flush any pending edit when leaving the page; cancel the flash timer.
   useEffect(
@@ -660,6 +709,15 @@ export function CalculatorPage() {
               className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
             >
               Missing required fields: {formatList(missingFields)}.
+            </div>
+          )}
+
+          {finalBill.message && (
+            <div
+              role="alert"
+              className="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {finalBill.message}
             </div>
           )}
 

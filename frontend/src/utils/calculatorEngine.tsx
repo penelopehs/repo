@@ -273,9 +273,7 @@ export function computeTotals(
 }
 
 export function isEntityComplete(e: Entity): boolean {
-  const filingOk =
-    !!e.filingStatus && (e.filingStatus !== "Other" || !!e.customFilingStatus?.trim());
-  const hasText = !!e.companyName?.trim() && !!e.state && filingOk;
+  const hasText = !!e.companyName?.trim() && !!e.state;
   const numericFields: (keyof Entity)[] = [
     "grossRevenue",
     "wagesOfficers",

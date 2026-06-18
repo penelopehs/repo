@@ -711,7 +711,7 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
               className={cn(
                 "flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3 text-xs font-medium transition-colors",
                 step === n
-                  ? "border-cyan text-cyan"
+                  ? "border-cyan bg-white/10 font-semibold text-cyan"
                   : step > n
                     ? "border-transparent text-green hover:text-white/75"
                     : "border-transparent text-white/45 hover:text-white/75",
@@ -824,32 +824,38 @@ function CallSetupStep({
           <MF label="Tax Year Being Evaluated">
             {taxYears && taxYears.length > 0 ? (
               (() => {
-                const allYearsValue = taxYears.map(String).join(", ");
-                const isAllSelected = setup.taxYear === allYearsValue;
-                return isAllSelected ? (
-                  <div className="relative">
-                    <Input readOnly value={allYearsValue} className="cursor-default pr-8" />
-                    <button
-                      type="button"
-                      onClick={() => onUpdate("taxYear", String(taxYears[0]))}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      title="Change year"
-                    >
-                      ✕
-                    </button>
+                const selectedYears = setup.taxYear
+                  ? setup.taxYear.split(",").map((y) => y.trim()).filter(Boolean)
+                  : [];
+                const toggle = (year: string) => {
+                  const isSelected = selectedYears.includes(year);
+                  const next = isSelected
+                    ? selectedYears.filter((y) => y !== year)
+                    : [...selectedYears, year];
+                  onUpdate("taxYear", next.join(", "));
+                };
+                return (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {taxYears.map((y) => {
+                      const yr = String(y);
+                      const active = selectedYears.includes(yr);
+                      return (
+                        <button
+                          key={yr}
+                          type="button"
+                          onClick={() => toggle(yr)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                            active
+                              ? "border-cyan/50 bg-cyan/10 text-cyan"
+                              : "border-border text-muted-foreground hover:border-cyan/40 hover:bg-accent hover:text-foreground",
+                          )}
+                        >
+                          {yr}
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <NativeSelect
-                    value={setup.taxYear}
-                    onChange={(e) => onUpdate("taxYear", e.target.value)}
-                  >
-                    <option value={allYearsValue}>All years of engagement</option>
-                    {taxYears.map((y) => (
-                      <option key={y} value={String(y)}>
-                        {y}
-                      </option>
-                    ))}
-                  </NativeSelect>
                 );
               })()
             ) : (
@@ -1038,7 +1044,7 @@ function BCMEntityPicker({
         {selected.map((e) => (
           <span
             key={e.id}
-            className="inline-flex items-center gap-1 rounded border border-border bg-accent px-2 py-0.5 text-[10px] text-foreground"
+            className="inline-flex items-center gap-1 rounded-md border-2 border-cyan/50 bg-cyan/20 px-2 py-0.5 text-[10px] font-semibold text-foreground"
           >
             {e.name}
             <button
@@ -1269,8 +1275,8 @@ function BCMAreaPills({
             className={cn(
               "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
               on
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground",
+                ? "border-cyan bg-cyan/25 font-semibold text-foreground shadow-sm ring-2 ring-cyan/35"
+                : "border-border text-muted-foreground hover:border-cyan/50 hover:bg-cyan/10 hover:text-foreground",
             )}
           >
             {a}

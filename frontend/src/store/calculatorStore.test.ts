@@ -103,18 +103,43 @@ describe("recalcMasterEntities", () => {
     expect(e.ein).toBe("12-345"); // kept — not carried by the card
     expect(e.city).toBe("Austin"); // kept — not carried by the card
     expect(e.state).toBe("CA"); // overlaid from the card
-    expect(e.w2Wages).toBe(500); // overlaid from the card
+    expect(e.w2Wages).toBeUndefined(); // excluded — never written to the master list
   });
 
   test("blank card fields don't erase existing master values", () => {
     const { entities } = recalcMasterEntities(
       data({
-        entities: [master("e_acme", "Acme", { state: "TX", w2Wages: 100 })],
-        calculations: { "2023": [card("Acme", { state: "", wagesW2: "" })] },
+        entities: [master("e_acme", "Acme", { state: "TX" })],
+        calculations: { "2023": [card("Acme", { state: "" })] },
       }),
     );
     expect(entities[0].state).toBe("TX");
-    expect(entities[0].w2Wages).toBe(100);
+  });
+
+  test("never writes per-year financial fields to the master list", () => {
+    const { entities } = recalcMasterEntities(
+      data({
+        // An older master entity may still hold these fields from a prior save.
+        entities: [master("e_acme", "Acme", { w2Wages: 100, supplies: 50, employeeCount: 12 })],
+        calculations: {
+          "2023": [
+            card("Acme", {
+              wagesW2: 999,
+              contractWages: 5,
+              totalSupplies: 7,
+              notes: "x",
+              employeeCount: 3,
+            }),
+          ],
+        },
+      }),
+    );
+    const e = entities[0];
+    expect(e.w2Wages).toBeUndefined();
+    expect(e.contractResearch).toBeUndefined();
+    expect(e.supplies).toBeUndefined();
+    expect(e.notes).toBeUndefined();
+    expect(e.employeeCount).toBeUndefined();
   });
 
   test("backfills initialEntities from entities on first run and preserves it after", () => {

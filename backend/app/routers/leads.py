@@ -363,7 +363,7 @@ def _people_contact_info(db: Session, client_id: int):
     return (p.firm, emails.get(chosen), phones.get(chosen))
 
 
-def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
+def _company_for(lead: models.CrmLead) -> Optional[str]:
     """The lead's company / entity name. It's seeded into the data JSON on
     create (entities[0].name); we fall back to the client's people firm. The
     lead's own contact (first_name/last_name/email/phone) lives directly on crm_leads."""
@@ -374,11 +374,6 @@ def _company_for(db: Session, lead: models.CrmLead) -> Optional[str]:
             first = entities[0]
             if isinstance(first, dict) and first.get("name"):
                 return first["name"]
-    client_id = _lead_client_id(db, lead)
-    if client_id:
-        info = _people_contact_info(db, client_id)
-        if info and info[0]:
-            return info[0]
     return None
 
 
@@ -399,25 +394,6 @@ def list_leads(
         q = q.filter(models.CrmLead.pipeline_status.in_(wanted))
     leads = q.all()
 
-    # Resolve each lead's client through its EPR assignment (epr → entity → client).
-    client_id_by_lead = {o.crm_lead_id: _lead_client_id(db, o) for o in leads}
-    client_ids = {cid for cid in client_id_by_lead.values() if cid}
-    # total lead count per client (across ALL statuses) -> New/Returning
-    counts = dict(
-        db.query(models.Entity.clients_idclients, func.count(models.CrmLead.crm_lead_id))
-        .select_from(models.CrmLead)
-        .join(
-            models.EntityPeopleRole,
-            models.EntityPeopleRole.identity_people_roles == models.CrmLead.epr_id,
-        )
-        .join(
-            models.Entity,
-            models.Entity.entity_id == models.EntityPeopleRole.entities_entity_id,
-        )
-        .filter(models.Entity.clients_idclients.in_(client_ids))
-        .group_by(models.Entity.clients_idclients)
-        .all()
-    ) if client_ids else {}
     # iduser -> name for every user referenced by a lead (rep + managers).
     names = _user_name_map(
         db,
@@ -452,7 +428,6 @@ def list_leads(
                 next_call_by_lead[c.crm_leads_id] = c
 
     def _item(o: models.CrmLead) -> schemas.LeadListItem:
-        client_id = client_id_by_lead.get(o.crm_lead_id)
         nc = next_call_by_lead.get(o.crm_lead_id)
         next_call = schemas.NextCallInfo(
             date=nc.scheduled_date,
@@ -461,7 +436,7 @@ def list_leads(
         ) if nc else None
         return schemas.LeadListItem(
             id=o.crm_lead_id,
-            company=_company_for(db, o),
+            company=_company_for(o),
             full_name=f"{o.first_name} {o.last_name}".strip(),
             first_name=o.first_name,
             last_name=o.last_name,
@@ -475,7 +450,7 @@ def list_leads(
             sales_manager_name=names.get(o.sales_manager_iduser),
             training_manager_iduser=o.training_manager_iduser,
             training_manager_name=names.get(o.training_manager_iduser),
-            client_type="Returning" if client_id and counts.get(client_id, 1) > 1 else "New",
+            client_type="Returning" if o.epr_id is not None else "New",
             latest_calc_date=_latest_calc_date(o.data),
             created_at=o.created_at,
             sow_signed_at=o.sow_signed_at,
@@ -561,7 +536,7 @@ def get_lead(lead_id: int, db: Session = Depends(get_db)):
 
 def _build_detail(db: Session, lead: models.CrmLead) -> schemas.LeadDetail:
     client_id = _lead_client_id(db, lead)
-    company = _company_for(db, lead)
+    company = _company_for(lead)
     names = _user_name_map(
         db,
         [lead.salesperson_iduser, lead.sales_manager_iduser, lead.training_manager_iduser],
@@ -722,6 +697,16 @@ def update_lead(
             raise HTTPException(
                 status_code=404, detail="Entity-people-role assignment not found"
             )
+        # Seed the related entity graph into data so _company_for can resolve
+        # the name without a DB lookup, matching create_lead behaviour.
+        lead_data = dict(lead.data) if isinstance(lead.data, dict) else {}
+        entities, people, entity_people = _related_graph(db, epr.people_idperson)
+        if entities:
+            lead_data["entities"] = entities
+        if people:
+            lead_data["people"] = people
+        lead_data["entityPeople"] = entity_people
+        data["data"] = lead_data
 
     new_status = data.get("pipeline_status")
     if isinstance(new_status, PipelineStatus):
