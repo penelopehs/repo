@@ -711,7 +711,7 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
               className={cn(
                 "flex items-center gap-2 whitespace-nowrap border-b-2 px-5 py-3 text-xs font-medium transition-colors",
                 step === n
-                  ? "border-cyan text-cyan"
+                  ? "border-cyan bg-white/10 font-semibold text-cyan"
                   : step > n
                     ? "border-transparent text-green hover:text-white/75"
                     : "border-transparent text-white/45 hover:text-white/75",
@@ -1038,7 +1038,7 @@ function BCMEntityPicker({
         {selected.map((e) => (
           <span
             key={e.id}
-            className="inline-flex items-center gap-1 rounded border border-border bg-accent px-2 py-0.5 text-[10px] text-foreground"
+            className="inline-flex items-center gap-1 rounded-md border-2 border-cyan/50 bg-cyan/20 px-2 py-0.5 text-[10px] font-semibold text-navy"
           >
             {e.name}
             <button
@@ -1269,8 +1269,8 @@ function BCMAreaPills({
             className={cn(
               "rounded-full border px-2.5 py-0.5 text-[11px] transition-colors",
               on
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:border-primary/40 hover:bg-accent hover:text-foreground",
+                ? "border-cyan bg-cyan/25 font-semibold text-navy shadow-sm ring-2 ring-cyan/35"
+                : "border-border text-muted-foreground hover:border-cyan/50 hover:bg-cyan/10 hover:text-navy",
             )}
           >
             {a}
