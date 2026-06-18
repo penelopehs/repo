@@ -156,10 +156,10 @@ export function getTier(federal: number): string {
   return match ? match.tier : "Out of Range";
 }
 
-export function getFinalBill(federal: number, tier: string) {
+export function getFinalBill(total: number, tier: string) {
   const rate = TIER_PCT[tier];
   if (rate == null) return null;
-  const computed = federal * rate;
+  const computed = total * rate;
   // Final bill can never be below $6,000 â€” floor to a seeded value in [$6,000, $8,000].
   const finalBill = computed < 6000 ? 6000 + seededRand(federal, 77) * 2000 : computed;
   return { finalBill, billingRate: rate };
@@ -217,8 +217,6 @@ export function runEngagementCalculation(entities: Entity[]): EngagementCalculat
   const aggregate = calculateFederal(entities);
   const { federal } = aggregate;
   const tier = getTier(federal);
-  const billing = tier !== "Out of Range" ? getFinalBill(federal, tier) : null;
-  const phases = billing ? getPhases(billing.finalBill, federal) : null;
 
   const totalSOW = entityFormulasList.reduce((sum, ef) => sum + ef.sowEstimate, 0);
 
@@ -232,6 +230,10 @@ export function runEngagementCalculation(entities: Entity[]): EngagementCalculat
       ...calculateState(e.state, federalShare),
     };
   });
+
+  const stateTotal = stateCredits.reduce((s, sc) => s + sc.stateCreditEstimate, 0);
+  const billing = tier !== "Out of Range" ? getFinalBill(federal + stateTotal, tier) : null;
+  const phases = billing ? getPhases(billing.finalBill, federal) : null;
 
   return {
     entityFormulas: entityFormulasList,
