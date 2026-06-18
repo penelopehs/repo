@@ -5,6 +5,7 @@ import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
+  ArrowLeft,
   Building2,
   Layers,
   Calculator as CalcIcon,
@@ -98,6 +99,16 @@ export function CalculatorPage() {
       .filter((l) => l.fullName.toLowerCase().includes(q) || l.company?.toLowerCase().includes(q))
       .slice(0, 8);
   }, [leads, client.clientName]);
+
+  // Back navigation: return to the originating client profile when the
+  // calculator was opened for a lead, otherwise fall back to browser history.
+  const goBack = useCallback(() => {
+    if (leadId != null) {
+      void navigate({ to: "/clients/$id", params: { id: String(leadId) } });
+    } else {
+      window.history.back();
+    }
+  }, [leadId, navigate]);
 
   const selectClient = (l: Lead) => {
     setNameFocused(false);
@@ -593,7 +604,17 @@ export function CalculatorPage() {
         <p className="text-xs font-semibold uppercase tracking-widest text-cyan">
           R&D Tax Credit & Billing
         </p>
-        <h1 className="mt-1 text-3xl font-bold text-navy">Sales Billing Calculator</h1>
+        <div className="mt-1 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={goBack}
+            aria-label="Go back"
+            className="shrink-0 cursor-pointer text-navy/60 transition-colors hover:text-navy"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </button>
+          <h1 className="text-3xl font-bold text-navy">Sales Billing Calculator</h1>
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           Configure the client, generate entities, and produce a billing-ready summary.
         </p>
