@@ -1,5 +1,6 @@
 // Feasibility Call — 3-step guided workflow (Call Setup → BCM v1 Builder → Output)
-// Data persists in localStorage keyed by leadId so reps can resume across sessions.
+// Drafts persist in the backend (crm_feasibility_calls, status="draft") and are
+// autosaved via PATCH so reps can resume across sessions and devices.
 
 import {
   useCallback,
@@ -52,6 +53,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { feasibilityApi } from "@/services/feasibility";
+import type { FeasibilityCallPayload, FeasibilityCallRecord } from "@/services/feasibility";
 import { useLeadsStore } from "@/store/leadsStore";
 import type { TaxYear } from "@/types/crm";
 import type { FeasibilityEntity } from "@/types/feasibility";
@@ -102,98 +104,31 @@ interface FeasibilityCallDraft {
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
+// Drafts live in the backend; these helpers translate between the server record
+// and the in-memory draft shape the UI works with. CRUD lives in
+// services/feasibility.ts (listDrafts / createDraft / updateDraft / deleteDraft).
 
-const STORAGE_KEY = "fc_drafts";
-
-function loadAllDrafts(): Record<string, FeasibilityCallDraft[]> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, FeasibilityCallDraft[]>) : {};
-  } catch {
-    return {};
-  }
-}
-
-// Forwards old single-field taxPreparer drafts to the current three-field shape.
-function migrateDraft(draft: FeasibilityCallDraft): FeasibilityCallDraft {
-  const setup = draft.setup as FCSetup & { taxPreparer?: string };
-  if (setup.taxPreparerFirst !== undefined) return draft;
-  const parts = (setup.taxPreparer ?? "").trim().split(/\s+/).filter(Boolean);
+// Maps a server record onto the draft shape. The draft id is the DB row id
+// rendered as a string (also used as the URL callId).
+function fromRecord(r: FeasibilityCallRecord): FeasibilityCallDraft {
   return {
-    ...draft,
-    setup: {
-      ...setup,
-      taxPreparerFirst: parts[0] ?? "",
-      taxPreparerMiddle: parts.length > 2 ? parts.slice(1, -1).join(" ") : "",
-      taxPreparerLast: parts.length > 1 ? parts[parts.length - 1] : "",
-    },
+    id: String(r.id),
+    leadId: String(r.crm_leads_id),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    currentStep: (r.current_step ?? 1) as 1 | 2 | 3,
+    setup: r.call_setup as FCSetup,
+    components: (r.components as BCMComponent[] | null) ?? [],
   };
 }
 
-// Coerces a raw stored entity value (may be a plain string from old drafts) into
-// a proper FCEntity object.
-function normalizeEntity(raw: unknown, index: number): FCEntity | null {
-  if (typeof raw === "string") {
-    const name = raw.trim();
-    if (!name) return null;
-    return { id: -(index + 1), name };
-  }
-  if (raw && typeof raw === "object" && "name" in raw) {
-    const e = raw as Partial<FCEntity>;
-    const name = (typeof e.name === "string" ? e.name : "").trim();
-    if (!name) return null;
-    return {
-      id: typeof e.id === "number" ? e.id : -(index + 1),
-      name,
-      type: e.type ?? undefined,
-      city: e.city ?? undefined,
-      state: e.state ?? undefined,
-    };
-  }
-  return null;
-}
-
-function normalizeComponent(comp: BCMComponent): BCMComponent {
-  const entities = (comp.entities ?? [])
-    .map((e, i) => normalizeEntity(e as unknown, i))
-    .filter((e): e is FCEntity => e !== null);
-  return { ...comp, entities };
-}
-
-// Runs both migrations in sequence: taxPreparer split → entity object coercion.
-function normalizeDraft(draft: FeasibilityCallDraft): FeasibilityCallDraft {
-  const migrated = migrateDraft(draft);
+// The fields persisted on every autosave / create.
+function toPayload(d: FeasibilityCallDraft): FeasibilityCallPayload {
   return {
-    ...migrated,
-    components: (migrated.components ?? []).map(normalizeComponent),
+    call_setup: d.setup,
+    components: d.components,
+    current_step: d.currentStep,
   };
-}
-
-export function loadDraftsForLead(leadId: string): FeasibilityCallDraft[] {
-  return (loadAllDrafts()[leadId] ?? []).map(normalizeDraft);
-}
-
-function saveDraft(draft: FeasibilityCallDraft): FeasibilityCallDraft {
-  const all = loadAllDrafts();
-  const list = all[draft.leadId] ?? [];
-  const idx = list.findIndex((d) => d.id === draft.id);
-  const updated: FeasibilityCallDraft = {
-    ...normalizeDraft(draft),
-    updatedAt: new Date().toISOString(),
-  };
-  if (idx >= 0) list[idx] = updated;
-  else list.unshift(updated);
-  all[draft.leadId] = list;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  return updated;
-}
-
-function deleteDraft(leadId: string, draftId: string): FeasibilityCallDraft[] {
-  const all = loadAllDrafts();
-  const remaining = (all[leadId] ?? []).filter((d) => d.id !== draftId);
-  all[leadId] = remaining;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  return remaining.map(normalizeDraft);
 }
 
 function makeEmptyComponent(): BCMComponent {
@@ -380,69 +315,120 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
   const [savedFlash, setSavedFlash] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const flashTimer = useRef<number | null>(null);
+  // The draft awaiting its debounced PATCH (also flushed on unmount).
+  const pendingRef = useRef<FeasibilityCallDraft | null>(null);
+  // De-dupes the "no drafts yet, create one" path across StrictMode's
+  // double-invoked mount so only a single draft row is created per lead.
+  const createRef = useRef<{
+    leadId: string;
+    promise: Promise<FeasibilityCallRecord>;
+  } | null>(null);
+
+  // Pushes the pending draft to the backend now. Used by the debounce timer and
+  // the flush-on-unmount cleanup so an in-flight edit is never lost.
+  const flush = useCallback(() => {
+    const d = pendingRef.current;
+    pendingRef.current = null;
+    if (!d) return;
+    feasibilityApi
+      .updateDraft(d.leadId, d.id, toPayload(d))
+      .then((rec) => {
+        const saved = fromRecord(rec);
+        setAllDrafts((prev) => prev.map((x) => (x.id === saved.id ? saved : x)));
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
-    const drafts = loadDraftsForLead(leadId);
+    let cancelled = false;
+    (async () => {
+      let drafts: FeasibilityCallDraft[];
+      try {
+        drafts = (await feasibilityApi.listDrafts(leadId)).map(fromRecord);
+      } catch {
+        return;
+      }
 
-    // Resume an existing draft whenever the client already has one; only mint a
-    // brand-new draft when there are none. This keeps navigating away and back
-    // (including via the "Start Feasibility Call" button, which arrives with
-    // callId="new") from accumulating a new draft on every visit — additional
-    // parallel drafts are created explicitly through the in-page "Start new
-    // call" button. It also makes the effect safe under StrictMode's
-    // double-invoked mount: the second run sees the draft the first run just
-    // created and resumes it instead of spawning a duplicate.
-    let active: FeasibilityCallDraft;
-    if (drafts.length === 0) {
-      active = saveDraft(
-        makeNewDraft(
-          leadId,
-          lead?.fullName ?? "",
-          lead?.company ?? "",
-          lead?.taxYears,
-          lead?.source,
-          lead?.rep,
-        ),
-      );
-    } else if (callId && callId !== "new") {
-      active = drafts.find((d) => d.id === callId) ?? drafts[0];
-    } else {
-      active = drafts[0];
-    }
+      // Resume an existing draft whenever the client already has one; only mint
+      // a brand-new draft when there are none. This keeps navigating away and
+      // back (including via the "Start Feasibility Call" button, which arrives
+      // with callId="new") from accumulating a new draft on every visit —
+      // additional parallel drafts are created explicitly through the in-page
+      // "Start new call" button.
+      let active: FeasibilityCallDraft | undefined;
+      if (drafts.length === 0) {
+        // Share one create call across StrictMode's two mount runs so the
+        // cancelled first run and the live second run resolve to the same row.
+        if (!createRef.current || createRef.current.leadId !== leadId) {
+          const seed = makeNewDraft(
+            leadId,
+            lead?.fullName ?? "",
+            lead?.company ?? "",
+            lead?.taxYears,
+            lead?.source,
+            lead?.rep,
+          );
+          createRef.current = {
+            leadId,
+            promise: feasibilityApi.createDraft(leadId, toPayload(seed)),
+          };
+        }
+        try {
+          active = fromRecord(await createRef.current.promise);
+        } catch {
+          createRef.current = null;
+          return;
+        }
+        drafts = [active];
+      } else if (callId && callId !== "new") {
+        active = drafts.find((d) => d.id === callId) ?? drafts[0];
+      } else {
+        active = drafts[0];
+      }
 
-    // Pin the URL to the active draft's id so a refresh resumes it instead of
-    // re-running the "new" path (and so the URL never lingers on "new").
-    if (callId !== active.id) {
-      navigate({
-        to: "/clients/$id/feasibility-call",
-        params: { id: leadId },
-        search: { callId: active.id },
-        replace: true,
-      });
-    }
+      if (cancelled || !active) return;
 
-    setDraft(active);
-    setAllDrafts(loadDraftsForLead(leadId));
+      // Pin the URL to the active draft's id so a refresh resumes it instead of
+      // re-running the "new" path (and so the URL never lingers on "new").
+      if (callId !== active.id) {
+        navigate({
+          to: "/clients/$id/feasibility-call",
+          params: { id: leadId },
+          search: { callId: active.id },
+          replace: true,
+        });
+      }
+
+      setDraft(active);
+      setAllDrafts(drafts);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [leadId, callId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(
     () => () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       if (flashTimer.current) window.clearTimeout(flashTimer.current);
+      flush();
     },
-    [],
+    [flush],
   );
 
-  const persist = useCallback((d: FeasibilityCallDraft) => {
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      saveDraft(d);
-      setAllDrafts(loadDraftsForLead(d.leadId));
-      setSavedFlash(true);
-      if (flashTimer.current) window.clearTimeout(flashTimer.current);
-      flashTimer.current = window.setTimeout(() => setSavedFlash(false), 2000);
-    }, 400);
-  }, []);
+  const persist = useCallback(
+    (d: FeasibilityCallDraft) => {
+      pendingRef.current = d;
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      saveTimer.current = window.setTimeout(() => {
+        flush();
+        setSavedFlash(true);
+        if (flashTimer.current) window.clearTimeout(flashTimer.current);
+        flashTimer.current = window.setTimeout(() => setSavedFlash(false), 2000);
+      }, 400);
+    },
+    [flush],
+  );
 
   const patchDraft = useCallback(
     (changes: Partial<FeasibilityCallDraft>) => {
@@ -493,20 +479,25 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
     });
   }, [patchDraft]);
 
-  const startNewCall = () => {
+  const startNewCall = async () => {
     if (!window.confirm("Start a new feasibility call for this client?")) return;
-    const fresh = saveDraft(
-      makeNewDraft(
-        leadId,
-        lead?.fullName ?? "",
-        lead?.company ?? "",
-        lead?.taxYears,
-        lead?.source,
-        lead?.rep,
-      ),
+    const seed = makeNewDraft(
+      leadId,
+      lead?.fullName ?? "",
+      lead?.company ?? "",
+      lead?.taxYears,
+      lead?.source,
+      lead?.rep,
     );
+    let fresh: FeasibilityCallDraft;
+    try {
+      fresh = fromRecord(await feasibilityApi.createDraft(leadId, toPayload(seed)));
+    } catch {
+      toast.error("Failed to start a new call — please try again.");
+      return;
+    }
     setDraft(fresh);
-    setAllDrafts(loadDraftsForLead(leadId));
+    setAllDrafts((prev) => [fresh, ...prev]);
     setOutputReady(false);
     setShowDraftList(false);
   };
@@ -644,24 +635,37 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
                         </button>
                         {manageMode && (
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              const remaining = deleteDraft(leadId, d.id);
+                              try {
+                                await feasibilityApi.deleteDraft(leadId, d.id);
+                              } catch {
+                                toast.error("Failed to delete draft — please try again.");
+                                return;
+                              }
+                              const remaining = allDrafts.filter((x) => x.id !== d.id);
                               setAllDrafts(remaining);
                               if (draft && d.id === draft.id) {
                                 if (remaining.length > 0) {
                                   setDraft(remaining[0]);
                                 } else {
-                                  const fresh = saveDraft(
-                                    makeNewDraft(
-                                      leadId,
-                                      lead?.fullName ?? "",
-                                      lead?.company ?? "",
-                                      lead?.taxYears,
-                                      lead?.source,
-                                      lead?.rep,
-                                    ),
+                                  const seed = makeNewDraft(
+                                    leadId,
+                                    lead?.fullName ?? "",
+                                    lead?.company ?? "",
+                                    lead?.taxYears,
+                                    lead?.source,
+                                    lead?.rep,
                                   );
+                                  let fresh: FeasibilityCallDraft;
+                                  try {
+                                    fresh = fromRecord(
+                                      await feasibilityApi.createDraft(leadId, toPayload(seed)),
+                                    );
+                                  } catch {
+                                    toast.error("Failed to start a new call — please try again.");
+                                    return;
+                                  }
                                   setDraft(fresh);
                                   setAllDrafts([fresh]);
                                   setShowDraftList(false);

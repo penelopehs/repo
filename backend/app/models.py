@@ -333,6 +333,8 @@ class CrmFeasibilityCall(Base):
     call_setup = Column(JSON, nullable=False)
     components = Column(JSON, nullable=False)
     generated_output = Column(JSON, nullable=True)
+    status = Column(String(20), nullable=False, server_default="draft")
+    current_step = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
 

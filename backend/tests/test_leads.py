@@ -566,4 +566,80 @@ def test_intake_note_on_missing_lead_404(client):
     assert resp.status_code == 404
 
 
+# ── Feasibility call drafts ───────────────────────────────────────────────────
+
+def test_feasibility_draft_crud(client):
+    lead = client.post("/leads", json={"first_name": "Feas", "last_name": "Lead"}).json()
+    lid = lead["id"]
+
+    # Create a draft (status defaults to "draft").
+    created = client.post(
+        f"/leads/{lid}/feasibility-calls",
+        json={
+            "call_setup": {"doctorName": "Dr A"},
+            "components": [],
+            "current_step": 1,
+        },
+    )
+    assert created.status_code == 201
+    draft = created.json()
+    assert draft["status"] == "draft"
+    assert draft["current_step"] == 1
+    cid = draft["id"]
+
+    # It shows up when filtering drafts.
+    listed = client.get(f"/leads/{lid}/feasibility-calls?status=draft")
+    assert listed.status_code == 200
+    assert [d["id"] for d in listed.json()] == [cid]
+
+    # PATCH autosave updates content and step.
+    patched = client.patch(
+        f"/leads/{lid}/feasibility-calls/{cid}",
+        json={"call_setup": {"doctorName": "Dr B"}, "current_step": 2},
+    )
+    assert patched.status_code == 200
+    assert patched.json()["call_setup"] == {"doctorName": "Dr B"}
+    assert patched.json()["current_step"] == 2
+
+    # A submitted call is excluded from the draft list.
+    client.post(
+        f"/leads/{lid}/feasibility-calls",
+        json={"call_setup": {}, "components": [], "status": "submitted"},
+    )
+    drafts_only = client.get(f"/leads/{lid}/feasibility-calls?status=draft").json()
+    assert [d["id"] for d in drafts_only] == [cid]
+    # Unfiltered list returns both.
+    assert len(client.get(f"/leads/{lid}/feasibility-calls").json()) == 2
+
+    # DELETE removes the draft.
+    assert client.delete(f"/leads/{lid}/feasibility-calls/{cid}").status_code == 204
+    assert client.get(f"/leads/{lid}/feasibility-calls?status=draft").json() == []
+
+
+def test_feasibility_draft_404_paths(client):
+    lead = client.post("/leads", json={"first_name": "Feas", "last_name": "Two"}).json()
+    lid = lead["id"]
+    created = client.post(
+        f"/leads/{lid}/feasibility-calls",
+        json={"call_setup": {}, "components": []},
+    ).json()
+    cid = created["id"]
+
+    # Missing call id.
+    assert client.patch(
+        f"/leads/{lid}/feasibility-calls/999999", json={"current_step": 1}
+    ).status_code == 404
+    assert client.delete(f"/leads/{lid}/feasibility-calls/999999").status_code == 404
+
+    # Wrong lead.
+    other = client.post("/leads", json={"first_name": "Wrong", "last_name": "Lead"}).json()
+    assert client.patch(
+        f"/leads/{other['id']}/feasibility-calls/{cid}", json={"current_step": 1}
+    ).status_code == 404
+    assert client.delete(f"/leads/{other['id']}/feasibility-calls/{cid}").status_code == 404
+
+    # Missing lead.
+    assert client.get("/leads/999999/feasibility-calls").status_code == 404
+
+
 

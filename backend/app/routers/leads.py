@@ -1168,7 +1168,59 @@ def create_feasibility_entity(
     )
 
 
-# ── Feasibility: save call ─────────────────────────────────────────────────────
+# ── Feasibility: calls (drafts + submitted) ────────────────────────────────────
+
+def _feasibility_call_read(call: models.CrmFeasibilityCall) -> schemas.FeasibilityCallRead:
+    return schemas.FeasibilityCallRead(
+        id=call.idcrm_feasibility_call,
+        crm_leads_id=call.crm_leads_id,
+        call_setup=call.call_setup,
+        components=call.components,
+        generated_output=call.generated_output,
+        status=call.status,
+        current_step=call.current_step,
+        created_at=call.created_at,
+        updated_at=call.updated_at,
+    )
+
+
+def _get_feasibility_call(
+    db: Session, lead_id: int, call_id: int
+) -> models.CrmFeasibilityCall:
+    call = (
+        db.query(models.CrmFeasibilityCall)
+        .filter(
+            models.CrmFeasibilityCall.idcrm_feasibility_call == call_id,
+            models.CrmFeasibilityCall.crm_leads_id == lead_id,
+        )
+        .first()
+    )
+    if not call:
+        raise HTTPException(status_code=404, detail="Feasibility call not found")
+    return call
+
+
+@router.get(
+    "/leads/{lead_id}/feasibility-calls",
+    response_model=List[schemas.FeasibilityCallRead],
+)
+def list_feasibility_calls(
+    lead_id: int,
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    _get_lead(db, lead_id)
+    query = db.query(models.CrmFeasibilityCall).filter(
+        models.CrmFeasibilityCall.crm_leads_id == lead_id
+    )
+    if status:
+        query = query.filter(models.CrmFeasibilityCall.status == status)
+    # Newest first, mirroring the old client-side "prepend new draft" ordering.
+    rows = query.order_by(
+        models.CrmFeasibilityCall.idcrm_feasibility_call.desc()
+    ).all()
+    return [_feasibility_call_read(c) for c in rows]
+
 
 @router.post(
     "/leads/{lead_id}/feasibility-calls",
@@ -1186,16 +1238,41 @@ def save_feasibility_call(
         call_setup=body.call_setup,
         components=body.components,
         generated_output=body.generated_output,
+        status=body.status,
+        current_step=body.current_step,
     )
     db.add(call)
     db.commit()
     db.refresh(call)
-    return schemas.FeasibilityCallRead(
-        id=call.idcrm_feasibility_call,
-        crm_leads_id=call.crm_leads_id,
-        call_setup=call.call_setup,
-        components=call.components,
-        generated_output=call.generated_output,
-        created_at=call.created_at,
-        updated_at=call.updated_at,
-    )
+    return _feasibility_call_read(call)
+
+
+@router.patch(
+    "/leads/{lead_id}/feasibility-calls/{call_id}",
+    response_model=schemas.FeasibilityCallRead,
+)
+def update_feasibility_call(
+    lead_id: int,
+    call_id: int,
+    body: schemas.FeasibilityCallUpdate,
+    db: Session = Depends(get_db),
+):
+    _get_lead(db, lead_id)
+    call = _get_feasibility_call(db, lead_id, call_id)
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(call, field, value)
+    db.commit()
+    db.refresh(call)
+    return _feasibility_call_read(call)
+
+
+@router.delete("/leads/{lead_id}/feasibility-calls/{call_id}", status_code=204)
+def delete_feasibility_call(
+    lead_id: int,
+    call_id: int,
+    db: Session = Depends(get_db),
+):
+    _get_lead(db, lead_id)
+    call = _get_feasibility_call(db, lead_id, call_id)
+    db.delete(call)
+    db.commit()

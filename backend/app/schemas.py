@@ -305,6 +305,16 @@ class FeasibilityCallCreate(BaseModel):
     call_setup: Any
     components: Any
     generated_output: Optional[Any] = None
+    status: str = "draft"
+    current_step: Optional[int] = None
+
+
+class FeasibilityCallUpdate(BaseModel):
+    call_setup: Optional[Any] = None
+    components: Optional[Any] = None
+    generated_output: Optional[Any] = None
+    status: Optional[str] = None
+    current_step: Optional[int] = None
 
 
 class FeasibilityCallRead(BaseModel):
@@ -313,5 +323,7 @@ class FeasibilityCallRead(BaseModel):
     call_setup: Any
     components: Any
     generated_output: Optional[Any] = None
+    status: str
+    current_step: Optional[int] = None
     created_at: datetime
     updated_at: datetime
