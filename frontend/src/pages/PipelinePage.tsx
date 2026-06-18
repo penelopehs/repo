@@ -328,16 +328,6 @@ export function PipelinePage() {
           onProfile={goProfile}
           onCalc={goCalc}
           onEdit={(l) => setEditing(l)}
-          onClose={async (l) => {
-            try {
-              await setStatus(l.id, "closed");
-              toast.success("Lead closed", { description: l.company });
-            } catch (e) {
-              toast.error("Couldn't close lead", {
-                description: e instanceof Error ? e.message : undefined,
-              });
-            }
-          }}
           onDelete={(l) => setPendingDelete(l.id)}
           emptyText={loading ? "Loading leads…" : "No leads match your filters."}
         />
@@ -450,7 +440,6 @@ interface TableProps {
   onProfile: (l: Lead) => void;
   onCalc: (l: Lead) => void;
   onEdit: (l: Lead) => void;
-  onClose: (l: Lead) => void;
   onDelete: (l: Lead) => void;
   emptyText?: string;
 }
@@ -561,9 +550,6 @@ function PipelineTable(p: TableProps) {
                       {hasExistingCalculation(l)
                         ? "Open Existing Calculation"
                         : "Create Calculation"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => p.onClose(l)}>
-                      <FileSignature className="mr-2 h-4 w-4" /> Mark Closed
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
