@@ -285,7 +285,7 @@ def test_patch_updates_all_fields(client, db_session):
     db_session.add(rep)
     db_session.commit()
     _, _, epr_id = make_assignment(
-        db_session, client_name="Reassign Co", firm="Reassign Firm"
+        db_session, client_name="Reassign Co", entity_name="Reassign Entity", firm="Reassign Firm"
     )
 
     lead = client.post("/leads", json={"first_name": "Before", "last_name": "Patch"}).json()
@@ -311,8 +311,8 @@ def test_patch_updates_all_fields(client, db_session):
     assert body["salesperson_iduser"] == rep.iduser
     assert body["salesperson_name"] == "Sales Rep"
     assert body["notes"] == "updated"
-    # epr re-link resolves the lead's company (falls back to the client's firm).
-    assert body["company"] == "Reassign Firm"
+    # epr re-link seeds data.entities from the linked entity graph.
+    assert body["company"] == "Reassign Entity"
 
 
 def test_patch_unknown_epr_404(client):

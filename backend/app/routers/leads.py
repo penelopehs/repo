@@ -714,6 +714,16 @@ def update_lead(
             raise HTTPException(
                 status_code=404, detail="Entity-people-role assignment not found"
             )
+        # Seed the related entity graph into data so _company_for can resolve
+        # the name without a DB lookup, matching create_lead behaviour.
+        lead_data = dict(lead.data) if isinstance(lead.data, dict) else {}
+        entities, people, entity_people = _related_graph(db, epr.people_idperson)
+        if entities:
+            lead_data["entities"] = entities
+        if people:
+            lead_data["people"] = people
+        lead_data["entityPeople"] = entity_people
+        data["data"] = lead_data
 
     new_status = data.get("pipeline_status")
     if isinstance(new_status, PipelineStatus):
