@@ -402,10 +402,7 @@ export function AddLeadDialog() {
               </Field>
             </div>
             <Field label="Pipeline Status">
-              <Select
-                value={form.status}
-                onValueChange={(v) => set("status", v as LeadStatus)}
-              >
+              <Select value={form.status} onValueChange={(v) => set("status", v as LeadStatus)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>

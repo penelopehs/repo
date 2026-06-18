@@ -306,6 +306,7 @@ const BCM_ROWS: {
 export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId?: string }) {
   const navigate = useNavigate();
   const lead = useLeadsStore((s) => s.leads.find((l) => l.id === leadId));
+  const fetchLead = useLeadsStore((s) => s.fetchLead);
   const [draft, setDraft] = useState<FeasibilityCallDraft | null>(null);
   const [allDrafts, setAllDrafts] = useState<FeasibilityCallDraft[]>([]);
   const [showDraftList, setShowDraftList] = useState(false);
@@ -338,6 +339,11 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
       })
       .catch(() => {});
   }, []);
+
+  // Ensure lead data is available even on a hard refresh (store starts empty).
+  useEffect(() => {
+    if (!lead) void fetchLead(leadId);
+  }, [leadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let cancelled = false;

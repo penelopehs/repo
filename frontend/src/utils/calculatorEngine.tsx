@@ -161,7 +161,7 @@ export function getFinalBill(total: number, tier: string) {
   if (rate == null) return null;
   const computed = total * rate;
   // Final bill can never be below $6,000 â€” floor to a seeded value in [$6,000, $8,000].
-  const finalBill = computed < 6000 ? 6000 + seededRand(federal, 77) * 2000 : computed;
+  const finalBill = computed < 6000 ? 6000 + seededRand(total, 77) * 2000 : computed;
   return { finalBill, billingRate: rate };
 }
 
