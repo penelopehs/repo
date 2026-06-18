@@ -69,8 +69,13 @@ import { EditClientDialog } from "@/components/pipeline/EditClientDialog";
 import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
-import { pipelineStageIndex, PIPELINE_STAGES, EMPTY_CALCULATIONS } from "@/types/crm";
-import type { FollowUpCall, ProfileNote, TaxYearRecord, TaxYearStatus } from "@/types/crm";
+import {
+  pipelineStageIndex,
+  PIPELINE_STAGES,
+  EMPTY_CALCULATIONS,
+  ALL_TAX_YEARS,
+} from "@/types/crm";
+import type { FollowUpCall, ProfileNote, TaxYear, TaxYearRecord, TaxYearStatus } from "@/types/crm";
 import { useUsersStore } from "@/store/usersStore";
 
 // The four scheduled calls a lead works through after "New Lead". Their order
@@ -504,19 +509,27 @@ export function ProfilePage({ id }: { id: string }) {
         lead={lead}
         onUpdate={async (yearStatuses) => {
           const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
-          // Mirror every engaged year into its own calculation: a copy of the
-          // master entity list in the calculator's saved (id-less) format. Years
-          // that already hold a non-empty calculation are left untouched; the
-          // default for a year is [].
+          // Calculations exist only for engaged years. A year is engaged when its
+          // explicit status is engaged/current_engaged, or — with no explicit
+          // record — when it's one of the client's engagement years (taxYears),
+          // mirroring TaxHistoryPanel.effectiveRecord. Default-engaged years live
+          // outside yearStatuses, so they must be considered here too.
+          const isEngaged = (year: TaxYear) => {
+            const record = yearStatuses[String(year)];
+            if (record) return record.status === "engaged" || record.status === "current_engaged";
+            return lead.taxYears.includes(year);
+          };
+          // Rebuild the map from scratch so a year that's no longer engaged drops
+          // its calculation. Keep an engaged year's existing non-empty calculation;
+          // seed an empty one from the master entity list (id-less calculator cards).
           const masterCards = stripEntityIds(entitiesFromLead(base.entities ?? []));
-          const calculations: Record<string, unknown> = { ...(base.calculations ?? {}) };
-          for (const [year, record] of Object.entries(yearStatuses)) {
-            if (record.status === "engaged" || record.status === "current_engaged") {
-              const existing = calculations[year];
-              if (!Array.isArray(existing) || existing.length === 0) {
-                calculations[year] = masterCards;
-              }
-            }
+          const prev = base.calculations ?? {};
+          const calculations: Record<string, unknown> = {};
+          for (const year of ALL_TAX_YEARS) {
+            if (!isEngaged(year)) continue;
+            const existing = prev[String(year)];
+            calculations[String(year)] =
+              Array.isArray(existing) && existing.length > 0 ? existing : masterCards;
           }
           await updateLead(id, { data: { ...base, yearStatuses, calculations } });
         }}
