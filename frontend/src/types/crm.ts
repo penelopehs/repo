@@ -178,6 +178,10 @@ export interface LeadData {
   notes?: string;
   /** Per-year R&D eligibility status overrides. Keyed by year as a string. */
   yearStatuses?: Record<string, TaxYearRecord>;
+  /** Epoch seconds of the most recent calculator save. Stamped by the
+   *  calculator on every calculation save and surfaced as the dashboard's
+   *  Latest Calculation column (backend echoes it as `latest_calc_date`). */
+  latestCalcDate?: number;
 }
 
 /** Default value for `LeadData.calculations`: an empty year-keyed map. Must be

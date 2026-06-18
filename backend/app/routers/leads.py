@@ -113,10 +113,17 @@ def _lead_tax_years(data) -> List[int]:
 
 
 def _latest_calc_date(data) -> Optional[float]:
-    """The newest calculation's `created_at` timestamp from the lead's data
-    blob. `data['calculations']` holds calculation objects (a dict keyed by
-    year, or a list); each carries a `created_at` epoch timestamp. Returns the
-    max, or None when there are no timestamped calculations."""
+    """When the lead's calculation was last saved, as an epoch timestamp.
+
+    The calculator stamps `data['latestCalcDate']` (epoch seconds) on every
+    save, so that explicit value wins when present. Otherwise we fall back to
+    the newest `created_at` across `data['calculations']` (a dict keyed by year,
+    or a list) for older leads that predate the stamp. Returns None when neither
+    is available."""
+    if isinstance(data, dict):
+        stamped = data.get("latestCalcDate")
+        if isinstance(stamped, (int, float)) and not isinstance(stamped, bool):
+            return float(stamped)
     timestamps: List[float] = []
     if isinstance(data, dict):
         calcs = data.get("calculations")

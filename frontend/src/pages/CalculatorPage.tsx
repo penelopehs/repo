@@ -306,7 +306,16 @@ export function CalculatorPage() {
       // Rebuild the master entity list from every year's calculation so entities
       // added/renamed in the calculator propagate back to data.entities.
       const { entities, initialEntities } = recalcMasterEntities({ ...existing, calculations });
-      data = { ...data, calculations, entities, initialEntities };
+      // Stamp the save time (epoch seconds) so the dashboard's Latest
+      // Calculation column reflects this edit; the backend echoes it back as
+      // latest_calc_date.
+      data = {
+        ...data,
+        calculations,
+        entities,
+        initialEntities,
+        latestCalcDate: Math.floor(Date.now() / 1000),
+      };
     }
     if (notesLeadId != null && notesLeadId === targetLeadId) {
       data.notes = notesRef.current;

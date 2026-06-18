@@ -203,6 +203,9 @@ function normalizeData(data: LeadData | null | undefined): LeadData {
     ...(data.filingStatus && { filingStatus: data.filingStatus }),
     ...(typeof data.notes === "string" && { notes: data.notes }),
     ...(data.yearStatuses && { yearStatuses: data.yearStatuses }),
+    // Preserve the calculator's last-saved stamp so it round-trips through
+    // edits and keeps surfacing as the dashboard's Latest Calculation column.
+    ...(typeof data.latestCalcDate === "number" && { latestCalcDate: data.latestCalcDate }),
   };
 }
 
