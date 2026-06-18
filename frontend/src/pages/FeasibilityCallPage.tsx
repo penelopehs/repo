@@ -384,10 +384,16 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
   useEffect(() => {
     const drafts = loadDraftsForLead(leadId);
 
+    // Resume an existing draft whenever the client already has one; only mint a
+    // brand-new draft when there are none. This keeps navigating away and back
+    // (including via the "Start Feasibility Call" button, which arrives with
+    // callId="new") from accumulating a new draft on every visit — additional
+    // parallel drafts are created explicitly through the in-page "Start new
+    // call" button. It also makes the effect safe under StrictMode's
+    // double-invoked mount: the second run sees the draft the first run just
+    // created and resumes it instead of spawning a duplicate.
     let active: FeasibilityCallDraft;
-    if (callId === "new" || drafts.length === 0) {
-      // Create a fresh draft and immediately replace the URL with its UUID so
-      // that refreshing the page resumes this draft instead of spawning another.
+    if (drafts.length === 0) {
       active = saveDraft(
         makeNewDraft(
           leadId,
@@ -398,16 +404,21 @@ export function FeasibilityCallPage({ leadId, callId }: { leadId: string; callId
           lead?.rep,
         ),
       );
+    } else if (callId && callId !== "new") {
+      active = drafts.find((d) => d.id === callId) ?? drafts[0];
+    } else {
+      active = drafts[0];
+    }
+
+    // Pin the URL to the active draft's id so a refresh resumes it instead of
+    // re-running the "new" path (and so the URL never lingers on "new").
+    if (callId !== active.id) {
       navigate({
         to: "/clients/$id/feasibility-call",
         params: { id: leadId },
         search: { callId: active.id },
         replace: true,
       });
-    } else if (callId && callId !== "new") {
-      active = drafts.find((d) => d.id === callId) ?? drafts[0];
-    } else {
-      active = drafts[0];
     }
 
     setDraft(active);
