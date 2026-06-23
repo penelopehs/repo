@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { TaxYear } from "@/types/crm";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { SELECTABLE_TAX_YEARS } from "@/types/crm";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -26,12 +26,13 @@ export function MultiYearSelect({
   placeholder = "Select years",
   className,
 }: Props) {
-  const allSelected = value.length === ALL_TAX_YEARS.length;
+  const allSelected =
+    SELECTABLE_TAX_YEARS.length > 0 && SELECTABLE_TAX_YEARS.every((y) => value.includes(y));
   const label =
     value.length === 0
       ? placeholder
       : allSelected
-        ? "All Years (2020–2026)"
+        ? "All Years (2022–2026)"
         : value.length <= 3
           ? value.join(", ")
           : `${value.length} years selected`;
@@ -60,8 +61,8 @@ export function MultiYearSelect({
           {allSelected && <Check className="h-4 w-4 text-cyan" />}
         </button>
         <Separator className="my-1.5" />
-        <div className="grid grid-cols-2 gap-1">
-          {ALL_TAX_YEARS.map((y) => {
+        <div className="grid grid-cols-3 gap-1">
+          {SELECTABLE_TAX_YEARS.map((y) => {
             const active = value.includes(y);
             return (
               <button
@@ -91,7 +92,7 @@ export function MultiYearSelect({
 // All/Clear handlers for single-select usage.
 export function YearButtons({
   value,
-  years = ALL_TAX_YEARS,
+  years = SELECTABLE_TAX_YEARS,
   invalidYears = [],
   onToggle,
   onSelectAll,
@@ -155,7 +156,7 @@ export function YearButtons({
 
 export function YearChips({ years, className }: { years: TaxYear[]; className?: string }) {
   if (years.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
-  const isAll = years.length === ALL_TAX_YEARS.length;
+  const isAll = years.length === SELECTABLE_TAX_YEARS.length;
   if (isAll) return <Badge className="bg-navy text-white hover:bg-navy">All Years</Badge>;
   return (
     <div className={cn("flex flex-wrap gap-1", className)}>

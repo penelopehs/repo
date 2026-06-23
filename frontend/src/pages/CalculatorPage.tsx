@@ -41,6 +41,7 @@ import {
   type LeadData,
   type TaxYear,
   EMPTY_CALCULATIONS,
+  SELECTABLE_TAX_YEARS,
 } from "@/types/crm";
 import {
   calculateSOW,
@@ -414,7 +415,7 @@ export function CalculatorPage() {
   );
 
   const yearsLabel =
-    client.taxYears.length === 7
+    client.taxYears.length === SELECTABLE_TAX_YEARS.length
       ? "All Tax Years"
       : client.taxYears.length === 0
         ? "No years selected"

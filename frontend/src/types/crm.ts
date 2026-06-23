@@ -1,7 +1,8 @@
 // Core CRM domain types — used across calculator, pipeline, profile, and documents.
 
-export type TaxYear = 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | 2026;
-export const ALL_TAX_YEARS: TaxYear[] = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+export type TaxYear = 2022 | 2023 | 2024 | 2025 | 2026;
+export const ALL_TAX_YEARS: TaxYear[] = [2022, 2023, 2024, 2025, 2026];
+export const SELECTABLE_TAX_YEARS: TaxYear[] = [2022, 2023, 2024, 2025, 2026];
 
 export type FilingStatus = "single" | "mfj" | "280c";
 
@@ -164,7 +165,7 @@ export interface LeadData {
    *  edited afterwards. Re-seeded into `entities` for any year whose calculation
    *  is empty so originally-seeded entities aren't lost. */
   initialEntities?: LeadDataEntity[];
-  /** Keyed by tax year (e.g. "2021"). Each year holds its own calculation —
+  /** Keyed by tax year (e.g. "2022"). Each year holds its own calculation —
    *  an array of the calculator's entity cards (Entity[]) once saved, or an
    *  empty array before the calculator has been opened for that year. */
   calculations: Record<string, Entity[] | unknown>;

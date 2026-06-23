@@ -40,11 +40,11 @@ describe("calculation context helpers", () => {
       data: {
         people: [],
         entities: [],
-        calculations: { "2024": {}, "2021": {}, "1999": {} },
+        calculations: { "2024": {}, "2022": {}, "1999": {} },
       },
     } as Lead;
     // "1999" is filtered out (not a valid TaxYear); the rest come back sorted.
-    expect(calculationYears(withCalcs)).toEqual([2021, 2024]);
+    expect(calculationYears(withCalcs)).toEqual([2022, 2024]);
     expect(calculationYears(lead)).toEqual([]);
   });
 });

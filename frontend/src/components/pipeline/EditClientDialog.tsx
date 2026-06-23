@@ -34,7 +34,7 @@ import type {
   TaxYear,
   TaxYearRecord,
 } from "@/types/crm";
-import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
+import { PIPELINE_STAGES, SELECTABLE_TAX_YEARS } from "@/types/crm";
 import { useLeadsStore } from "@/store/leadsStore";
 import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
@@ -369,7 +369,7 @@ export function EditClientDialog({ lead, trigger, open: openProp, onOpenChange }
                     : [...prev.taxYears, year].sort((a, b) => a - b),
                 }))
               }
-              onSelectAll={() => setForm((prev) => ({ ...prev, taxYears: [...ALL_TAX_YEARS] }))}
+              onSelectAll={() => setForm((prev) => ({ ...prev, taxYears: [...SELECTABLE_TAX_YEARS] }))}
               onClear={() => setForm((prev) => ({ ...prev, taxYears: [] }))}
             />
           </Item>

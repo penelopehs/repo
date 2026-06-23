@@ -6,7 +6,7 @@ export function hasExistingCalculation(lead: Pick<Lead, "latestCalculation">) {
 }
 
 // The tax years a lead has calculations for live as the keys of
-// `data.calculations` (e.g. "2021"). Parse them into sorted, valid TaxYears so
+// `data.calculations` (e.g. "2022"). Parse them into sorted, valid TaxYears so
 // the calculator can show them as the selected years.
 export function calculationYears(lead: Pick<Lead, "data">): TaxYear[] {
   const calcs = lead.data?.calculations ?? {};

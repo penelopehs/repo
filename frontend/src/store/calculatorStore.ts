@@ -11,7 +11,7 @@ import type {
   LeadDataEntity,
   TaxYear,
 } from "@/types/crm";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { ALL_TAX_YEARS, SELECTABLE_TAX_YEARS } from "@/types/crm";
 
 const newOwner = (): EntityOwner => ({
   id: `own_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -276,7 +276,7 @@ export const useCalculatorStore = create<CalculatorState>((set) => ({
       next.sort((a, b) => a - b);
       return { client: { ...s.client, taxYears: next } };
     }),
-  selectAllTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [...ALL_TAX_YEARS] } })),
+  selectAllTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [...SELECTABLE_TAX_YEARS] } })),
   clearTaxYears: () => set((s) => ({ client: { ...s.client, taxYears: [] } })),
   setEntityCountInput: (n) => set({ entityCountInput: Math.max(1, Math.min(50, n)) }),
   generateEntities: (n) =>

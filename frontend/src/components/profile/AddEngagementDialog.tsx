@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { EngagementType, EngagementStatus, EngagementPhase, TaxYear } from "@/types/crm";
-import { ALL_TAX_YEARS } from "@/types/crm";
+import { SELECTABLE_TAX_YEARS } from "@/types/crm";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
 import { useEngagementsStore } from "@/store/engagementsStore";
 import { formatCurrency } from "@/utils/format";
@@ -140,8 +140,10 @@ export function AddEngagementDialog({ clientId, open, onOpenChange }: Props) {
               value={years}
               onToggle={toggle}
               onSelectAll={() => {
-                setYears([...ALL_TAX_YEARS]);
-                setAmounts(Object.fromEntries(ALL_TAX_YEARS.map((y) => [y, amounts[y] || 6000])));
+                setYears([...SELECTABLE_TAX_YEARS]);
+                setAmounts(
+                  Object.fromEntries(SELECTABLE_TAX_YEARS.map((y) => [y, amounts[y] || 6000])),
+                );
               }}
               onClear={() => {
                 setYears([]);

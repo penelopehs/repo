@@ -74,6 +74,7 @@ import {
   PIPELINE_STAGES,
   EMPTY_CALCULATIONS,
   ALL_TAX_YEARS,
+  SELECTABLE_TAX_YEARS,
 } from "@/types/crm";
 import type { FollowUpCall, ProfileNote, TaxYear, TaxYearRecord, TaxYearStatus } from "@/types/crm";
 import { useUsersStore } from "@/store/usersStore";
@@ -1650,8 +1651,15 @@ function TaxHistoryPanel({
   onUpdate: (yearStatuses: Record<string, TaxYearRecord>) => Promise<void>;
 }) {
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 7 }, (_, i) => currentYear - i);
   const saved = lead.data?.yearStatuses ?? {};
+  // Years outside the selectable range that still have saved statuses or engagement
+  // records are included so historical data renders safely.
+  const legacyYears = ALL_TAX_YEARS.filter(
+    (y) => !SELECTABLE_TAX_YEARS.includes(y) && (saved[y] != null || lead.taxYears.includes(y)),
+  );
+  const years = Array.from(new Set<number>([...SELECTABLE_TAX_YEARS, ...legacyYears])).sort(
+    (a, b) => b - a,
+  );
 
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [pendingChange, setPendingChange] = useState<{
@@ -1731,7 +1739,7 @@ function TaxHistoryPanel({
         </div>
 
         {/* Year cards */}
-        <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {records.map(({ year, record }) => {
             const meta = YEAR_STATUS_META[record.status];
             return (

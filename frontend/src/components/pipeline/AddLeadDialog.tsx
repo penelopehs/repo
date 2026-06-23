@@ -30,7 +30,7 @@ import { useUsersStore } from "@/store/usersStore";
 import { userFullName } from "@/services/users";
 import { clientsApi, type ClientContactRow } from "@/services/clients";
 import { MultiYearSelect } from "@/components/MultiYearSelect";
-import { ALL_TAX_YEARS, PIPELINE_STAGES } from "@/types/crm";
+import { PIPELINE_STAGES, SELECTABLE_TAX_YEARS } from "@/types/crm";
 import { IntroCallPromptDialog } from "@/components/pipeline/IntroCallPromptDialog";
 
 const SOURCES: LeadSource[] = [
@@ -449,7 +449,7 @@ export function AddLeadDialog() {
               <MultiYearSelect
                 value={years}
                 onToggle={toggleYear}
-                onSelectAll={() => setYears([...ALL_TAX_YEARS])}
+                onSelectAll={() => setYears([...SELECTABLE_TAX_YEARS])}
                 onClear={() => setYears([])}
               />
             </Field>
