@@ -72,7 +72,7 @@ _UPDATED = text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 class User(Base):
     __tablename__ = "users"
 
-    iduser = Column(Integer, primary_key=True, autoincrement=True)
+    iduser = Column("user_id", Integer, primary_key=True, autoincrement=True)
     azure_ad_user_id = Column(String(100), unique=True, nullable=False)
     email = Column(String(255), nullable=False, unique=True)
     first_name = Column(String(50), nullable=False)
@@ -85,9 +85,9 @@ class User(Base):
 class Client(Base):
     __tablename__ = "clients"
 
-    idclients = Column(Integer, primary_key=True, autoincrement=True)
+    idclients = Column("clients_id", Integer, primary_key=True, autoincrement=True)
     client_name = Column(String(255), nullable=False)
-    client_status_idclient_status = Column(Integer, nullable=False)
+    client_status_idclient_status = Column("client_status_id", Integer, nullable=False)
     created_by = Column(Integer, nullable=True)
     updated_by = Column(Integer, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -97,7 +97,7 @@ class Client(Base):
 class ClientStatusRef(Base):
     __tablename__ = "client_status"
 
-    idclient_status = Column(Integer, primary_key=True, autoincrement=True)
+    idclient_status = Column("client_status_id", Integer, primary_key=True, autoincrement=True)
     status_name = Column(String(50), nullable=False)
     description = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
@@ -117,7 +117,7 @@ class Entity(Base):
     __tablename__ = "entities"
 
     entity_id = Column(Integer, primary_key=True, autoincrement=True)
-    clients_idclients = Column(Integer, nullable=False)
+    clients_idclients = Column("clients_id", Integer, nullable=False)
     entity_name = Column(String(255), nullable=False)
     dba = Column(String(255), nullable=True)
     state = Column(String(2), nullable=True)
@@ -139,7 +139,7 @@ class Person(Base):
 
     __tablename__ = "people"
 
-    idperson = Column(Integer, primary_key=True, autoincrement=True)
+    idperson = Column("person_id", Integer, primary_key=True, autoincrement=True)
     first_name = Column(String(100), nullable=False)
     last_name = Column(String(100), nullable=False)
     # ── new columns (managed by Alembic) ──
@@ -151,7 +151,7 @@ class PeopleEmail(Base):
     __tablename__ = "people_emails"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    people_idperson = Column(Integer, nullable=False)
+    people_idperson = Column("person_id", Integer, nullable=False)
     email = Column(String(255), nullable=False)
     is_primary = Column(Boolean, nullable=False, default=False)
 
@@ -160,7 +160,7 @@ class PeoplePhone(Base):
     __tablename__ = "people_phones"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    people_idperson = Column(Integer, nullable=False)
+    people_idperson = Column("person_id", Integer, nullable=False)
     phone = Column(String(50), nullable=False)
     is_primary = Column(Boolean, nullable=False, default=False)
 
@@ -168,31 +168,37 @@ class PeoplePhone(Base):
 class PeopleRole(Base):
     __tablename__ = "people_roles"
 
-    idroles = Column(Integer, primary_key=True, autoincrement=True)
+    idroles = Column("roles_id", Integer, primary_key=True, autoincrement=True)
     role_name = Column(String(100), nullable=False)
 
 
 class EntityPeopleRole(Base):
     __tablename__ = "entity_people_roles"
 
-    identity_people_roles = Column(Integer, primary_key=True, autoincrement=True)
-    entities_entity_id = Column(Integer, nullable=False)
-    people_idperson = Column(Integer, nullable=False)
-    roles_idroles = Column(Integer, nullable=False)
+    identity_people_roles = Column(
+        "entity_people_roles_id", Integer, primary_key=True, autoincrement=True
+    )
+    entities_entity_id = Column("entity_id", Integer, nullable=False)
+    people_idperson = Column("person_id", Integer, nullable=False)
+    roles_idroles = Column("roles_id", Integer, nullable=False)
     created_at = Column(DateTime, nullable=True)
 
 
 class EngagementTypeRef(Base):
     __tablename__ = "engagement_types"
 
-    idengagement_types = Column(Integer, primary_key=True, autoincrement=True)
+    idengagement_types = Column(
+        "engagement_types_id", Integer, primary_key=True, autoincrement=True
+    )
     engagement_type_name = Column(String(100), nullable=False)
 
 
 class EngagementStatusRef(Base):
     __tablename__ = "engagement_status"
 
-    idengagement_status = Column(Integer, primary_key=True, autoincrement=True)
+    idengagement_status = Column(
+        "engagement_status_id", Integer, primary_key=True, autoincrement=True
+    )
     status_name = Column(String(45), nullable=False)
 
 
@@ -201,11 +207,11 @@ class Engagement(Base):
 
     __tablename__ = "engagements"
 
-    idengagements = Column(Integer, primary_key=True, autoincrement=True)
-    entities_entity_id = Column(Integer, nullable=False)
+    idengagements = Column("engagements_id", Integer, primary_key=True, autoincrement=True)
+    entities_entity_id = Column("entity_id", Integer, nullable=False)
     assigned_user_id = Column(Integer, nullable=False)
-    engagement_types_idengagement_types = Column(Integer, nullable=False)
-    engagement_status_idengagement_status = Column(Integer, nullable=False)
+    engagement_types_idengagement_types = Column("engagement_types_id", Integer, nullable=False)
+    engagement_status_idengagement_status = Column("engagement_status_id", Integer, nullable=False)
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -222,7 +228,7 @@ class EngagementTaxYear(Base):
     __tablename__ = "engagement_tax_years"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    engagements_idengagements = Column(Integer, nullable=False)
+    engagements_idengagements = Column("engagements_id", Integer, nullable=False)
     tax_year = Column(YEAR, nullable=False)
 
 
@@ -234,7 +240,7 @@ class CrmLead(Base):
     crm_lead_id = Column(Integer, primary_key=True, autoincrement=True)
     epr_id = Column(
         Integer,
-        ForeignKey("entity_people_roles.identity_people_roles"),
+        ForeignKey("entity_people_roles.entity_people_roles_id"),
         nullable=True,
     )
     pipeline_status = Column(
@@ -242,14 +248,14 @@ class CrmLead(Base):
     )
     lead_source = Column(String(100), nullable=True)
     salesperson_iduser = Column(
-        Integer, ForeignKey("users.iduser"), nullable=True
+        "salesperson_id", Integer, ForeignKey("users.user_id"), nullable=True
     )
     # Optional assignments (extra staff attached to the lead).
     sales_manager_iduser = Column(
-        Integer, ForeignKey("users.iduser"), nullable=True
+        "sales_manager_id", Integer, ForeignKey("users.user_id"), nullable=True
     )
     training_manager_iduser = Column(
-        Integer, ForeignKey("users.iduser"), nullable=True
+        "training_manager_id", Integer, ForeignKey("users.user_id"), nullable=True
     )
     first_name = Column(String(255), nullable=False)
     last_name = Column(String(255), nullable=False)
@@ -268,7 +274,9 @@ class CrmLead(Base):
 class CrmIntakeQuestion(Base):
     __tablename__ = "crm_intake_questions"
 
-    idcrm_intake_question = Column(Integer, primary_key=True, autoincrement=True)
+    idcrm_intake_question = Column(
+        "crm_intake_question_id", Integer, primary_key=True, autoincrement=True
+    )
     crm_leads_id = Column(
         Integer,
         ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
@@ -286,7 +294,9 @@ class CrmIntakeNote(Base):
 
     __tablename__ = "crm_intake_notes"
 
-    idcrm_intake_note = Column(Integer, primary_key=True, autoincrement=True)
+    idcrm_intake_note = Column(
+        "crm_intake_note_id", Integer, primary_key=True, autoincrement=True
+    )
     crm_leads_id = Column(
         Integer,
         ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
@@ -294,7 +304,7 @@ class CrmIntakeNote(Base):
     )
     note = Column(Text, nullable=False)
     created_by_iduser = Column(
-        Integer, ForeignKey("users.iduser"), nullable=True
+        "created_by_id", Integer, ForeignKey("users.user_id"), nullable=True
     )
     created_at = Column(DateTime, nullable=False, server_default=_CREATED)
     updated_at = Column(DateTime, nullable=False, server_default=_UPDATED)
@@ -305,7 +315,9 @@ class CrmIntakeNote(Base):
 class CrmFollowUpCall(Base):
     __tablename__ = "crm_follow_up_calls"
 
-    idcrm_follow_up_call = Column(Integer, primary_key=True, autoincrement=True)
+    idcrm_follow_up_call = Column(
+        "crm_follow_up_call_id", Integer, primary_key=True, autoincrement=True
+    )
     crm_leads_id = Column(
         Integer,
         ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
@@ -324,7 +336,9 @@ class CrmFollowUpCall(Base):
 class CrmFeasibilityCall(Base):
     __tablename__ = "crm_feasibility_calls"
 
-    idcrm_feasibility_call = Column(Integer, primary_key=True, autoincrement=True)
+    idcrm_feasibility_call = Column(
+        "crm_feasibility_call_id", Integer, primary_key=True, autoincrement=True
+    )
     crm_leads_id = Column(
         Integer,
         ForeignKey("crm_leads.crm_lead_id", ondelete="CASCADE"),
