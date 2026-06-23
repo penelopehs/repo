@@ -110,6 +110,17 @@ export function ProfilePage({ id }: { id: string }) {
     () => (routeLead ? getClientCluster(routeLead, allLeads) : []),
     [routeLead, allLeads],
   );
+  // `cluster` is rebuilt from the leads store, so its array (and member object)
+  // identity churns whenever any fetch below writes to a store. Depend on a
+  // referentially-stable list of member ids — keyed off the joined id string —
+  // so the hydration effects fire on membership changes only, not on every
+  // store write (which would loop: fetchLead → store update → new `cluster`
+  // reference → effect re-runs → fetchLead → …).
+  const clusterIdsKey = cluster.map((l) => l.id).join(",");
+  const clusterMemberIds = useMemo(
+    () => (clusterIdsKey ? clusterIdsKey.split(",") : []),
+    [clusterIdsKey],
+  );
   const canonicalId = useMemo(
     () => (routeLead ? canonicalLeadId(routeLead, allLeads) : id),
     [routeLead, allLeads, id],
@@ -275,26 +286,26 @@ export function ProfilePage({ id }: { id: string }) {
   }, [id, routeLead, fetchLead]);
 
   useEffect(() => {
-    for (const member of cluster) {
-      void fetchLead(member.id);
+    for (const memberId of clusterMemberIds) {
+      void fetchLead(memberId);
     }
-  }, [cluster, fetchLead]);
+  }, [clusterMemberIds, fetchLead]);
 
   useEffect(() => {
     void ensureUsers();
   }, [ensureUsers]);
 
   useEffect(() => {
-    for (const member of cluster) {
-      void fetchCalls(member.id);
+    for (const memberId of clusterMemberIds) {
+      void fetchCalls(memberId);
     }
-  }, [cluster, fetchCalls]);
+  }, [clusterMemberIds, fetchCalls]);
 
   useEffect(() => {
-    for (const member of cluster) {
-      void fetchIntakeNotes(member.id);
+    for (const memberId of clusterMemberIds) {
+      void fetchIntakeNotes(memberId);
     }
-  }, [cluster, fetchIntakeNotes]);
+  }, [clusterMemberIds, fetchIntakeNotes]);
 
   useEffect(() => {
     const now = new Date();
