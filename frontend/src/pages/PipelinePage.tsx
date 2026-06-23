@@ -52,6 +52,7 @@ import type { Lead, LeadStatus } from "@/types/crm";
 import { PIPELINE_STAGES } from "@/types/crm";
 import { formatDate, formatLocalDate } from "@/utils/format";
 import { buildCalculationSearch, hasExistingCalculation } from "@/utils/calculationContext";
+import { canonicalLeadId } from "@/utils/clientIdentity";
 import { cn } from "@/lib/utils";
 
 type KpiFilter = LeadStatus | "total" | null;
@@ -140,7 +141,10 @@ export function PipelinePage() {
   const goCalc = (l: Lead) => {
     navigate({ to: "/calculator", search: buildCalculationSearch(l) as never });
   };
-  const goProfile = (l: Lead) => navigate({ to: "/clients/$id", params: { id: l.id } });
+  const goProfile = (l: Lead) => {
+    const targetId = canonicalLeadId(l, leads);
+    navigate({ to: "/clients/$id", params: { id: targetId } });
+  };
 
   const onSort = (f: SortField) => {
     if (f === sortField) setSortDir((d) => (d === "asc" ? "desc" : "asc"));

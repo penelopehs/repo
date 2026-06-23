@@ -70,6 +70,12 @@ import { formatCurrency, formatDate, formatLocalDate, formatTime } from "@/utils
 import { cn } from "@/lib/utils";
 import { buildCalculationSearch } from "@/utils/calculationContext";
 import {
+  canonicalLeadId,
+  clientRecordSnapshots,
+  getClientCluster,
+  mergeLeadsForDisplay,
+} from "@/utils/clientIdentity";
+import {
   pipelineStageIndex,
   PIPELINE_STAGES,
   EMPTY_CALCULATIONS,
@@ -90,24 +96,55 @@ const CALL_STEPS = [
   { title: "Close Call", noun: "close call" },
 ] as const;
 
-// Stable empty reference so the zustand selector below doesn't return a fresh
-// array on every read (which would make useSyncExternalStore loop forever).
-const NO_CALLS: FollowUpCall[] = [];
-const NO_NOTES: ProfileNote[] = [];
-
 export function ProfilePage({ id }: { id: string }) {
   const me = useUsersStore((s) => s.me);
   const ensureUsers = useUsersStore((s) => s.ensureLoaded);
-  const lead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
+  const allLeads = useLeadsStore((s) => s.leads);
+  const routeLead = useLeadsStore((s) => s.leads.find((l) => l.id === id));
   const updateLead = useLeadsStore((s) => s.updateLead);
   const fetchLead = useLeadsStore((s) => s.fetchLead);
+  const callsByLead = useFollowUpCallsStore((s) => s.byLead);
+  const notesByLead = useIntakeNotesStore((s) => s.byLead);
+
+  const cluster = useMemo(
+    () => (routeLead ? getClientCluster(routeLead, allLeads) : []),
+    [routeLead, allLeads],
+  );
+  const canonicalId = useMemo(
+    () => (routeLead ? canonicalLeadId(routeLead, allLeads) : id),
+    [routeLead, allLeads, id],
+  );
+  const lead = useMemo(() => {
+    if (!routeLead) return undefined;
+    if (cluster.length <= 1) return routeLead;
+    return mergeLeadsForDisplay(cluster, canonicalId);
+  }, [routeLead, cluster, canonicalId]);
+  const primaryLead = useMemo(
+    () => cluster.find((l) => l.id === canonicalId) ?? routeLead,
+    [cluster, canonicalId, routeLead],
+  );
+  const recordSnapshots = useMemo(() => clientRecordSnapshots(cluster), [cluster]);
+  const clusterReps = useMemo(
+    () => [...new Set(recordSnapshots.map((r) => r.rep).filter(Boolean))],
+    [recordSnapshots],
+  );
+
   // Start in the loading state when the lead isn't already cached, so a direct
   // load shows a spinner rather than a flash of "Client not found".
-  const [leadLoading, setLeadLoading] = useState(!lead);
-  const calls = useFollowUpCallsStore((s) => s.byLead[id] ?? NO_CALLS);
+  const [leadLoading, setLeadLoading] = useState(!routeLead);
+  const calls = useMemo(
+    () => cluster.flatMap((l) => callsByLead[l.id] ?? []),
+    [cluster, callsByLead],
+  );
+  const intakeNotes = useMemo(
+    () =>
+      cluster
+        .flatMap((l) => notesByLead[l.id] ?? [])
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [cluster, notesByLead],
+  );
   const fetchCalls = useFollowUpCallsStore((s) => s.fetch);
   const updateCall = useFollowUpCallsStore((s) => s.update);
-  const intakeNotes = useIntakeNotesStore((s) => s.byLead[id] ?? NO_NOTES);
   const fetchIntakeNotes = useIntakeNotesStore((s) => s.fetch);
   const addIntakeNote = useIntakeNotesStore((s) => s.add);
   const updateIntakeNote = useIntakeNotesStore((s) => s.update);
@@ -171,7 +208,7 @@ export function ProfilePage({ id }: { id: string }) {
     if (!text || savingNote) return;
     setSavingNote(true);
     try {
-      await addIntakeNote(id, text);
+      await addIntakeNote(canonicalId, text);
       setNewNote("");
       flashNoteSaved();
     } catch {
@@ -196,7 +233,7 @@ export function ProfilePage({ id }: { id: string }) {
     if (!text || savingNote) return;
     setSavingNote(true);
     try {
-      await updateIntakeNote(id, noteId, text);
+      await updateIntakeNote(canonicalId, noteId, text);
       cancelEditNote();
       flashNoteSaved();
     } catch {
@@ -209,7 +246,7 @@ export function ProfilePage({ id }: { id: string }) {
   const handleDeleteNote = async (noteId: string) => {
     if (!window.confirm("Delete this note?")) return;
     try {
-      await removeIntakeNote(id, noteId);
+      await removeIntakeNote(canonicalId, noteId);
       if (editingNoteId === noteId) cancelEditNote();
       flashNoteSaved();
     } catch {
@@ -221,39 +258,55 @@ export function ProfilePage({ id }: { id: string }) {
   // afterwards, so the Call Progress / status badge (driven off the lead) and
   // the call's own completed flag stay in sync.
   const handleToggleCallComplete = async (call: FollowUpCall) => {
-    await updateCall(id, call.id, { completed: !call.completed });
+    const ownerId =
+      cluster.find((l) => (callsByLead[l.id] ?? []).some((c) => c.id === call.id))?.id ??
+      canonicalId;
+    await updateCall(ownerId, call.id, { completed: !call.completed });
   };
 
   const engagements = useMemo(() => lead?.engagements ?? [], [lead?.engagements]);
 
   // Hydrate the lead on a direct page load (the pipeline list may not be in memory).
   useEffect(() => {
-    if (!lead) {
+    if (!routeLead) {
       setLeadLoading(true);
       void fetchLead(id).finally(() => setLeadLoading(false));
     }
-  }, [id, lead, fetchLead]);
+  }, [id, routeLead, fetchLead]);
+
+  useEffect(() => {
+    for (const member of cluster) {
+      void fetchLead(member.id);
+    }
+  }, [cluster, fetchLead]);
 
   useEffect(() => {
     void ensureUsers();
   }, [ensureUsers]);
 
   useEffect(() => {
-    void fetchCalls(id);
-  }, [fetchCalls, id]);
+    for (const member of cluster) {
+      void fetchCalls(member.id);
+    }
+  }, [cluster, fetchCalls]);
 
   useEffect(() => {
-    void fetchIntakeNotes(id);
-  }, [fetchIntakeNotes, id]);
+    for (const member of cluster) {
+      void fetchIntakeNotes(member.id);
+    }
+  }, [cluster, fetchIntakeNotes]);
 
   useEffect(() => {
     const now = new Date();
     calls.forEach((c) => {
       if (!c.completed && new Date(`${c.date}T${c.time}`) < now) {
-        void updateCall(id, c.id, { completed: true });
+        const ownerId =
+          cluster.find((l) => (callsByLead[l.id] ?? []).some((x) => x.id === c.id))?.id ??
+          canonicalId;
+        void updateCall(ownerId, c.id, { completed: true });
       }
     });
-  }, [calls, updateCall, id]);
+  }, [calls, updateCall, cluster, callsByLead, canonicalId]);
 
   const chartData = useMemo(() => {
     const map = new Map<number, number>();
@@ -389,7 +442,7 @@ export function ProfilePage({ id }: { id: string }) {
       e.id === editingEntityId ? { ...e, name: newName } : e,
     );
     try {
-      await updateLead(id, {
+      await updateLead(canonicalId, {
         data: {
           ...lead.data,
           entities: updatedEntities,
@@ -436,7 +489,7 @@ export function ProfilePage({ id }: { id: string }) {
 
     const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
     try {
-      await updateLead(id, {
+      await updateLead(canonicalId, {
         data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
       });
       resetContactForm();
@@ -457,7 +510,7 @@ export function ProfilePage({ id }: { id: string }) {
     }
     const base = lead.data ?? { people: [], entities: [], calculations: EMPTY_CALCULATIONS };
     try {
-      await updateLead(id, {
+      await updateLead(canonicalId, {
         data: { ...base, people: nextPeople, entityPeople: nextEntityPeople },
       });
       resetContactForm();
@@ -532,7 +585,7 @@ export function ProfilePage({ id }: { id: string }) {
             calculations[String(year)] =
               Array.isArray(existing) && existing.length > 0 ? existing : masterCards;
           }
-          await updateLead(id, { data: { ...base, yearStatuses, calculations } });
+          await updateLead(canonicalId, { data: { ...base, yearStatuses, calculations } });
         }}
       />
 
@@ -668,7 +721,7 @@ export function ProfilePage({ id }: { id: string }) {
                             onClick={() =>
                               navigate({
                                 to: "/clients/$id/feasibility-call",
-                                params: { id },
+                                params: { id: canonicalId },
                                 search: { callId: undefined },
                               })
                             }
@@ -706,6 +759,34 @@ export function ProfilePage({ id }: { id: string }) {
                 icon={<Phone className="h-3 w-3" />}
               />
               <Info label="Email" value={lead.email} icon={<Mail className="h-3 w-3" />} />
+              {recordSnapshots.length > 1 && (
+                <>
+                  <Info
+                    label="Engagement Years (all records)"
+                    value={recordSnapshots
+                      .map((r) => (r.taxYears.length ? r.taxYears.join(", ") : "—"))
+                      .join(" · ")}
+                  />
+                  <Info
+                    label="Representatives (all records)"
+                    value={[...new Set(recordSnapshots.map((r) => r.rep))].join(", ")}
+                  />
+                  <Info
+                    label="Latest Calculations (all records)"
+                    value={recordSnapshots
+                      .map((r) => (r.latestCalculation === "—" ? "—" : formatDate(r.latestCalculation)))
+                      .join(" · ")}
+                  />
+                  <Info
+                    label="Next Calls (all records)"
+                    value={recordSnapshots.map((r) => r.nextCallLabel).join(" · ")}
+                  />
+                  <Info
+                    label="Added Dates (all records)"
+                    value={recordSnapshots.map((r) => formatLocalDate(r.addedAt)).join(" · ")}
+                  />
+                </>
+              )}
             </div>
             <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1023,7 +1104,9 @@ export function ProfilePage({ id }: { id: string }) {
                     .slice(0, 2)}
                 </div>
                 <div>
-                  <p className="font-semibold text-navy">{lead.rep}</p>
+                  <p className="font-semibold text-navy">
+                    {clusterReps.length > 1 ? clusterReps.join(", ") : lead.rep}
+                  </p>
                   <p className="text-xs text-muted-foreground">Senior Sales Representative</p>
                 </div>
               </div>
@@ -1369,7 +1452,7 @@ export function ProfilePage({ id }: { id: string }) {
                 onClick={() =>
                   navigate({
                     to: "/clients/$id/feasibility-call",
-                    params: { id },
+                    params: { id: canonicalId },
                     search: { callId: "new" },
                   })
                 }
@@ -1389,7 +1472,7 @@ export function ProfilePage({ id }: { id: string }) {
                 onClick={() =>
                   navigate({
                     to: "/clients/$id/feasibility-call",
-                    params: { id },
+                    params: { id: canonicalId },
                     search: { callId: undefined },
                   })
                 }
@@ -1494,7 +1577,7 @@ export function ProfilePage({ id }: { id: string }) {
       </div>
 
       <ScheduleCallDialog
-        clientId={id}
+        clientId={canonicalId}
         call={editingCall}
         defaultCallType={
           !editingCall && !calls.some((c) => c.callType === "intro_call") ? "Intro Call" : undefined
@@ -1505,7 +1588,7 @@ export function ProfilePage({ id }: { id: string }) {
           if (!o) setEditingCall(null);
         }}
       />
-      <EditClientDialog lead={lead} open={openEdit} onOpenChange={setOpenEdit} />
+      <EditClientDialog lead={primaryLead ?? lead} open={openEdit} onOpenChange={setOpenEdit} />
     </div>
   );
 }
