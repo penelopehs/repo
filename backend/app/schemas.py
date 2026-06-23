@@ -118,6 +118,12 @@ class LeadUpdate(BaseModel):
     data: Optional[Any] = None
 
 
+class NextCallInfo(BaseModel):
+    date: date
+    time: Optional[str] = None
+    call_type: Optional[str] = None
+
+
 class LeadListItem(BaseModel):
     id: int
     company: Optional[str] = None
@@ -177,12 +183,6 @@ class EngagementRead(BaseModel):
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     tax_years: List[int] = Field(default_factory=list)
-
-
-class NextCallInfo(BaseModel):
-    date: date
-    time: Optional[str] = None
-    call_type: Optional[str] = None
 
 
 class FollowUpCallRead(BaseModel):
